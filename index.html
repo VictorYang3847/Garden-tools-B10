@@ -3,333 +3,311 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>绿篱机 B10 寿命计算器</title>
+    <title>B10 可靠性工具 — 园林电动工具</title>
     <link rel="stylesheet" href="css/styles.css" />
   </head>
   <body>
     <header>
-      <h1>
-        绿篱机 B10 寿命计算器
-        <span class="badge">锂电 · v1.0</span>
-      </h1>
-      <p>基于 Weibull 模型 — 保修目标反推 · 零件串联合成 · 保修末失效率验证</p>
+      <div class="header-top">
+        <div>
+          <h1>
+            B10 可靠性工具
+            <span class="badge">绿篱机 · v2.0</span>
+          </h1>
+          <p>产品定义 → 测试规划 → 结果分析</p>
+        </div>
+        <div class="toolbar">
+          <label class="toolbar-label">
+            项目
+            <select id="project-select"></select>
+          </label>
+          <button type="button" id="new-project" class="btn-sm">+ 项目</button>
+          <label class="toolbar-label">
+            型号
+            <select id="model-select"></select>
+          </label>
+          <button type="button" id="new-model" class="btn-sm">+ 型号</button>
+          <button type="button" id="export-data" class="btn-sm btn-ghost">导出</button>
+          <button type="button" id="import-btn" class="btn-sm btn-ghost">导入</button>
+          <input type="file" id="import-file" accept=".json" hidden />
+        </div>
+      </div>
+      <nav class="nav-tabs">
+        <a href="#/definition" class="nav-tab" data-page="definition">产品定义</a>
+        <a href="#/planning" class="nav-tab" data-page="planning">测试规划</a>
+        <a href="#/analysis" class="nav-tab" data-page="analysis">结果分析</a>
+      </nav>
     </header>
 
     <main>
-      <form id="calc-form">
-        <!-- 1. 产品基本信息 -->
-        <section>
-          <h2><span class="num">1</span> 产品基本信息</h2>
-          <div class="grid">
-            <label>
-              产品型号 / 项目代号
-              <input type="text" name="model" required placeholder="HT-550-Li" />
-            </label>
-            <label>
-              额定电压 (V)
-              <input type="number" name="voltage" min="1" step="0.1" required />
-            </label>
-            <label>
-              额定功率 (W)
-              <input type="number" name="power" min="0" step="1" />
-            </label>
-            <label>
-              刀片类型
-              <select name="bladeType">
-                <option value="single">单刃往复</option>
-                <option value="double">双刃往复</option>
-              </select>
-            </label>
-            <label>
-              刀片有效长度 (mm)
-              <input type="number" name="bladeLength" min="0" step="1" />
-            </label>
-            <label>
-              最大冲程频率 (次/min)
-              <input type="number" name="strokeRate" min="0" step="1" />
-            </label>
-          </div>
-          <p class="hint">动力类型固定为锂电，整机 B10 含刀片组件。</p>
-        </section>
-
-        <!-- 2. 应用场景 -->
-        <section>
-          <h2><span class="num">2</span> 应用场景（自行定义）</h2>
-          <div class="grid">
-            <label>
-              场景名称
-              <input type="text" name="scenarioName" required placeholder="欧洲家用" />
-            </label>
-            <label>
-              年均使用时间 (h/年)
-              <input type="number" name="hoursPerYear" min="0.1" step="0.1" required />
-            </label>
-            <label>
-              典型 Duty cycle (%)
-              <input type="number" name="dutyCycle" min="0" max="100" step="1" />
-            </label>
-            <label>
-              单次典型连续运行 (min)
-              <input type="number" name="continuousRunMin" min="0" step="1" />
-            </label>
-            <label class="grid-full">
-              场景说明
-              <textarea name="scenarioNote" rows="2" placeholder="可选备注"></textarea>
-            </label>
-          </div>
-        </section>
-
-        <!-- 3. 保修与目标 -->
-        <section>
-          <h2><span class="num">3</span> 保修与可靠性目标</h2>
-          <div class="grid">
-            <label>
-              保修年限 (年)
-              <input type="number" name="warrantyYears" min="0.1" step="0.1" required />
-            </label>
-            <label>
-              保修期末累计时间 (h)
-              <span class="readonly-value" id="warranty-hours-display">—</span>
-            </label>
-            <label>
-              保修期末可接受失效率 (%)
-              <input
-                type="number"
-                name="acceptableFailureRate"
-                min="0.01"
-                max="99"
-                step="0.01"
-                required
-              />
-            </label>
-            <label>
-              设计目标置信度
-              <select name="confidence" id="confidence">
-                <option value="90">90%</option>
-                <option value="95">95%</option>
-              </select>
-            </label>
-            <label>
-              目标 B10 安全余量 (%)
-              <input type="number" name="safetyMargin" id="safety-margin" min="0" step="1" />
-            </label>
-            <label>
-              Weibull 形状参数 β
-              <input type="number" name="beta" min="0.5" max="10" step="0.1" required />
-            </label>
-          </div>
-          <p class="hint">β 默认 2.0（磨损型）；置信度 90% → 余量 20%，95% → 30%。</p>
-        </section>
-
-        <!-- 4. 失效判据 -->
-        <section>
-          <h2><span class="num">4</span> 整机失效判据</h2>
-          <div class="grid">
-            <label>
-              失效定义
-              <select name="failureDefinition">
-                <option value="dead">完全无法工作</option>
-                <option value="performance">性能低于阈值</option>
-              </select>
-            </label>
-            <label>
-              性能衰减阈值 (%)
-              <input type="number" name="performanceThreshold" min="1" max="99" step="1" />
-            </label>
-          </div>
-          <p class="hint">失效判据用于报告记录；计算模型使用 Weibull B10 串联合成。</p>
-        </section>
-
-        <!-- 5. 零件 B10 -->
-        <section>
-          <h2><span class="num">5</span> 零件 B10（手动输入）</h2>
-
-          <div class="part-card">
-            <h3>
-              电机
-              <label class="fixed">
-                <input type="checkbox" name="motorIncluded" checked /> 纳入整机
-              </label>
-            </h3>
-            <div class="grid">
-              <label>
-                目标 B10 (h)
-                <input type="number" name="motorB10" min="0" step="1" required />
-              </label>
-              <label>
-                电机类型
-                <select name="motorType">
-                  <option value="brushed">有刷</option>
-                  <option value="brushless">无刷</option>
-                </select>
-              </label>
+      <!-- ========== 页面 1：产品定义 ========== -->
+      <div id="page-definition" class="page">
+        <form id="definition-form" class="definition-layout" onsubmit="return false">
+          <!-- A 区：计算相关 -->
+          <div class="panel panel-calc">
+            <div class="panel-header">
+              <h2>计算相关</h2>
+              <p>影响 B10 目标与测试标准的输入</p>
             </div>
-          </div>
 
-          <div class="part-card">
-            <h3>
-              电池包
-              <label class="fixed">
-                <input type="checkbox" name="batteryIncluded" checked /> 纳入整机
-              </label>
-            </h3>
-            <div class="grid">
-              <label>
-                目标 B10 (循环次数)
-                <input type="number" name="batteryCycles" id="battery-cycles" min="0" step="1" required />
-              </label>
-              <label>
-                每次使用平均时长 (h)
-                <input
-                  type="number"
-                  name="batteryHoursPerCycle"
-                  id="battery-hours-per-cycle"
-                  min="0"
-                  step="0.01"
-                  required
-                />
-              </label>
-              <label>
-                等效 B10 (h)
-                <span class="readonly-value"><span id="battery-equiv">—</span> h</span>
-              </label>
-              <label>
-                电芯容量 (Ah)
-                <input type="number" name="batteryCapacity" min="0" step="0.1" />
-              </label>
+            <section>
+              <h3>使用场景</h3>
+              <div class="grid">
+                <label>
+                  场景名称
+                  <input type="text" name="scenarioName" required placeholder="欧洲家用" />
+                </label>
+                <label>
+                  年均使用时间 (h/年)
+                  <input type="number" name="hoursPerYear" min="0.1" step="0.1" required />
+                </label>
+                <label>
+                  典型 Duty cycle (%)
+                  <input type="number" name="dutyCycle" min="0" max="100" step="1" />
+                </label>
+                <label>
+                  单次典型连续运行 (min)
+                  <input type="number" name="continuousRunMin" min="0" step="1" />
+                </label>
+                <label class="grid-full">
+                  场景说明
+                  <textarea name="scenarioNote" rows="2" placeholder="可选"></textarea>
+                </label>
+              </div>
+            </section>
+
+            <section>
+              <h3>保修与可靠性目标</h3>
+              <div class="grid">
+                <label>
+                  保修年限 (年)
+                  <input type="number" name="warrantyYears" min="0.1" step="0.1" required />
+                </label>
+                <label>
+                  保修期末累计时间 (h)
+                  <span class="readonly-value" id="warranty-hours-display">—</span>
+                </label>
+                <label>
+                  保修期末可接受失效率 (%)
+                  <input type="number" name="acceptableFailureRate" min="0.01" max="99" step="0.01" required />
+                </label>
+                <label>
+                  设计目标置信度
+                  <select name="confidence">
+                    <option value="90">90%</option>
+                    <option value="95">95%</option>
+                  </select>
+                </label>
+                <label>
+                  目标 B10 安全余量 (%)
+                  <input type="number" name="safetyMargin" min="0" step="1" />
+                </label>
+                <label>
+                  Weibull 形状参数 β
+                  <input type="number" name="beta" min="0.5" max="10" step="0.1" required />
+                </label>
+              </div>
+            </section>
+
+            <section>
+              <h3>整机失效判据</h3>
+              <div class="grid">
+                <label>
+                  失效定义
+                  <select name="failureDefinition">
+                    <option value="dead">完全无法工作</option>
+                    <option value="performance">性能低于阈值</option>
+                  </select>
+                </label>
+                <label>
+                  性能衰减阈值 (%)
+                  <input type="number" name="performanceThreshold" min="1" max="99" step="1" />
+                </label>
+              </div>
+              <p class="hint">整机 B10 含刀片组件（锂电绿篱机）。</p>
+            </section>
+
+            <section>
+              <h3>各零件目标 B10</h3>
+
+              <div class="part-card">
+                <h4>
+                  电机
+                  <label class="fixed"><input type="checkbox" name="motorIncluded" checked /> 纳入整机</label>
+                </h4>
+                <div class="grid">
+                  <label>目标 B10 (h) <input type="number" name="motorB10" min="0" step="1" required /></label>
+                  <label>
+                    电机类型
+                    <select name="motorType"><option value="brushed">有刷</option><option value="brushless">无刷</option></select>
+                  </label>
+                </div>
+              </div>
+
+              <div class="part-card">
+                <h4>
+                  电池包
+                  <label class="fixed"><input type="checkbox" name="batteryIncluded" checked /> 纳入整机</label>
+                </h4>
+                <div class="grid">
+                  <label>目标 B10 (循环) <input type="number" name="batteryCycles" min="0" step="1" required /></label>
+                  <label>每次使用平均 (h) <input type="number" name="batteryHoursPerCycle" min="0" step="0.01" required /></label>
+                  <label>等效 B10 (h) <span class="readonly-value"><span id="battery-equiv">—</span> h</span></label>
+                  <label>电芯容量 (Ah) <input type="number" name="batteryCapacity" min="0" step="0.1" /></label>
+                </div>
+              </div>
+
+              <div class="part-card">
+                <h4>
+                  齿轮箱 / 传动
+                  <label class="fixed"><input type="checkbox" name="gearboxIncluded" checked /> 纳入整机</label>
+                </h4>
+                <div class="grid">
+                  <label>目标 B10 (h) <input type="number" name="gearboxB10" min="0" step="1" required /></label>
+                </div>
+              </div>
+
+              <div class="part-card">
+                <h4>
+                  刀片组件
+                  <label class="fixed"><input type="checkbox" name="bladeIncluded" checked /> 纳入整机</label>
+                </h4>
+                <div class="grid">
+                  <label>目标 B10 (h) <input type="number" name="bladeB10" min="0" step="1" required /></label>
+                  <label>材质 <input type="text" name="bladeMaterial" placeholder="SK5" /></label>
+                </div>
+              </div>
+
+              <div class="part-card">
+                <h4>
+                  轴承
+                  <label class="fixed"><input type="checkbox" name="bearingIncluded" checked /> 纳入整机</label>
+                </h4>
+                <div class="grid">
+                  <label>目标 B10 (h) <input type="number" name="bearingB10" min="0" step="1" required /></label>
+                  <label>轴承型号 <input type="text" name="bearingModel" placeholder="可选" /></label>
+                </div>
+              </div>
+            </section>
+
+            <div class="actions">
+              <button type="button" id="def-calculate" class="btn-primary">计算测试标准</button>
+              <button type="button" id="def-save" class="btn-secondary">保存</button>
+              <button type="button" id="def-reset" class="btn-ghost">恢复默认</button>
             </div>
+
+            <section id="definition-results" hidden>
+              <h3>测试标准计算结果</h3>
+              <div id="status-banner" class="status-banner"></div>
+              <div class="metrics">
+                <div class="metric">
+                  <div class="metric-label">目标整机 B10（含余量）</div>
+                  <div class="metric-value"><span id="result-target-b10">—</span><span class="metric-unit">h</span></div>
+                </div>
+                <div class="metric">
+                  <div class="metric-label">零件合成 B10</div>
+                  <div class="metric-value"><span id="result-parts-b10">—</span><span class="metric-unit">h</span></div>
+                </div>
+                <div class="metric">
+                  <div class="metric-label">瓶颈零件</div>
+                  <div class="metric-value" style="font-size:1rem" id="result-bottleneck">—</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-label">目标差距</div>
+                  <div class="metric-value" id="result-gap">—</div>
+                  <div class="metric-unit">h</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-label">保修末预测失效率</div>
+                  <div class="metric-value" id="result-f-warranty">—</div>
+                </div>
+              </div>
+              <div class="sub-metrics">
+                <div>保修累计 <strong><span id="result-tw">—</span> h</strong></div>
+                <div>反推 B10（无余量） <strong><span id="result-b10-calc">—</span> h</strong></div>
+                <div>达标最低（无余量） <strong><span id="result-min-no-margin">—</span> h</strong></div>
+                <div>达标最低（含余量） <strong><span id="result-min-with-margin">—</span> h</strong></div>
+              </div>
+              <div class="chart-title">零件 B10 对比</div>
+              <div id="chart-bars"></div>
+              <div class="actions">
+                <button type="button" id="copy-summary" class="btn-secondary">复制测试标准摘要</button>
+              </div>
+            </section>
           </div>
 
-          <div class="part-card">
-            <h3>
-              齿轮箱 / 传动
-              <label class="fixed">
-                <input type="checkbox" name="gearboxIncluded" checked /> 纳入整机
-              </label>
-            </h3>
-            <div class="grid">
-              <label>
-                目标 B10 (h)
-                <input type="number" name="gearboxB10" min="0" step="1" required />
-              </label>
+          <!-- B 区：产品记录 -->
+          <div class="panel panel-record">
+            <div class="panel-header">
+              <h2>产品记录</h2>
+              <p>不参与计算，用于报告与追溯</p>
             </div>
+
+            <section>
+              <div class="grid">
+                <label>
+                  型号名称
+                  <input type="text" name="modelName" required placeholder="HT-550-Li" />
+                </label>
+                <label>
+                  项目代号
+                  <input type="text" name="projectCode" placeholder="可选" />
+                </label>
+                <label>
+                  额定电压 (V)
+                  <input type="number" name="voltage" min="1" step="0.1" required />
+                </label>
+                <label>
+                  额定功率 (W)
+                  <input type="number" name="power" min="0" step="1" />
+                </label>
+                <label>
+                  刀片类型
+                  <select name="bladeType">
+                    <option value="single">单刃往复</option>
+                    <option value="double">双刃往复</option>
+                  </select>
+                </label>
+                <label>
+                  刀片有效长度 (mm)
+                  <input type="number" name="bladeLength" min="0" step="1" />
+                </label>
+                <label>
+                  最大冲程频率 (次/min)
+                  <input type="number" name="strokeRate" min="0" step="1" />
+                </label>
+                <label class="grid-full">
+                  动力类型
+                  <span class="readonly-value">锂电（固定）</span>
+                </label>
+              </div>
+            </section>
+
+            <section>
+              <h3>报告信息</h3>
+              <div class="grid">
+                <label>
+                  分析人
+                  <input type="text" name="analyst" placeholder="可选" />
+                </label>
+                <label class="grid-full">
+                  备注
+                  <textarea name="note" rows="4" placeholder="方案版本、变更说明…"></textarea>
+                </label>
+              </div>
+            </section>
           </div>
+        </form>
+      </div>
 
-          <div class="part-card">
-            <h3>
-              刀片组件
-              <label class="fixed">
-                <input type="checkbox" name="bladeIncluded" checked /> 纳入整机
-              </label>
-            </h3>
-            <div class="grid">
-              <label>
-                目标 B10 (h)
-                <input type="number" name="bladeB10" min="0" step="1" required />
-              </label>
-              <label>
-                材质
-                <input type="text" name="bladeMaterial" placeholder="SK5" />
-              </label>
-            </div>
-          </div>
+      <!-- ========== 页面 2：测试规划（Phase 2 骨架） ========== -->
+      <div id="page-planning" class="page" hidden></div>
 
-          <div class="part-card">
-            <h3>
-              轴承
-              <label class="fixed">
-                <input type="checkbox" name="bearingIncluded" checked /> 纳入整机
-              </label>
-            </h3>
-            <div class="grid">
-              <label>
-                目标 B10 (h)
-                <input type="number" name="bearingB10" min="0" step="1" required />
-              </label>
-              <label>
-                轴承型号
-                <input type="text" name="bearingModel" placeholder="可选" />
-              </label>
-            </div>
-          </div>
-        </section>
-
-        <!-- 6. 元数据 -->
-        <section>
-          <h2><span class="num">6</span> 报告信息</h2>
-          <div class="grid">
-            <label>
-              分析人
-              <input type="text" name="analyst" placeholder="可选" />
-            </label>
-            <label class="grid-full">
-              备注
-              <textarea name="note" rows="2" placeholder="方案版本、变更说明等"></textarea>
-            </label>
-          </div>
-        </section>
-
-        <div class="actions">
-          <button type="submit" class="btn-primary">计算 B10</button>
-          <button type="button" id="reset-defaults" class="btn-ghost">恢复默认值</button>
-        </div>
-      </form>
-
-      <!-- 结果 -->
-      <section id="results" hidden>
-        <h2>计算结果</h2>
-
-        <div id="status-banner" class="status-banner"></div>
-
-        <div class="metrics">
-          <div class="metric">
-            <div class="metric-label">目标整机 B10（含余量）</div>
-            <div class="metric-value">
-              <span id="result-target-b10">—</span>
-              <span class="metric-unit">h</span>
-            </div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">零件合成 B10</div>
-            <div class="metric-value">
-              <span id="result-parts-b10">—</span>
-              <span class="metric-unit">h</span>
-            </div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">瓶颈零件</div>
-            <div class="metric-value" style="font-size: 1rem" id="result-bottleneck">—</div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">目标差距</div>
-            <div class="metric-value" id="result-gap">—</div>
-            <div class="metric-unit">h（合成 − 目标）</div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">保修末预测失效率</div>
-            <div class="metric-value" id="result-f-warranty">—</div>
-          </div>
-        </div>
-
-        <div class="sub-metrics">
-          <div>保修累计时间 <strong><span id="result-tw">—</span> h</strong></div>
-          <div>反推 B10（无余量） <strong><span id="result-b10-calc">—</span> h</strong></div>
-          <div>达标最低 B10（无余量） <strong><span id="result-min-no-margin">—</span> h</strong></div>
-          <div>达标最低 B10（含余量） <strong><span id="result-min-with-margin">—</span> h</strong></div>
-        </div>
-
-        <div class="chart-title">零件 B10 对比（等效运行小时）</div>
-        <div id="chart-bars"></div>
-
-        <div class="actions">
-          <button type="button" id="copy-summary" class="btn-secondary">复制报告摘要</button>
-        </div>
-      </section>
+      <!-- ========== 页面 3：结果分析（Phase 3 骨架） ========== -->
+      <div id="page-analysis" class="page" hidden></div>
     </main>
 
-    <footer>
-      B10 Tool for Gardening Tools · 内部可靠性分析工具 · 模式 B（测试数据分析）将在 v2 加入
-    </footer>
+    <footer>B10 Tool for Gardening Tools · 数据保存在浏览器本地 · 支持 JSON 导出/导入</footer>
 
     <script type="module" src="js/app.js"></script>
   </body>

@@ -1,55 +1,52 @@
 # B10 Tool for Gardening Tools
 
-绿篱机（锂电）B10 寿命计算器 — 内部可靠性分析工具第一版。
+园林电动工具 B10 可靠性分析工具（绿篱机 · 锂电）。
 
-## 功能
+## 三阶段工作流
 
-- **链 A**：根据保修年限、年均使用时间、可接受失效率，反推目标整机 B10（Weibull 模型）
-- **链 B**：录入各零件 B10（电池支持循环→等效小时换算），串联合成整机 B10，识别瓶颈
-- **链 C**：用合成 B10 反算保修末失效率，验证是否达标
+| 页面 | 状态 | 功能 |
+|------|------|------|
+| **产品定义** | ✅ Phase 1 | 计算区 / 记录区分离；定义测试标准与目标 B10 |
+| **测试规划** | 🔜 Phase 2 | 样本量、截尾方式、试验时长（当前为预览骨架） |
+| **结果分析** | 🔜 Phase 3 | Weibull 拟合、按零件/失效模式分析、图表 |
+
+## 数据模型
+
+```
+项目 (Project)
+ └── 型号 A (Model)
+ │     ├── 产品记录（电压、刀片规格…）
+ │     ├── 产品定义 / 测试标准（计算相关）
+ │     ├── 测试规划
+ │     └── 试验结果
+ └── 型号 B …
+```
+
+- 一个项目可包含多个型号
+- 数据保存在浏览器 `localStorage`
+- 支持 JSON 导出 / 导入（跨设备备份）
 
 ## 本地运行
 
-纯静态页面，无需构建：
-
 ```bash
-# 方式 1：直接用浏览器打开 index.html
-
-# 方式 2：本地 HTTP 服务（ES Module 需要）
 npx serve .
-# 或
-python -m http.server 8080
+# 访问 http://localhost:3000
 ```
 
-然后访问 `http://localhost:8080`（或对应端口）。
+> 需 HTTP 服务（ES Module），不能直接双击 `index.html`。
 
-## GitHub Pages 部署
+## GitHub Pages
 
-1. 进入仓库 **Settings → Pages**
-2. **Source** 选择 `Deploy from a branch`
-3. **Branch** 选择 `main`，文件夹选 `/ (root)`
-4. 保存后等待几分钟，访问 `https://VictorYang3847.github.io/B10_Tool_For_Gardening_Tools/`
+Settings → Pages → Branch: `main` → `/ (root)`
 
-## 默认算例
+访问：https://VictorYang3847.github.io/B10_Tool_For_Gardening_Tools/
 
-| 参数 | 值 |
-|------|-----|
-| 保修 | 2 年 × 25 h/年 = 50 h |
-| 可接受失效率 | 2% |
-| β | 2.0 |
-| 安全余量 | 20% |
-| 目标 B10 | ≈ 137 h |
-| 零件合成（默认零件值） | 80 h（瓶颈：刀片） |
+## 版本
 
-## 技术栈
-
-- HTML / CSS / JavaScript (ES Modules)
-- 无第三方依赖
-
-## 版本规划
-
-- **v1**（当前）：绿篱机 · 锂电 · 目标设定 + 零件合成
-- **v2**：Weibull 测试数据分析、CSV 导入、多产品支持
+- **v1**：单页 B10 计算器
+- **v2.0 (Phase 1)**：三页框架 + 项目/多型号 + 产品定义双区布局
+- **v2.1 (Phase 2)**：测试规划
+- **v2.2 (Phase 3)**：结果分析 + Weibull 图表
 
 ## License
 

@@ -135,14 +135,23 @@ export function calculateAll(inputs) {
   };
 }
 
-export function defaultInputs() {
+export function defaultModelRecord(modelName = "HT-550-Li") {
   return {
-    model: "HT-550-Li",
+    modelName,
+    projectCode: "",
     voltage: 18,
     power: 450,
     bladeType: "double",
     bladeLength: 550,
     strokeRate: 3000,
+    analyst: "",
+    note: "",
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function defaultModelDefinition() {
+  return {
     scenarioName: "默认场景",
     scenarioNote: "",
     hoursPerYear: 25,
@@ -162,7 +171,25 @@ export function defaultInputs() {
       blade: { included: true, b10: 80, material: "SK5" },
       bearing: { included: true, b10: 500, model: "" },
     },
-    analyst: "",
-    note: "",
+  };
+}
+
+/** @deprecated use defaultModelRecord + defaultModelDefinition */
+export function defaultInputs() {
+  const record = defaultModelRecord();
+  const definition = defaultModelDefinition();
+  return {
+    model: record.modelName,
+    ...record,
+    ...definition,
+    parts: {
+      ...definition.parts,
+      motor: { ...definition.parts.motor },
+      battery: { ...definition.parts.battery, capacity: definition.parts.battery.capacity },
+      blade: { ...definition.parts.blade, material: definition.parts.blade.material },
+      bearing: { ...definition.parts.bearing, model: definition.parts.bearing.model },
+    },
+    analyst: record.analyst,
+    note: record.note,
   };
 }
