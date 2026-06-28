@@ -20,6 +20,31 @@ export function initPlanningPage(onSave) {
   document.getElementById("plan-apply-global").addEventListener("click", applyGlobal);
   document.getElementById("plan-calc-all").addEventListener("click", calcAll);
   document.getElementById("plan-save").addEventListener("click", savePlanning);
+
+  document.getElementById("planning-tbody").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action='calc']");
+    if (!btn) return;
+    const tr = btn.closest("tr");
+    const id = tr.dataset.id;
+    calcItem(id, btn);
+  });
+
+  document.getElementById("planning-tbody").addEventListener("change", (e) => {
+    const el = e.target.closest("[data-field]");
+    if (!el) return;
+    const tr = el.closest("tr");
+    const id = tr.dataset.id;
+    const field = el.dataset.field;
+    const planning = currentModel?.planning;
+    if (!planning) return;
+    const item = planning.items.find((it) => it.id === id);
+    if (!item) return;
+    if (el.type === "number") {
+      item[field] = el.value ? Number(el.value) : null;
+    } else {
+      item[field] = el.value;
+    }
+  });
 }
 
 function getDefinitionResult(model) {
@@ -41,11 +66,15 @@ function getTargetB10(itemId, result) {
 
 function syncPlanningItems(model, result) {
   const planning = model.planning;
-  const expectedIds = ["product"];
-  if (result) {
+  const defaultIds = ["product", "motor", "battery", "gearbox", "blade", "bearing"];
+  const expectedIds = [];
+  if (result && result.partEntries) {
+    expectedIds.push("product");
     for (const p of result.partEntries) {
       if (p.included) expectedIds.push(p.id);
     }
+  } else {
+    expectedIds.push(...defaultIds);
   }
 
   for (const id of expectedIds) {
@@ -60,8 +89,9 @@ function syncPlanningItems(model, result) {
 
   for (const item of planning.items) {
     const target = getTargetB10(item.id, result);
-    if (target != null) item.targetB10 = target;
+    if (target != null && target > 0) item.targetB10 = target;
     if (!item.name) item.name = PART_LABELS[item.id] || item.id;
+    if (!item.censoringType) item.censoringType = "time";
   }
 }
 
@@ -111,32 +141,9 @@ function renderTable(planning, result) {
       </td>`;
     tbody.appendChild(tr);
   }
-
-  tbody.querySelectorAll("select.plan-select, input.plan-input").forEach((el) => {
-    el.addEventListener("change", (e) => {
-      const tr = e.target.closest("tr");
-      const id = tr.dataset.id;
-      const field = e.target.dataset.field;
-      const item = planning.items.find((it) => it.id === id);
-      if (!item) return;
-      if (e.target.type === "number") {
-        item[field] = e.target.value ? Number(e.target.value) : null;
-      } else {
-        item[field] = e.target.value;
-      }
-    });
-  });
-
-  tbody.querySelectorAll("button[data-action='calc']").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const tr = e.target.closest("tr");
-      const id = tr.dataset.id;
-      calcItem(id);
-    });
-  });
 }
 
-function calcItem(itemId) {
+function calcItem(itemId, triggerEl) {
   const planning = currentModel.planning;
   const result = getDefinitionResult(currentModel);
   const item = planning.items.find((it) => it.id === itemId);
@@ -144,7 +151,7 @@ function calcItem(itemId) {
 
   const target = getTargetB10(itemId, result);
   if (!target || target <= 0) {
-    alert("请先在产品定义页计算目标 B10");
+    alert("请先在产品定义页点击「计算测试标准」，生成目标 B10 后再进行规划。");
     return;
   }
 
@@ -162,6 +169,7 @@ function calcItem(itemId) {
   item.allowedFailures = allowedFailures;
 
   renderTable(planning, result);
+  if (triggerEl) toast(triggerEl, `已计算: ${sampleSize} 样本`, 1200);
 }
 
 function calcAll() {
