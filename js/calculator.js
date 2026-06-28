@@ -4,6 +4,10 @@
 
 const K10 = Math.log(10 / 9); // ≈ 0.10536
 
+function genId() {
+  return crypto.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 export function weibullEta(b10, beta) {
   return b10 / Math.pow(K10, 1 / beta);
 }

@@ -28,21 +28,7 @@ export function initAnalysisPage(onSave) {
   const batchTabs = document.getElementById("batch-tabs");
   const itemsTbody = document.getElementById("items-tbody");
 
-  console.log("[Analysis] Initializing:", {
-    newBatchBtn: !!newBatchBtn,
-    importBtn: !!importBtn,
-    importFile: !!importFile,
-    downloadTemplateBtn: !!downloadTemplateBtn,
-    addItemBtn: !!addItemBtn,
-    deleteBatchBtn: !!deleteBatchBtn,
-    batchTabs: !!batchTabs,
-    itemsTbody: !!itemsTbody,
-  });
-
-  if (newBatchBtn) {
-    newBatchBtn.addEventListener("click", newBatch);
-    console.log("[Analysis] newBatchBtn event bound");
-  }
+  if (newBatchBtn) newBatchBtn.addEventListener("click", newBatch);
   if (importBtn) importBtn.addEventListener("click", () => importFile?.click());
   if (importFile) importFile.addEventListener("change", importCsv);
   if (downloadTemplateBtn) downloadTemplateBtn.addEventListener("click", downloadCsvTemplate);
@@ -112,16 +98,11 @@ function getTargetB10(model) {
 }
 
 function newBatch() {
-  console.log("[Analysis] newBatch called, currentModel:", !!currentModel);
-  if (!currentModel) {
-    console.log("[Analysis] newBatch: currentModel is null, cannot create batch");
-    return;
-  }
+  if (!currentModel) return;
   const num = currentModel.analysis.batches.length + 1;
   const batch = defaultAnalysisBatch(`试验批次 ${num}`);
   currentModel.analysis.batches.push(batch);
   activeBatchId = batch.id;
-  console.log("[Analysis] newBatch: created batch", batch.id);
   saveAndRefresh();
 }
 
