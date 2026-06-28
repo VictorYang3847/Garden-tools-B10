@@ -341,12 +341,15 @@ function drawWeibullPlot(fit, targetB10) {
   const plotW = w - padL - padR;
   const plotH = h - padT - padB;
 
-  ctx.strokeStyle = "var(--border)";
+  ctx.fillStyle = "#1e293b";
+  ctx.fillRect(padL, padT, plotW, plotH);
+
+  ctx.strokeStyle = "#475569";
   ctx.lineWidth = 1;
   ctx.strokeRect(padL, padT, plotW, plotH);
 
   if (!fit || !fit.points || fit.points.length < 2) {
-    ctx.fillStyle = "var(--text-muted)";
+    ctx.fillStyle = "#94a3b8";
     ctx.font = "14px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("数据不足，无法拟合", w / 2, h / 2);
@@ -364,7 +367,7 @@ function drawWeibullPlot(fit, targetB10) {
   const xScale = (x) => padL + ((x - xMin) / (xMax - xMin)) * plotW;
   const yScale = (y) => padT + plotH - ((y - yMin) / (yMax - yMin)) * plotH;
 
-  ctx.strokeStyle = "rgba(45, 58, 79, 0.5)";
+  ctx.strokeStyle = "#475569";
   ctx.lineWidth = 0.5;
   for (let i = 1; i <= 5; i++) {
     const x = padL + (plotW / 5) * i;
@@ -381,7 +384,7 @@ function drawWeibullPlot(fit, targetB10) {
     ctx.stroke();
   }
 
-  ctx.fillStyle = "var(--text-muted)";
+  ctx.fillStyle = "#cbd5e1";
   ctx.font = "11px sans-serif";
   ctx.textAlign = "center";
   for (let i = 0; i <= 5; i++) {
@@ -396,7 +399,7 @@ function drawWeibullPlot(fit, targetB10) {
   }
 
   if (fit.beta && fit.eta) {
-    ctx.strokeStyle = "var(--accent)";
+    ctx.strokeStyle = "#38bdf8";
     ctx.lineWidth = 2;
     ctx.beginPath();
     const xStart = xMin;
@@ -409,7 +412,7 @@ function drawWeibullPlot(fit, targetB10) {
   }
 
   if (targetB10 && targetB10 > 0) {
-    ctx.strokeStyle = "var(--danger)";
+    ctx.strokeStyle = "#f87171";
     ctx.lineWidth = 1.5;
     ctx.setLineDash([5, 4]);
     const xTarget = Math.log(targetB10);
@@ -423,14 +426,17 @@ function drawWeibullPlot(fit, targetB10) {
     ctx.setLineDash([]);
   }
 
-  ctx.fillStyle = "var(--success)";
+  ctx.fillStyle = "#4ade80";
+  ctx.strokeStyle = "#22c55e";
+  ctx.lineWidth = 1;
   for (const p of points) {
     ctx.beginPath();
-    ctx.arc(xScale(p.x), yScale(p.y), 4, 0, Math.PI * 2);
+    ctx.arc(xScale(p.x), yScale(p.y), 5, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
   }
 
-  ctx.fillStyle = "var(--text)";
+  ctx.fillStyle = "#f1f5f9";
   ctx.font = "12px sans-serif";
   ctx.textAlign = "center";
   ctx.fillText("失效时间 (h)", w / 2, h - 5);
@@ -456,12 +462,15 @@ function drawCdfPlot(fit, targetB10) {
   const plotW = w - padL - padR;
   const plotH = h - padT - padB;
 
-  ctx.strokeStyle = "var(--border)";
+  ctx.fillStyle = "#1e293b";
+  ctx.fillRect(padL, padT, plotW, plotH);
+
+  ctx.strokeStyle = "#475569";
   ctx.lineWidth = 1;
   ctx.strokeRect(padL, padT, plotW, plotH);
 
   if (!fit || !fit.beta || !fit.eta) {
-    ctx.fillStyle = "var(--text-muted)";
+    ctx.fillStyle = "#94a3b8";
     ctx.font = "14px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("数据不足，无法拟合", w / 2, h / 2);
@@ -474,7 +483,7 @@ function drawCdfPlot(fit, targetB10) {
   const xScale = (t) => padL + ((t - tMin) / (tMax - tMin)) * plotW;
   const yScale = (p) => padT + plotH - p * plotH;
 
-  ctx.strokeStyle = "rgba(45, 58, 79, 0.5)";
+  ctx.strokeStyle = "#475569";
   ctx.lineWidth = 0.5;
   for (let i = 1; i <= 5; i++) {
     const x = padL + (plotW / 5) * i;
@@ -489,7 +498,7 @@ function drawCdfPlot(fit, targetB10) {
     ctx.stroke();
   }
 
-  ctx.fillStyle = "var(--text-muted)";
+  ctx.fillStyle = "#cbd5e1";
   ctx.font = "11px sans-serif";
   ctx.textAlign = "center";
   for (let i = 0; i <= 5; i++) {
@@ -502,7 +511,7 @@ function drawCdfPlot(fit, targetB10) {
     ctx.fillText(fmt(pVal * 100, 0) + "%", padL - 5, padT + plotH - (plotH / 4) * i + 4);
   }
 
-  ctx.strokeStyle = "var(--accent)";
+  ctx.strokeStyle = "#38bdf8";
   ctx.lineWidth = 2;
   ctx.beginPath();
   let first = true;
@@ -519,7 +528,7 @@ function drawCdfPlot(fit, targetB10) {
   ctx.stroke();
 
   if (targetB10 && targetB10 > 0) {
-    ctx.strokeStyle = "var(--danger)";
+    ctx.strokeStyle = "#f87171";
     ctx.lineWidth = 1.5;
     ctx.setLineDash([5, 4]);
     if (targetB10 <= tMax) {
@@ -530,24 +539,27 @@ function drawCdfPlot(fit, targetB10) {
       ctx.stroke();
     }
     ctx.setLineDash([]);
-    ctx.fillStyle = "var(--danger)";
+    ctx.fillStyle = "#f87171";
     ctx.font = "11px sans-serif";
     ctx.textAlign = "left";
     ctx.fillText(`目标 B10: ${fmt(targetB10, 0)}h`, xScale(targetB10) + 5, yScale(0.1) - 5);
   }
 
   if (fit.points) {
-    ctx.fillStyle = "var(--success)";
+    ctx.fillStyle = "#4ade80";
+    ctx.strokeStyle = "#22c55e";
+    ctx.lineWidth = 1;
     for (const p of fit.points) {
       if (p.t <= tMax) {
         ctx.beginPath();
-        ctx.arc(xScale(p.t), yScale(p.rank), 4, 0, Math.PI * 2);
+        ctx.arc(xScale(p.t), yScale(p.rank), 5, 0, Math.PI * 2);
         ctx.fill();
+        ctx.stroke();
       }
     }
   }
 
-  ctx.fillStyle = "var(--text)";
+  ctx.fillStyle = "#f1f5f9";
   ctx.font = "12px sans-serif";
   ctx.textAlign = "center";
   ctx.fillText("时间 (h)", w / 2, h - 5);
