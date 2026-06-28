@@ -415,6 +415,7 @@
             <div class="actions">
               <button type="button" id="ana-new-batch" class="btn-primary">+ 新建批次</button>
               <button type="button" id="ana-import" class="btn-secondary">导入 CSV</button>
+              <button type="button" id="ana-download-template" class="btn-ghost">下载模板</button>
               <input type="file" id="ana-import-file" accept=".csv" hidden />
             </div>
           </div>
@@ -480,6 +481,9 @@
             <div class="empty-icon">📋</div>
             <h3>尚无试验数据</h3>
             <p>点击「添加样本」录入失效或截尾数据，或使用「导入 CSV」批量导入。</p>
+            <p style="margin-top: 0.5rem;">
+              <button type="button" id="empty-download-template" class="btn-ghost">下载 CSV 模板</button>
+            </p>
           </div>
         </section>
 

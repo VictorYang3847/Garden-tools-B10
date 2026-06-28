@@ -23,11 +23,49 @@ export function initAnalysisPage(onSave) {
     document.getElementById("ana-import-file").click();
   });
   document.getElementById("ana-import-file").addEventListener("change", importCsv);
+  document.getElementById("ana-download-template").addEventListener("click", downloadCsvTemplate);
+  document.getElementById("empty-download-template").addEventListener("click", downloadCsvTemplate);
   document.getElementById("ana-add-item").addEventListener("click", addItem);
   document.getElementById("ana-batch-delete").addEventListener("click", deleteBatch);
 
   ["batch-name", "batch-part", "batch-date", "batch-note"].forEach((id) => {
     document.getElementById(id).addEventListener("change", updateBatchFromForm);
+  });
+
+  document.getElementById("batch-tabs").addEventListener("click", (e) => {
+    const tab = e.target.closest(".batch-tab");
+    if (!tab) return;
+    activeBatchId = tab.dataset.id;
+    saveAndRefresh();
+  });
+
+  document.getElementById("items-tbody").addEventListener("change", (e) => {
+    const el = e.target.closest("[data-field]");
+    if (!el) return;
+    const tr = el.closest("tr");
+    const id = tr.dataset.id;
+    const batch = getActiveBatch();
+    if (!batch) return;
+    const item = batch.items.find((i) => i.id === id);
+    if (!item) return;
+    let val = el.value;
+    const field = el.dataset.field;
+    if (field === "time") val = Number(val) || 0;
+    if (field === "failed") val = val === "true";
+    item[field] = val;
+    autoSave();
+    updateCharts();
+  });
+
+  document.getElementById("items-tbody").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action='delete']");
+    if (!btn) return;
+    const tr = btn.closest("tr");
+    const id = tr.dataset.id;
+    const batch = getActiveBatch();
+    if (!batch) return;
+    batch.items = batch.items.filter((i) => i.id !== id);
+    saveAndRefresh();
   });
 }
 
@@ -47,6 +85,7 @@ function getTargetB10(model) {
 }
 
 function newBatch() {
+  if (!currentModel) return;
   const num = currentModel.analysis.batches.length + 1;
   const batch = defaultAnalysisBatch(`试验批次 ${num}`);
   currentModel.analysis.batches.push(batch);
@@ -76,6 +115,22 @@ function addItem() {
     note: "",
   });
   saveAndRefresh();
+}
+
+function downloadCsvTemplate() {
+  const csv = [
+    "time,failed,part,failureMode,note",
+    "120,true,blade,磨损,示例：刀片在120小时失效",
+    "150,true,gearbox,齿轮断裂,",
+    "200,false,product,,示例：200小时未失效（截尾）",
+    "180,true,bearing,轴承抱死,",
+  ].join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "试验数据模板.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function importCsv(e) {
@@ -166,12 +221,6 @@ function renderBatchTabs() {
       </button>`
     )
     .join("");
-  container.querySelectorAll(".batch-tab").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      activeBatchId = btn.dataset.id;
-      saveAndRefresh();
-    });
-  });
 }
 
 function renderBatchDetail() {
@@ -230,31 +279,6 @@ function renderItemsTable(batch) {
       </tr>`;
     })
     .join("");
-
-  tbody.querySelectorAll(".item-input").forEach((el) => {
-    el.addEventListener("change", (e) => {
-      const tr = e.target.closest("tr");
-      const id = tr.dataset.id;
-      const field = e.target.dataset.field;
-      const item = batch.items.find((i) => i.id === id);
-      if (!item) return;
-      let val = e.target.value;
-      if (field === "time") val = Number(val) || 0;
-      if (field === "failed") val = val === "true";
-      item[field] = val;
-      autoSave();
-      updateCharts();
-    });
-  });
-
-  tbody.querySelectorAll("button[data-action='delete']").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const tr = e.target.closest("tr");
-      const id = tr.dataset.id;
-      batch.items = batch.items.filter((i) => i.id !== id);
-      saveAndRefresh();
-    });
-  });
 }
 
 function updateSummary(analysisResult) {
