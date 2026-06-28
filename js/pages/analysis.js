@@ -18,55 +18,82 @@ const PART_LABELS = {
 export function initAnalysisPage(onSave) {
   onSaveCallback = onSave;
 
-  document.getElementById("ana-new-batch").addEventListener("click", newBatch);
-  document.getElementById("ana-import").addEventListener("click", () => {
-    document.getElementById("ana-import-file").click();
+  const newBatchBtn = document.getElementById("ana-new-batch");
+  const importBtn = document.getElementById("ana-import");
+  const importFile = document.getElementById("ana-import-file");
+  const downloadTemplateBtn = document.getElementById("ana-download-template");
+  const emptyDownloadTemplateBtn = document.getElementById("empty-download-template");
+  const addItemBtn = document.getElementById("ana-add-item");
+  const deleteBatchBtn = document.getElementById("ana-batch-delete");
+  const batchTabs = document.getElementById("batch-tabs");
+  const itemsTbody = document.getElementById("items-tbody");
+
+  console.log("[Analysis] Initializing:", {
+    newBatchBtn: !!newBatchBtn,
+    importBtn: !!importBtn,
+    importFile: !!importFile,
+    downloadTemplateBtn: !!downloadTemplateBtn,
+    addItemBtn: !!addItemBtn,
+    deleteBatchBtn: !!deleteBatchBtn,
+    batchTabs: !!batchTabs,
+    itemsTbody: !!itemsTbody,
   });
-  document.getElementById("ana-import-file").addEventListener("change", importCsv);
-  document.getElementById("ana-download-template").addEventListener("click", downloadCsvTemplate);
-  document.getElementById("empty-download-template").addEventListener("click", downloadCsvTemplate);
-  document.getElementById("ana-add-item").addEventListener("click", addItem);
-  document.getElementById("ana-batch-delete").addEventListener("click", deleteBatch);
+
+  if (newBatchBtn) {
+    newBatchBtn.addEventListener("click", newBatch);
+    console.log("[Analysis] newBatchBtn event bound");
+  }
+  if (importBtn) importBtn.addEventListener("click", () => importFile?.click());
+  if (importFile) importFile.addEventListener("change", importCsv);
+  if (downloadTemplateBtn) downloadTemplateBtn.addEventListener("click", downloadCsvTemplate);
+  if (emptyDownloadTemplateBtn) emptyDownloadTemplateBtn.addEventListener("click", downloadCsvTemplate);
+  if (addItemBtn) addItemBtn.addEventListener("click", addItem);
+  if (deleteBatchBtn) deleteBatchBtn.addEventListener("click", deleteBatch);
 
   ["batch-name", "batch-part", "batch-date", "batch-note"].forEach((id) => {
-    document.getElementById(id).addEventListener("change", updateBatchFromForm);
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", updateBatchFromForm);
   });
 
-  document.getElementById("batch-tabs").addEventListener("click", (e) => {
-    const tab = e.target.closest(".batch-tab");
-    if (!tab) return;
-    activeBatchId = tab.dataset.id;
-    saveAndRefresh();
-  });
+  if (batchTabs) {
+    batchTabs.addEventListener("click", (e) => {
+      const tab = e.target.closest(".batch-tab");
+      if (!tab) return;
+      activeBatchId = tab.dataset.id;
+      saveAndRefresh();
+    });
+  }
 
-  document.getElementById("items-tbody").addEventListener("change", (e) => {
-    const el = e.target.closest("[data-field]");
-    if (!el) return;
-    const tr = el.closest("tr");
-    const id = tr.dataset.id;
-    const batch = getActiveBatch();
-    if (!batch) return;
-    const item = batch.items.find((i) => i.id === id);
-    if (!item) return;
-    let val = el.value;
-    const field = el.dataset.field;
-    if (field === "time") val = Number(val) || 0;
-    if (field === "failed") val = val === "true";
-    item[field] = val;
-    autoSave();
-    updateCharts();
-  });
+  if (itemsTbody) {
+    itemsTbody.addEventListener("change", (e) => {
+      const el = e.target.closest("[data-field]");
+      if (!el) return;
+      const tr = el.closest("tr");
+      const id = tr.dataset.id;
+      const batch = getActiveBatch();
+      if (!batch) return;
+      const item = batch.items.find((i) => i.id === id);
+      if (!item) return;
+      let val = el.value;
+      const field = el.dataset.field;
+      if (field === "time") val = Number(val) || 0;
+      if (field === "failed") val = val === "true";
+      item[field] = val;
+      autoSave();
+      updateCharts();
+    });
 
-  document.getElementById("items-tbody").addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-action='delete']");
-    if (!btn) return;
-    const tr = btn.closest("tr");
-    const id = tr.dataset.id;
-    const batch = getActiveBatch();
-    if (!batch) return;
-    batch.items = batch.items.filter((i) => i.id !== id);
-    saveAndRefresh();
-  });
+    itemsTbody.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-action='delete']");
+      if (!btn) return;
+      const tr = btn.closest("tr");
+      const id = tr.dataset.id;
+      const batch = getActiveBatch();
+      if (!batch) return;
+      batch.items = batch.items.filter((i) => i.id !== id);
+      saveAndRefresh();
+    });
+  }
 }
 
 function getDefinitionResult(model) {
@@ -85,11 +112,16 @@ function getTargetB10(model) {
 }
 
 function newBatch() {
-  if (!currentModel) return;
+  console.log("[Analysis] newBatch called, currentModel:", !!currentModel);
+  if (!currentModel) {
+    console.log("[Analysis] newBatch: currentModel is null, cannot create batch");
+    return;
+  }
   const num = currentModel.analysis.batches.length + 1;
   const batch = defaultAnalysisBatch(`试验批次 ${num}`);
   currentModel.analysis.batches.push(batch);
   activeBatchId = batch.id;
+  console.log("[Analysis] newBatch: created batch", batch.id);
   saveAndRefresh();
 }
 
