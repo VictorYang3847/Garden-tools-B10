@@ -13,8 +13,8 @@ import {
   initDefinitionPage,
   fillDefinitionForm,
 } from "./pages/definition.js";
-import { renderPlanningPage } from "./pages/planning.js";
-import { renderAnalysisPage } from "./pages/analysis.js";
+import { initPlanningPage, renderPlanningPage } from "./pages/planning.js";
+import { initAnalysisPage, renderAnalysisPage } from "./pages/analysis.js";
 
 let state = loadAppState();
 
@@ -27,6 +27,8 @@ const pages = {
 };
 
 initDefinitionPage(handleModelSave);
+initPlanningPage(handleModelSave);
+initAnalysisPage(handleModelSave);
 
 document.getElementById("new-project").addEventListener("click", onNewProject);
 document.getElementById("new-model").addEventListener("click", onNewModel);
@@ -112,16 +114,18 @@ function renderCurrentPage() {
   }
 }
 
-function handleModelSave({ record, definition, lastResult }) {
+function handleModelSave({ record, definition, planning, analysis, lastResult, auto }) {
   const project = getActiveProject(state);
   const model = project.models.find((m) => m.id === state.activeModelId);
   if (!model) return;
 
-  model.record = record;
-  model.definition = definition;
+  if (record) model.record = record;
+  if (definition) model.definition = definition;
+  if (planning) model.planning = planning;
+  if (analysis) model.analysis = analysis;
   if (lastResult) model.lastResult = lastResult;
 
-  const newName = record.modelName?.trim() || model.name;
+  const newName = record?.modelName?.trim() || model.name;
   if (newName !== model.name) {
     model.name = newName;
     refreshSelectors();

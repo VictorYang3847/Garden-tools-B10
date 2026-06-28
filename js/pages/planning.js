@@ -1,103 +1,228 @@
 import { mergeInputs } from "../store.js";
-import { calculateAll } from "../calculator.js";
-import { fmt } from "../utils.js";
+import { calculateAll, calcSampleSize, defaultPlanningItem } from "../calculator.js";
+import { fmt, toast } from "../utils.js";
 
-const PART_MAP = {
-  product: { label: "整机", unit: "h", fromResult: (r) => r.b10Target },
-  motor: { label: "电机", unit: "h", partId: "motor" },
-  battery: { label: "电池包", unit: "h", partId: "battery" },
-  gearbox: { label: "齿轮箱/传动", unit: "h", partId: "gearbox" },
-  blade: { label: "刀片组件", unit: "h", partId: "blade" },
-  bearing: { label: "轴承", unit: "h", partId: "bearing" },
+let currentModel = null;
+let onSaveCallback = null;
+
+const PART_LABELS = {
+  product: "整机",
+  motor: "电机",
+  battery: "电池包",
+  gearbox: "齿轮箱/传动",
+  blade: "刀片组件",
+  bearing: "轴承",
 };
 
-function getTargetB10(itemId, model, result) {
+export function initPlanningPage(onSave) {
+  onSaveCallback = onSave;
+
+  document.getElementById("plan-apply-global").addEventListener("click", applyGlobal);
+  document.getElementById("plan-calc-all").addEventListener("click", calcAll);
+  document.getElementById("plan-save").addEventListener("click", savePlanning);
+}
+
+function getDefinitionResult(model) {
+  const inputs = mergeInputs(model.record, model.definition);
+  if (model.lastResult) return model.lastResult;
+  try {
+    return calculateAll(inputs);
+  } catch {
+    return null;
+  }
+}
+
+function getTargetB10(itemId, result) {
   if (!result) return null;
-  const spec = PART_MAP[itemId];
-  if (itemId === "product") return spec.fromResult(result);
-  const part = result.partEntries.find((p) => p.id === spec.partId);
+  if (itemId === "product") return result.b10Target;
+  const part = result.partEntries.find((p) => p.id === itemId);
   return part?.included ? part.equivHours : null;
 }
 
-export function renderPlanningPage(model) {
-  const root = document.getElementById("page-planning");
-  const inputs = mergeInputs(model.record, model.definition);
-  let result = model.lastResult;
-  if (!result) {
-    try {
-      result = calculateAll(inputs);
-    } catch {
-      result = null;
+function syncPlanningItems(model, result) {
+  const planning = model.planning;
+  const expectedIds = ["product"];
+  if (result) {
+    for (const p of result.partEntries) {
+      if (p.included) expectedIds.push(p.id);
     }
   }
 
-  const items = model.planning?.items ?? [];
-
-  let rows = "";
-  for (const item of items) {
-    const target = getTargetB10(item.id, model, result);
-    const targetStr = target != null ? `${fmt(target, 0)} h` : "—（请先在产品定义页计算）";
-    rows += `
-      <tr>
-        <td><strong>${item.name}</strong></td>
-        <td class="target-cell">${targetStr}</td>
-        <td>
-          <select disabled class="disabled-field">
-            <option ${item.censoringType === "time" ? "selected" : ""}>定时截尾</option>
-            <option ${item.censoringType === "complete" ? "selected" : ""}>完全失效</option>
-            <option ${item.censoringType === "failure_count" ? "selected" : ""}>定数截尾</option>
-          </select>
-        </td>
-        <td><input disabled class="disabled-field" placeholder="Phase 2" value="${item.sampleSize ?? ""}" /></td>
-        <td><input disabled class="disabled-field" placeholder="Phase 2" value="${item.testDuration ?? ""}" /></td>
-        <td><span class="phase-tag">待开发</span></td>
-      </tr>`;
+  for (const id of expectedIds) {
+    if (!planning.items.find((it) => it.id === id)) {
+      planning.items.push(
+        defaultPlanningItem(id, PART_LABELS[id] || id, getTargetB10(id, result) || 0)
+      );
+    }
   }
 
-  root.innerHTML = `
-    <div class="page-intro">
-      <h2>测试规划</h2>
-      <p>根据产品定义中的目标 B10，规划整机与各零件的试验样本量、截尾方式与试验时长。<strong>完整规划功能将在 Phase 2 实现。</strong></p>
-    </div>
+  planning.items = planning.items.filter((it) => expectedIds.includes(it.id));
 
-    <section class="info-card">
-      <h3>当前型号测试标准摘要</h3>
-      <div class="summary-grid">
-        <div>型号 <strong>${model.name}</strong></div>
-        <div>目标整机 B10 <strong>${result ? fmt(result.b10Target, 0) + " h" : "—"}</strong></div>
-        <div>零件合成 B10 <strong>${result ? fmt(result.b10Parts, 0) + " h" : "—"}</strong></div>
-        <div>瓶颈 <strong>${result?.bottleneck?.name ?? "—"}</strong></div>
-      </div>
-      ${!result ? '<p class="hint warn">请先在「产品定义」页完成计算并保存，以载入目标 B10。</p>' : ""}
-    </section>
+  for (const item of planning.items) {
+    const target = getTargetB10(item.id, result);
+    if (target != null) item.targetB10 = target;
+    if (!item.name) item.name = PART_LABELS[item.id] || item.id;
+  }
+}
 
-    <section>
-      <h3>试验规划表 <span class="phase-tag">Phase 2 预览</span></h3>
-      <p class="hint">第一版暂用简化样本量规则；下表展示规划结构，编辑功能后续开放。</p>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>规划对象</th>
-              <th>引用目标 B10</th>
-              <th>截尾类型</th>
-              <th>样本量 n</th>
-              <th>试验时长 (h)</th>
-              <th>状态</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-    </section>
+function renderSummary(model, result) {
+  document.getElementById("plan-model-name").textContent = model.name;
+  document.getElementById("plan-target-b10").textContent = result
+    ? fmt(result.b10Target, 0) + " h"
+    : "—";
+  document.getElementById("plan-parts-b10").textContent = result
+    ? fmt(result.b10Parts, 0) + " h"
+    : "—";
+  document.getElementById("plan-bottleneck").textContent = result?.bottleneck?.name ?? "—";
+}
 
-    <section class="placeholder-card">
-      <h3>Phase 2 将包含</h3>
-      <ul>
-        <li>经验规则样本量（整机 10–15，磨损件 15–20）</li>
-        <li>试验时长建议（1.0–1.5 × 目标 B10）</li>
-        <li>定时截尾 / 完全失效 / 定数截尾可选</li>
-        <li>通过判据与台架加载条件记录</li>
-      </ul>
-    </section>`;
+function renderTable(planning, result) {
+  const tbody = document.getElementById("planning-tbody");
+  tbody.innerHTML = "";
+
+  for (const item of planning.items) {
+    const target = getTargetB10(item.id, result);
+    const tr = document.createElement("tr");
+    tr.dataset.id = item.id;
+    tr.innerHTML = `
+      <td><strong>${item.name}</strong></td>
+      <td class="target-cell">${target != null ? fmt(target, 0) + " h" : "—"}</td>
+      <td>
+        <select data-field="censoringType" class="plan-select">
+          <option value="time" ${item.censoringType === "time" ? "selected" : ""}>定时截尾</option>
+          <option value="complete" ${item.censoringType === "complete" ? "selected" : ""}>完全失效</option>
+          <option value="failure_count" ${item.censoringType === "failure_count" ? "selected" : ""}>定数截尾</option>
+        </select>
+      </td>
+      <td>
+        <input type="number" data-field="sampleSize" class="plan-input" min="1" step="1"
+          value="${item.sampleSize ?? ""}" placeholder="自动" />
+      </td>
+      <td>
+        <input type="number" data-field="testDuration" class="plan-input" min="0" step="1"
+          value="${item.testDuration ?? ""}" placeholder="自动" />
+      </td>
+      <td>
+        <input type="text" data-field="benchCondition" class="plan-input"
+          value="${item.benchCondition || ""}" placeholder="台架加载条件" />
+      </td>
+      <td>
+        <button type="button" data-action="calc" class="btn-sm btn-secondary">计算</button>
+      </td>`;
+    tbody.appendChild(tr);
+  }
+
+  tbody.querySelectorAll("select.plan-select, input.plan-input").forEach((el) => {
+    el.addEventListener("change", (e) => {
+      const tr = e.target.closest("tr");
+      const id = tr.dataset.id;
+      const field = e.target.dataset.field;
+      const item = planning.items.find((it) => it.id === id);
+      if (!item) return;
+      if (e.target.type === "number") {
+        item[field] = e.target.value ? Number(e.target.value) : null;
+      } else {
+        item[field] = e.target.value;
+      }
+    });
+  });
+
+  tbody.querySelectorAll("button[data-action='calc']").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const tr = e.target.closest("tr");
+      const id = tr.dataset.id;
+      calcItem(id);
+    });
+  });
+}
+
+function calcItem(itemId) {
+  const planning = currentModel.planning;
+  const result = getDefinitionResult(currentModel);
+  const item = planning.items.find((it) => it.id === itemId);
+  if (!item) return;
+
+  const target = getTargetB10(itemId, result);
+  if (!target || target <= 0) {
+    alert("请先在产品定义页计算目标 B10");
+    return;
+  }
+
+  const confidence = Number(document.getElementById("plan-confidence").value) / 100;
+  const allowedFailures = Number(document.getElementById("plan-allowed-failures").value) || 0;
+  const { sampleSize, testDuration } = calcSampleSize(
+    target,
+    item.censoringType,
+    confidence,
+    allowedFailures
+  );
+
+  item.sampleSize = sampleSize;
+  item.testDuration = Math.round(testDuration);
+  item.allowedFailures = allowedFailures;
+
+  renderTable(planning, result);
+}
+
+function calcAll() {
+  const result = getDefinitionResult(currentModel);
+  if (!result) {
+    alert("请先在产品定义页计算目标 B10");
+    return;
+  }
+
+  const confidence = Number(document.getElementById("plan-confidence").value) / 100;
+  const allowedFailures = Number(document.getElementById("plan-allowed-failures").value) || 0;
+
+  for (const item of currentModel.planning.items) {
+    const target = getTargetB10(item.id, result);
+    if (!target || target <= 0) continue;
+    const { sampleSize, testDuration } = calcSampleSize(
+      target,
+      item.censoringType,
+      confidence,
+      allowedFailures
+    );
+    item.sampleSize = sampleSize;
+    item.testDuration = Math.round(testDuration);
+    item.allowedFailures = allowedFailures;
+  }
+
+  renderTable(currentModel.planning, result);
+  toast(document.getElementById("plan-calc-all"), "已计算全部", 1500);
+}
+
+function applyGlobal() {
+  const censoringType = document.getElementById("plan-default-censoring").value;
+  for (const item of currentModel.planning.items) {
+    item.censoringType = censoringType;
+  }
+  const result = getDefinitionResult(currentModel);
+  renderTable(currentModel.planning, result);
+  toast(document.getElementById("plan-apply-global"), "已应用", 1500);
+}
+
+function savePlanning() {
+  if (!onSaveCallback || !currentModel) return;
+  onSaveCallback({
+    record: currentModel.record,
+    definition: currentModel.definition,
+    planning: currentModel.planning,
+    lastResult: currentModel.lastResult,
+  });
+  toast(document.getElementById("plan-save"), "已保存", 1500);
+}
+
+export function renderPlanningPage(model) {
+  currentModel = model;
+  const result = getDefinitionResult(model);
+
+  syncPlanningItems(model, result);
+
+  if (model.definition) {
+    document.getElementById("plan-confidence").value = String(model.definition.confidence || 90);
+  }
+
+  renderSummary(model, result);
+  renderTable(model.planning, result);
 }

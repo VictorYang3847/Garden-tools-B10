@@ -174,6 +174,169 @@ export function defaultModelDefinition() {
   };
 }
 
+export function calcSampleSize(targetB10, censoringType, confidence = 0.9, allowedFailures = 1) {
+  if (!targetB10 || targetB10 <= 0) return { sampleSize: 0, testDuration: 0 };
+  const baseSamples = { time: 12, complete: 15, failure_count: 20 };
+  let n = baseSamples[censoringType] || 12;
+  if (confidence >= 0.95) n = Math.ceil(n * 1.3);
+  if (allowedFailures > 1) n = Math.ceil(n * (1 + allowedFailures * 0.15));
+  n = Math.max(n, 5);
+  const durationMultiplier = censoringType === "time" ? 1.2 : censoringType === "complete" ? 1.5 : 1.3;
+  const testDuration = targetB10 * durationMultiplier;
+  return { sampleSize: n, testDuration };
+}
+
+export function suggestPlanningItems(definitionResult, isWearPart = {}) {
+  const items = [];
+  items.push({
+    id: "product",
+    name: "整机",
+    targetB10: definitionResult.b10Target,
+    isWearPart: false,
+  });
+  for (const part of definitionResult.partEntries) {
+    if (!part.included) continue;
+    items.push({
+      id: part.id,
+      name: part.name,
+      targetB10: part.equivHours,
+      unit: part.unit,
+      isWearPart: ["blade", "bearing", "gearbox"].includes(part.id),
+    });
+  }
+  return items;
+}
+
+export function medianRank(i, n) {
+  return (i - 0.3) / (n + 0.4);
+}
+
+export function weibullFit(failureTimes, censoredTimes = []) {
+  const allFailures = [...failureTimes].filter((t) => t > 0).sort((a, b) => a - b);
+  const allCensored = [...censoredTimes].filter((t) => t > 0);
+  const n = allFailures.length + allCensored.length;
+  if (allFailures.length < 2 || n < 3) {
+    return { beta: null, eta: null, b10: null, rSquared: null, points: [] };
+  }
+  const allTimes = [
+    ...allFailures.map((t) => ({ t, failed: true })),
+    ...allCensored.map((t) => ({ t, failed: false })),
+  ].sort((a, b) => a.t - b.t);
+  const failureRanks = [];
+  let prevRank = 0;
+  let failureCount = 0;
+  for (const item of allTimes) {
+    if (item.failed) {
+      failureCount++;
+      const rank = (n * prevRank + 1) / (n + 1);
+      failureRanks.push({ t: item.t, rank });
+      prevRank = rank;
+    } else {
+      prevRank = prevRank;
+    }
+  }
+  if (failureRanks.length < 2) {
+    return { beta: null, eta: null, b10: null, rSquared: null, points: [] };
+  }
+  const xs = failureRanks.map((p) => Math.log(p.t));
+  const ys = failureRanks.map((p) => Math.log(Math.log(1 / (1 - p.rank))));
+  const nPoints = xs.length;
+  const sumX = xs.reduce((s, x) => s + x, 0);
+  const sumY = ys.reduce((s, y) => s + y, 0);
+  const sumXY = xs.reduce((s, x, i) => s + x * ys[i], 0);
+  const sumXX = xs.reduce((s, x) => s + x * x, 0);
+  const beta = (nPoints * sumXY - sumX * sumY) / (nPoints * sumXX - sumX * sumX);
+  const alpha = (sumY - beta * sumX) / nPoints;
+  const eta = Math.exp(-alpha / beta);
+  const b10 = eta * Math.pow(K10, 1 / beta);
+  const yMean = sumY / nPoints;
+  let ssTot = 0;
+  let ssRes = 0;
+  for (let i = 0; i < nPoints; i++) {
+    const yPred = alpha + beta * xs[i];
+    ssTot += (ys[i] - yMean) ** 2;
+    ssRes += (ys[i] - yPred) ** 2;
+  }
+  const rSquared = ssTot > 0 ? 1 - ssRes / ssTot : 0;
+  const points = failureRanks.map((p) => ({
+    t: p.t,
+    rank: p.rank,
+    x: Math.log(p.t),
+    y: Math.log(Math.log(1 / (1 - p.rank))),
+  }));
+  return { beta, eta, b10, rSquared, points, failureCount, totalCount: n };
+}
+
+export function weibullCdf(t, eta, beta) {
+  if (t <= 0 || eta <= 0 || beta <= 0) return 0;
+  return 1 - Math.exp(-Math.pow(t / eta, beta));
+}
+
+export function weibullPdf(t, eta, beta) {
+  if (t <= 0 || eta <= 0 || beta <= 0) return 0;
+  return (beta / eta) * Math.pow(t / eta, beta - 1) * Math.exp(-Math.pow(t / eta, beta));
+}
+
+export function calcAnalysisResult(batches, targetB10) {
+  const allFailures = [];
+  const allCensored = [];
+  const failureModes = {};
+  const partFailures = {};
+  for (const batch of batches) {
+    for (const item of batch.items || []) {
+      if (item.failed) {
+        allFailures.push(item.time);
+        if (item.failureMode) {
+          failureModes[item.failureMode] = (failureModes[item.failureMode] || 0) + 1;
+        }
+        if (item.part) {
+          partFailures[item.part] = (partFailures[item.part] || 0) + 1;
+        }
+      } else {
+        allCensored.push(item.time);
+      }
+    }
+  }
+  const fit = weibullFit(allFailures, allCensored);
+  const pass = fit.b10 != null && targetB10 != null ? fit.b10 >= targetB10 : null;
+  const gap = fit.b10 != null && targetB10 != null ? fit.b10 - targetB10 : null;
+  return {
+    fit,
+    pass,
+    gap,
+    targetB10,
+    totalSamples: allFailures.length + allCensored.length,
+    failureCount: allFailures.length,
+    failureModes,
+    partFailures,
+  };
+}
+
+export function defaultPlanningItem(id, name, targetB10 = 0) {
+  return {
+    id,
+    name,
+    targetB10,
+    censoringType: "time",
+    allowedFailures: 1,
+    sampleSize: null,
+    testDuration: null,
+    benchCondition: "",
+    note: "",
+  };
+}
+
+export function defaultAnalysisBatch(name = "试验批次 1") {
+  return {
+    id: genId(),
+    name,
+    part: "product",
+    startDate: new Date().toISOString().slice(0, 10),
+    items: [],
+    note: "",
+  };
+}
+
 /** @deprecated use defaultModelRecord + defaultModelDefinition */
 export function defaultInputs() {
   const record = defaultModelRecord();

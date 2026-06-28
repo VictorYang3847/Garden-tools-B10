@@ -12,7 +12,7 @@
         <div>
           <h1>
             B10 可靠性工具
-            <span class="badge">绿篱机 · v2.0</span>
+            <span class="badge">绿篱机 · v2.2</span>
           </h1>
           <p>产品定义 → 测试规划 → 结果分析</p>
         </div>
@@ -300,11 +300,227 @@
         </form>
       </div>
 
-      <!-- ========== 页面 2：测试规划（Phase 2 骨架） ========== -->
-      <div id="page-planning" class="page" hidden></div>
+      <!-- ========== 页面 2：测试规划 ========== -->
+      <div id="page-planning" class="page" hidden>
+        <div class="page-intro">
+          <h2>测试规划</h2>
+          <p>根据产品定义中的目标 B10，规划整机与各零件的试验样本量、截尾方式与试验时长。</p>
+        </div>
 
-      <!-- ========== 页面 3：结果分析（Phase 3 骨架） ========== -->
-      <div id="page-analysis" class="page" hidden></div>
+        <section class="info-card">
+          <h3>当前型号测试标准摘要</h3>
+          <div class="summary-grid">
+            <div>型号 <strong id="plan-model-name">—</strong></div>
+            <div>目标整机 B10 <strong id="plan-target-b10">—</strong></div>
+            <div>零件合成 B10 <strong id="plan-parts-b10">—</strong></div>
+            <div>瓶颈 <strong id="plan-bottleneck">—</strong></div>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-header">
+            <h2><span class="num">1</span> 全局参数</h2>
+          </div>
+          <div class="grid">
+            <label>
+              默认截尾类型
+              <select id="plan-default-censoring">
+                <option value="time">定时截尾</option>
+                <option value="complete">完全失效</option>
+                <option value="failure_count">定数截尾</option>
+              </select>
+            </label>
+            <label>
+              置信度
+              <select id="plan-confidence">
+                <option value="90">90%</option>
+                <option value="95">95%</option>
+              </select>
+            </label>
+            <label>
+              允许失效数
+              <input type="number" id="plan-allowed-failures" min="0" step="1" value="1" />
+            </label>
+            <label class="grid-full">
+              <div class="actions">
+                <button type="button" id="plan-apply-global" class="btn-secondary">应用到所有项目</button>
+                <button type="button" id="plan-calc-all" class="btn-primary">自动计算全部</button>
+                <button type="button" id="plan-save" class="btn-secondary">保存规划</button>
+              </div>
+            </label>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-header">
+            <h2><span class="num">2</span> 试验项目明细</h2>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table" id="planning-table">
+              <thead>
+                <tr>
+                  <th>规划对象</th>
+                  <th>目标 B10</th>
+                  <th>截尾类型</th>
+                  <th>样本量 n</th>
+                  <th>试验时长 (h)</th>
+                  <th>台架条件</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="planning-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="info-card">
+          <h3>规划说明</h3>
+          <ul style="margin: 0.5rem 0 0; padding-left: 1.25rem; color: var(--text-muted); font-size: 0.85rem;">
+            <li><strong>定时截尾</strong>：试验到规定时间停止，适合长寿命产品验证</li>
+            <li><strong>完全失效</strong>：所有样本失效后停止，数据更完整但耗时</li>
+            <li><strong>定数截尾</strong>：失效数达到规定数量后停止，平衡效率与精度</li>
+            <li>样本量基于经验规则：整机 10–15，磨损件 15–20，可根据置信度调整</li>
+            <li>试验时长建议：定时截尾 1.2×B10，完全失效 1.5×B10</li>
+          </ul>
+        </section>
+      </div>
+
+      <!-- ========== 页面 3：结果分析 ========== -->
+      <div id="page-analysis" class="page" hidden>
+        <div class="page-intro">
+          <h2>测试结果分析</h2>
+          <p>录入台架试验失效数据，进行 Weibull 拟合，计算实测 B10、β 值，并按零件 / 失效模式分组分析。</p>
+        </div>
+
+        <section class="info-card">
+          <h3>当前型号目标对照</h3>
+          <div class="summary-grid">
+            <div>型号 <strong id="ana-model-name">—</strong></div>
+            <div>目标整机 B10 <strong id="ana-target-b10">—</strong></div>
+            <div>实测 B10 <strong id="ana-actual-b10">—</strong></div>
+            <div>验证结果 <strong id="ana-result">—</strong></div>
+          </div>
+          <div id="ana-fit-summary" class="sub-metrics" style="margin-top: 0.75rem; display: none;">
+            <div>形状参数 β <strong id="ana-beta">—</strong></div>
+            <div>特征寿命 η <strong id="ana-eta">—</strong></div>
+            <div>拟合优度 R² <strong id="ana-r2">—</strong></div>
+            <div>总样本数 <strong id="ana-samples">—</strong></div>
+            <div>失效数 <strong id="ana-failures">—</strong></div>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-header">
+            <h2><span class="num">1</span> 试验批次管理</h2>
+            <div class="actions">
+              <button type="button" id="ana-new-batch" class="btn-primary">+ 新建批次</button>
+              <button type="button" id="ana-import" class="btn-secondary">导入 CSV</button>
+              <input type="file" id="ana-import-file" accept=".csv" hidden />
+            </div>
+          </div>
+          <div id="batch-tabs" class="batch-tabs"></div>
+        </section>
+
+        <section id="batch-detail-section" hidden>
+          <div class="section-header">
+            <h2><span class="num">2</span> 批次详情</h2>
+          </div>
+          <div class="grid">
+            <label>
+              批次名称
+              <input type="text" id="batch-name" />
+            </label>
+            <label>
+              测试对象
+              <select id="batch-part">
+                <option value="product">整机</option>
+                <option value="motor">电机</option>
+                <option value="battery">电池包</option>
+                <option value="gearbox">齿轮箱/传动</option>
+                <option value="blade">刀片组件</option>
+                <option value="bearing">轴承</option>
+              </select>
+            </label>
+            <label>
+              开始日期
+              <input type="date" id="batch-date" />
+            </label>
+            <label class="grid-full">
+              备注
+              <textarea id="batch-note" rows="2"></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section id="batch-items-section" hidden>
+          <div class="section-header">
+            <h2><span class="num">3</span> 试验数据录入</h2>
+            <div class="actions">
+              <button type="button" id="ana-add-item" class="btn-secondary">+ 添加样本</button>
+              <button type="button" id="ana-batch-delete" class="btn-ghost" style="color: var(--danger);">删除批次</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table" id="items-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>时间 (h)</th>
+                  <th>状态</th>
+                  <th>失效零件</th>
+                  <th>失效模式</th>
+                  <th>备注</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="items-tbody"></tbody>
+            </table>
+          </div>
+          <div id="items-empty" class="empty-state" hidden>
+            <div class="empty-icon">📋</div>
+            <h3>尚无试验数据</h3>
+            <p>点击「添加样本」录入失效或截尾数据，或使用「导入 CSV」批量导入。</p>
+          </div>
+        </section>
+
+        <section id="analysis-charts-section" hidden>
+          <div class="section-header">
+            <h2><span class="num">4</span> Weibull 分析图表</h2>
+          </div>
+          <div class="chart-grid">
+            <div class="chart-card">
+              <div class="chart-card-title">Weibull 概率图</div>
+              <div class="weibull-plot" id="weibull-plot">
+                <canvas id="weibull-canvas" width="600" height="400"></canvas>
+              </div>
+              <p class="hint">横轴：失效时间（对数刻度），纵轴：累积失效概率（Weibull 刻度）</p>
+            </div>
+            <div class="chart-card">
+              <div class="chart-card-title">CDF 累积分布</div>
+              <div class="weibull-plot" id="cdf-plot">
+                <canvas id="cdf-canvas" width="600" height="400"></canvas>
+              </div>
+              <p class="hint">红色虚线为目标 B10，蓝色实线为拟合曲线</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="failure-mode-section" hidden>
+          <div class="section-header">
+            <h2><span class="num">5</span> 失效模式与零件分析</h2>
+          </div>
+          <div class="chart-grid">
+            <div class="chart-card">
+              <div class="chart-card-title">按失效模式分布</div>
+              <div id="failure-mode-chart"></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-card-title">按失效零件分布</div>
+              <div id="failure-part-chart"></div>
+            </div>
+          </div>
+        </section>
+      </div>
     </main>
 
     <footer>B10 Tool for Gardening Tools · 数据保存在浏览器本地 · 支持 JSON 导出/导入</footer>
