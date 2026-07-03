@@ -1,169 +1,178 @@
 import {
-  loadAppState,
-  saveAppState,
-  getActiveProject,
-  getActiveModel,
-  createProject,
-  createModel,
-  genId,
-  exportStateJson,
-  importStateJson,
+  getProjects,
+  getCurrentProject,
+  setCurrentProject,
+  getCurrentProduct,
+  setCurrentProduct,
+  getCurrentModel,
+  setCurrentModel,
+  getProducts,
+  getModels,
+  addProject,
+  addProduct,
+  addModel,
+  deleteProject,
+  deleteProduct,
+  deleteModel,
+  exportData,
+  importData,
 } from "./store.js";
-import {
-  initDefinitionPage,
-  fillDefinitionForm,
-} from "./pages/definition.js";
-import { initPlanningPage, renderPlanningPage } from "./pages/planning.js";
-import { initAnalysisPage, renderAnalysisPage } from "./pages/analysis.js";
-
-let state = loadAppState();
+import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js";
 
 const projectSelect = document.getElementById("project-select");
+const productSelect = document.getElementById("product-select");
 const modelSelect = document.getElementById("model-select");
-const pages = {
-  definition: document.getElementById("page-definition"),
-  planning: document.getElementById("page-planning"),
-  analysis: document.getElementById("page-analysis"),
-};
+const pageTitle = document.getElementById("page-title");
+const mainContent = document.getElementById("main-content");
+const sidebarToggle = document.getElementById("sidebar-toggle");
+const importBtn = document.getElementById("import-btn");
+const exportBtn = document.getElementById("export-btn");
+const importFile = document.getElementById("import-file");
 
-initDefinitionPage(handleModelSave);
-initPlanningPage(handleModelSave);
-initAnalysisPage(handleModelSave);
+const navItems = document.querySelectorAll(".nav-item");
 
-document.getElementById("new-project").addEventListener("click", onNewProject);
-document.getElementById("new-model").addEventListener("click", onNewModel);
-document.getElementById("export-data").addEventListener("click", onExport);
-document.getElementById("import-btn").addEventListener("click", () => {
-  document.getElementById("import-file").click();
-});
-document.getElementById("import-file").addEventListener("change", onImport);
+initApp();
 
-projectSelect.addEventListener("change", () => {
-  state.activeProjectId = projectSelect.value;
-  const project = getActiveProject(state);
-  state.activeModelId = project.models[0]?.id;
-  persistAndRefresh();
-});
+function initApp() {
+  initSelectors();
+  initSidebar();
+  initImportExport();
 
-modelSelect.addEventListener("change", () => {
-  state.activeModelId = modelSelect.value;
-  persistAndRefresh();
-});
-
-document.querySelectorAll(".nav-tab").forEach((tab) => {
-  tab.addEventListener("click", (e) => {
-    e.preventDefault();
-    navigateTo(tab.dataset.page);
+  initRouter({
+    mainContent: mainContent,
+    navItems: Array.from(navItems),
+    onRouteChange: handleRouteChange,
+    getModel: () => getCurrentModel(),
+    saveModel: (modelData) => {
+      const current = getCurrentModel();
+      if (current && modelData) {
+        Object.assign(current, modelData);
+        refreshAllSelectors();
+      }
+    },
   });
-});
 
-window.addEventListener("hashchange", syncPageFromHash);
-
-function navigateTo(page) {
-  state.activePage = page;
-  location.hash = `#/${page}`;
-  renderCurrentPage();
+  navItems.forEach((item) => {
+    item.addEventListener("click", (e) => {
+      e.preventDefault();
+      const route = item.dataset.route;
+      navigateTo(route);
+      closeSidebarMobile();
+    });
+  });
 }
 
-function syncPageFromHash() {
-  const hash = location.hash.replace(/^#\/?/, "") || "definition";
-  const page = ["definition", "planning", "analysis"].includes(hash)
-    ? hash
-    : "definition";
-  state.activePage = page;
-  renderCurrentPage();
+function handleRouteChange(routeKey, route) {
+  pageTitle.textContent = route.title;
+  document.title = `${route.title} - 可靠性工具平台`;
 }
 
-function refreshSelectors() {
-  projectSelect.innerHTML = state.projects
+function initSelectors() {
+  refreshAllSelectors();
+
+  projectSelect.addEventListener("change", () => {
+    setCurrentProject(projectSelect.value);
+    refreshAllSelectors();
+    refreshCurrentRoute();
+  });
+
+  productSelect.addEventListener("change", () => {
+    setCurrentProduct(productSelect.value);
+    refreshAllSelectors();
+    refreshCurrentRoute();
+  });
+
+  modelSelect.addEventListener("change", () => {
+    setCurrentModel(modelSelect.value);
+    refreshAllSelectors();
+    refreshCurrentRoute();
+  });
+}
+
+function refreshAllSelectors() {
+  refreshProjectSelect();
+  refreshProductSelect();
+  refreshModelSelect();
+}
+
+function refreshProjectSelect() {
+  const projects = getProjects();
+  const current = getCurrentProject();
+  projectSelect.innerHTML = projects
     .map(
       (p) =>
-        `<option value="${p.id}" ${p.id === state.activeProjectId ? "selected" : ""}>${escapeHtml(p.name)}</option>`
+        `<option value="${p.id}" ${current && p.id === current.id ? "selected" : ""}>${escapeHtml(p.name)}</option>`
     )
     .join("");
+}
 
-  const project = getActiveProject(state);
-  modelSelect.innerHTML = project.models
+function refreshProductSelect() {
+  const project = getCurrentProject();
+  const products = project ? getProducts(project.id) : [];
+  const current = getCurrentProduct();
+  productSelect.innerHTML = products
+    .map(
+      (p) =>
+        `<option value="${p.id}" ${current && p.id === current.id ? "selected" : ""}>${escapeHtml(p.name)}</option>`
+    )
+    .join("");
+}
+
+function refreshModelSelect() {
+  const product = getCurrentProduct();
+  const models = product ? getModels(product.id) : [];
+  const current = getCurrentModel();
+  modelSelect.innerHTML = models
     .map(
       (m) =>
-        `<option value="${m.id}" ${m.id === state.activeModelId ? "selected" : ""}>${escapeHtml(m.name)}</option>`
+        `<option value="${m.id}" ${current && m.id === current.id ? "selected" : ""}>${escapeHtml(m.name)}</option>`
     )
     .join("");
 }
 
-function renderCurrentPage() {
-  refreshSelectors();
+function initSidebar() {
+  sidebarToggle.addEventListener("click", toggleSidebar);
 
-  document.querySelectorAll(".nav-tab").forEach((tab) => {
-    tab.classList.toggle("active", tab.dataset.page === state.activePage);
+  document.addEventListener("click", (e) => {
+    if (window.innerWidth <= 768) {
+      const sidebar = document.getElementById("sidebar");
+      const toggleBtn = document.getElementById("sidebar-toggle");
+      if (
+        !sidebar.contains(e.target) &&
+        !toggleBtn.contains(e.target) &&
+        document.body.classList.contains("sidebar-open")
+      ) {
+        closeSidebarMobile();
+      }
+    }
   });
+}
 
-  for (const [key, el] of Object.entries(pages)) {
-    el.hidden = key !== state.activePage;
-  }
+function toggleSidebar() {
+  document.body.classList.toggle("sidebar-open");
+}
 
-  const model = getActiveModel(state);
-  if (!model) return;
-
-  if (state.activePage === "definition") {
-    fillDefinitionForm(model);
-  } else if (state.activePage === "planning") {
-    renderPlanningPage(model);
-  } else if (state.activePage === "analysis") {
-    renderAnalysisPage(model);
+function closeSidebarMobile() {
+  if (window.innerWidth <= 768) {
+    document.body.classList.remove("sidebar-open");
   }
 }
 
-function handleModelSave({ record, definition, planning, analysis, lastResult, auto }) {
-  const project = getActiveProject(state);
-  const model = project.models.find((m) => m.id === state.activeModelId);
-  if (!model) return;
-
-  if (record) model.record = record;
-  if (definition) model.definition = definition;
-  if (planning) model.planning = planning;
-  if (analysis) model.analysis = analysis;
-  if (lastResult) model.lastResult = lastResult;
-
-  const newName = record?.modelName?.trim() || model.name;
-  if (newName !== model.name) {
-    model.name = newName;
-    refreshSelectors();
-  }
-
-  saveAppState(state);
-}
-
-function persistAndRefresh() {
-  saveAppState(state);
-  renderCurrentPage();
-}
-
-function onNewProject() {
-  const name = prompt("新项目名称：", "新项目");
-  if (!name?.trim()) return;
-  const project = createProject(name.trim());
-  state.projects.push(project);
-  state.activeProjectId = project.id;
-  state.activeModelId = project.models[0].id;
-  persistAndRefresh();
-}
-
-function onNewModel() {
-  const name = prompt("新型号名称：", "新型号");
-  if (!name?.trim()) return;
-  const project = getActiveProject(state);
-  const model = createModel(name.trim());
-  project.models.push(model);
-  state.activeModelId = model.id;
-  persistAndRefresh();
+function initImportExport() {
+  exportBtn.addEventListener("click", onExport);
+  importBtn.addEventListener("click", () => {
+    importFile.click();
+  });
+  importFile.addEventListener("change", onImport);
 }
 
 function onExport() {
-  const blob = new Blob([exportStateJson(state)], { type: "application/json" });
+  const blob = new Blob([exportData()], {
+    type: "application/json",
+  });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `b10-tool-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `reliability-tool-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -174,9 +183,9 @@ function onImport(e) {
   const reader = new FileReader();
   reader.onload = () => {
     try {
-      state = importStateJson(reader.result);
-      saveAppState(state);
-      persistAndRefresh();
+      importData(reader.result);
+      refreshAllSelectors();
+      refreshCurrentRoute();
       alert("导入成功");
     } catch (err) {
       alert("导入失败：" + err.message);
@@ -192,10 +201,4 @@ function escapeHtml(s) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-}
-
-if (!location.hash) {
-  location.hash = "#/definition";
-} else {
-  syncPageFromHash();
 }

@@ -1,0 +1,890 @@
+import { genId } from "../store.js";
+import { fmt, toast } from "../utils.js";
+
+let currentModel = null;
+let onSaveCallback = null;
+let activeTab = "test-items";
+
+const STRESS_TYPES = {
+  temperature: "温度",
+  humidity: "湿度",
+  vibration: "振动",
+  voltage: "电压",
+};
+
+const ACCEL_MODELS = {
+  arrhenius: "Arrhenius",
+  coffinManson: "Coffin-Manson",
+  inversePower: "逆幂律",
+  combined: "综合",
+};
+
+const HALT_STRESS_TYPES = {
+  lowTemp: "低温",
+  highTemp: "高温",
+  tempCycle: "温度循环",
+  vibration: "振动",
+  combined: "综合",
+};
+
+const CENSOR_TYPES = {
+  time: "定时截尾",
+  failure: "定数截尾",
+  complete: "完全失效",
+};
+
+function ensureTestPlan() {
+  if (!currentModel.modules) currentModel.modules = {};
+  if (!currentModel.modules.testPlan) {
+    currentModel.modules.testPlan = {
+      globalParams: {
+        confidence: 0.9,
+        allowedFailures: 0,
+        defaultCensorType: "time",
+      },
+      testItems: [],
+      altPlans: [],
+      haltTests: [],
+    };
+  }
+  const tp = currentModel.modules.testPlan;
+  if (!tp.globalParams) {
+    tp.globalParams = { confidence: 0.9, allowedFailures: 0, defaultCensorType: "time" };
+  }
+  if (!tp.testItems) tp.testItems = [];
+  if (!tp.altPlans) tp.altPlans = [];
+  if (!tp.haltTests) tp.haltTests = [];
+}
+
+function save() {
+  if (onSaveCallback && currentModel) {
+    onSaveCallback(currentModel);
+  }
+}
+
+function autoSave() {
+  save();
+}
+
+export function init(model, onSave) {
+  currentModel = model;
+  onSaveCallback = onSave;
+}
+
+export function render(container, model) {
+  currentModel = model;
+  const template = document.getElementById("test-plan-template");
+  const content = template.content.cloneNode(true);
+  container.appendChild(content);
+
+  ensureTestPlan();
+  bindEvents();
+  renderGlobalParams();
+  renderTestItems();
+  renderAltPlans();
+  renderHaltTests();
+  switchTab(activeTab);
+}
+
+function bindEvents() {
+  const toolbar = document.querySelector(".test-plan-toolbar");
+  if (toolbar) {
+    toolbar.addEventListener("click", (e) => {
+      const tab = e.target.closest(".test-plan-tab");
+      if (!tab) return;
+      switchTab(tab.dataset.tab);
+    });
+  }
+
+  bindGlobalParamsEvents();
+  bindTestItemsEvents();
+  bindAltEvents();
+  bindHaltEvents();
+}
+
+function switchTab(tabName) {
+  activeTab = tabName;
+  document.querySelectorAll(".test-plan-tab").forEach((t) => {
+    t.classList.toggle("active", t.dataset.tab === tabName);
+  });
+  document.querySelectorAll(".test-plan-tab-content").forEach((c) => {
+    c.style.display = "none";
+  });
+  const tabEl = document.getElementById(`tp-tab-${tabName}`);
+  if (tabEl) tabEl.style.display = "";
+}
+
+function bindGlobalParamsEvents() {
+  const confidence = document.getElementById("tp-confidence");
+  const allowedFailures = document.getElementById("tp-allowed-failures");
+  const defaultCensor = document.getElementById("tp-default-censor");
+
+  if (confidence) {
+    confidence.addEventListener("change", () => {
+      currentModel.modules.testPlan.globalParams.confidence = Number(confidence.value);
+      autoSave();
+    });
+  }
+  if (allowedFailures) {
+    allowedFailures.addEventListener("change", () => {
+      currentModel.modules.testPlan.globalParams.allowedFailures = Number(allowedFailures.value) || 0;
+      autoSave();
+    });
+  }
+  if (defaultCensor) {
+    defaultCensor.addEventListener("change", () => {
+      currentModel.modules.testPlan.globalParams.defaultCensorType = defaultCensor.value;
+      autoSave();
+    });
+  }
+}
+
+function renderGlobalParams() {
+  const params = currentModel.modules.testPlan.globalParams;
+  const confidence = document.getElementById("tp-confidence");
+  const allowedFailures = document.getElementById("tp-allowed-failures");
+  const defaultCensor = document.getElementById("tp-default-censor");
+
+  if (confidence) confidence.value = String(params.confidence ?? 0.9);
+  if (allowedFailures) allowedFailures.value = params.allowedFailures ?? 0;
+  if (defaultCensor) defaultCensor.value = params.defaultCensorType ?? "time";
+}
+
+function calculateSampleSize(reliability, confidence, allowedFailures) {
+  const R = Number(reliability) || 0.9;
+  const gamma = Number(confidence) || 0.9;
+  const r = Number(allowedFailures) || 0;
+
+  if (r === 0) {
+    return Math.ceil(Math.log(1 - gamma) / Math.log(R));
+  }
+
+  const chiSquared = chiSquareInv(1 - gamma, 2 * (r + 1));
+  return Math.ceil(chiSquared / (2 * Math.log(1 / R)));
+}
+
+function chiSquareInv(p, df) {
+  if (p <= 0) return 0;
+  if (p >= 1) return Infinity;
+
+  let x = df * Math.pow(1 - 2 / (9 * df) + normInv(p) * Math.sqrt(2 / (9 * df)), 3);
+  for (let i = 0; i < 10; i++) {
+    const error = chiSquareCdf(x, df) - p;
+    const pdf = chiSquarePdf(x, df);
+    if (Math.abs(error) < 1e-10) break;
+    x = x - error / pdf;
+    if (x < 0) x = 0.001;
+  }
+  return x;
+}
+
+function normInv(p) {
+  if (p <= 0) return -Infinity;
+  if (p >= 1) return Infinity;
+  const t = Math.sqrt(-2 * Math.log(p < 0.5 ? p : 1 - p));
+  const c0 = 2.515517,
+    c1 = 0.802853,
+    c2 = 0.010328;
+  const d1 = 1.432788,
+    d2 = 0.189269,
+    d3 = 0.001308;
+  const x = t - (c0 + c1 * t + c2 * t * t) / (1 + d1 * t + d2 * t * t + d3 * t * t * t);
+  return p < 0.5 ? -x : x;
+}
+
+function chiSquarePdf(x, df) {
+  if (x <= 0) return 0;
+  return (
+    (Math.pow(x, df / 2 - 1) * Math.exp(-x / 2)) /
+    (Math.pow(2, df / 2) * gammaFunc(df / 2))
+  );
+}
+
+function chiSquareCdf(x, df) {
+  if (x <= 0) return 0;
+  return lowerRegularizedGamma(df / 2, x / 2);
+}
+
+function gammaFunc(z) {
+  if (z < 0.5) {
+    return Math.PI / (Math.sin(Math.PI * z) * gammaFunc(1 - z));
+  }
+  z -= 1;
+  const g = 7;
+  const c = [
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+    -176.61502916214059, 12.507343278686905, -0.13857109526572012,
+    9.9843695780195716e-6, 1.5056327351493116e-7,
+  ];
+  let x = c[0];
+  for (let i = 1; i < g + 2; i++) {
+    x += c[i] / (z + i);
+  }
+  const t = z + g + 0.5;
+  return Math.sqrt(2 * Math.PI) * Math.pow(t, z + 0.5) * Math.exp(-t) * x;
+}
+
+function lowerRegularizedGamma(a, x) {
+  if (x < 0) return 0;
+  if (x === 0) return 0;
+  if (x < a + 1) {
+    let sum = 1 / a;
+    let term = 1 / a;
+    for (let n = 1; n <= 100; n++) {
+      term *= x / (a + n);
+      sum += term;
+      if (Math.abs(term) < Math.abs(sum) * 1e-10) break;
+    }
+    return sum * Math.exp(-x + a * Math.log(x) - lnGamma(a));
+  } else {
+    let b = x + 1 - a;
+    let c = Infinity;
+    let d = 1 / b;
+    let h = d;
+    for (let i = 1; i <= 100; i++) {
+      const an = -i * (i - a);
+      b += 2;
+      d = an * d + b;
+      if (Math.abs(d) < 1e-30) d = 1e-30;
+      c = b + an / c;
+      if (Math.abs(c) < 1e-30) c = 1e-30;
+      d = 1 / d;
+      const delta = d * c;
+      h *= delta;
+      if (Math.abs(delta - 1) < 1e-10) break;
+    }
+    return 1 - Math.exp(-x + a * Math.log(x) - lnGamma(a)) * h;
+  }
+}
+
+function lnGamma(z) {
+  return Math.log(gammaFunc(z));
+}
+
+function calculateTestDuration(targetLife, censorType) {
+  const life = Number(targetLife) || 0;
+  switch (censorType) {
+    case "time":
+      return Math.ceil(life * 1.2);
+    case "failure":
+      return Math.ceil(life * 1.3);
+    case "complete":
+      return Math.ceil(life * 1.5);
+    default:
+      return Math.ceil(life * 1.2);
+  }
+}
+
+function createNewTestItem() {
+  const params = currentModel.modules.testPlan.globalParams;
+  return {
+    id: genId(),
+    name: "",
+    targetLife: 1000,
+    targetReliability: 0.9,
+    sampleSize: 0,
+    testDuration: 0,
+    censorType: params.defaultCensorType || "time",
+    benchCondition: "",
+  };
+}
+
+function bindTestItemsEvents() {
+  const addBtn = document.getElementById("tp-add-item");
+  const calcAllBtn = document.getElementById("tp-calc-all");
+  const importBtn = document.getElementById("tp-import-fmea");
+  const tbody = document.getElementById("tp-items-tbody");
+
+  if (addBtn) addBtn.addEventListener("click", addTestItem);
+  if (calcAllBtn) calcAllBtn.addEventListener("click", calculateAllTestItems);
+  if (importBtn) importBtn.addEventListener("click", importFromFmea);
+
+  if (tbody) {
+    tbody.addEventListener("change", (e) => {
+      const el = e.target.closest("[data-field]");
+      if (!el) return;
+      const tr = el.closest("tr");
+      const id = tr.dataset.id;
+      const field = el.dataset.field;
+      const item = currentModel.modules.testPlan.testItems.find((i) => i.id === id);
+      if (!item) return;
+
+      let val = el.value;
+      if (el.type === "number") val = Number(val) || 0;
+      item[field] = val;
+
+      if (
+        field === "targetLife" ||
+        field === "targetReliability" ||
+        field === "censorType"
+      ) {
+        const params = currentModel.modules.testPlan.globalParams;
+        item.sampleSize = calculateSampleSize(
+          item.targetReliability,
+          params.confidence,
+          params.allowedFailures
+        );
+        item.testDuration = calculateTestDuration(item.targetLife, item.censorType);
+      }
+
+      autoSave();
+      renderTestItems();
+    });
+
+    tbody.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-action='delete']");
+      if (!btn) return;
+      const tr = btn.closest("tr");
+      const id = tr.dataset.id;
+      if (!confirm("确定删除该测试项？")) return;
+      currentModel.modules.testPlan.testItems =
+        currentModel.modules.testPlan.testItems.filter((i) => i.id !== id);
+      autoSave();
+      renderTestItems();
+    });
+  }
+}
+
+function renderTestItems() {
+  const tbody = document.getElementById("tp-items-tbody");
+  const empty = document.getElementById("tp-items-empty");
+  const items = currentModel.modules.testPlan.testItems;
+
+  if (!tbody) return;
+
+  if (!items || items.length === 0) {
+    tbody.innerHTML = "";
+    if (empty) empty.style.display = "";
+    return;
+  }
+  if (empty) empty.style.display = "none";
+
+  tbody.innerHTML = items
+    .map((item, idx) => {
+      return `
+      <tr data-id="${item.id}">
+        <td>${idx + 1}</td>
+        <td><input type="text" data-field="name" value="${escapeHtml(item.name)}" class="item-input" placeholder="测试项目名称" /></td>
+        <td><input type="number" data-field="targetLife" value="${item.targetLife}" min="0" step="1" class="item-input" /></td>
+        <td>
+          <select data-field="targetReliability" class="item-input">
+            <option value="0.9" ${item.targetReliability === 0.9 ? "selected" : ""}>90%</option>
+            <option value="0.95" ${item.targetReliability === 0.95 ? "selected" : ""}>95%</option>
+            <option value="0.99" ${item.targetReliability === 0.99 ? "selected" : ""}>99%</option>
+            <option value="0.999" ${item.targetReliability === 0.999 ? "selected" : ""}>99.9%</option>
+          </select>
+        </td>
+        <td class="tp-sample-size">${item.sampleSize || "-"}</td>
+        <td class="tp-test-duration">${item.testDuration || "-"}</td>
+        <td>
+          <select data-field="censorType" class="item-input">
+            <option value="time" ${item.censorType === "time" ? "selected" : ""}>定时截尾</option>
+            <option value="failure" ${item.censorType === "failure" ? "selected" : ""}>定数截尾</option>
+            <option value="complete" ${item.censorType === "complete" ? "selected" : ""}>完全失效</option>
+          </select>
+        </td>
+        <td><input type="text" data-field="benchCondition" value="${escapeHtml(item.benchCondition)}" class="item-input" placeholder="台架条件" /></td>
+        <td><button type="button" data-action="delete" class="btn-sm btn-ghost" style="color: var(--danger);">删除</button></td>
+      </tr>`;
+    })
+    .join("");
+}
+
+function addTestItem() {
+  const item = createNewTestItem();
+  const params = currentModel.modules.testPlan.globalParams;
+  item.sampleSize = calculateSampleSize(
+    item.targetReliability,
+    params.confidence,
+    params.allowedFailures
+  );
+  item.testDuration = calculateTestDuration(item.targetLife, item.censorType);
+  currentModel.modules.testPlan.testItems.push(item);
+  autoSave();
+  renderTestItems();
+
+  const tbody = document.getElementById("tp-items-tbody");
+  const lastRow = tbody?.lastElementChild;
+  if (lastRow) {
+    const firstInput = lastRow.querySelector("input[data-field='name']");
+    if (firstInput) firstInput.focus();
+  }
+}
+
+function calculateAllTestItems() {
+  const params = currentModel.modules.testPlan.globalParams;
+  const items = currentModel.modules.testPlan.testItems;
+  for (const item of items) {
+    item.sampleSize = calculateSampleSize(
+      item.targetReliability,
+      params.confidence,
+      params.allowedFailures
+    );
+    item.testDuration = calculateTestDuration(item.targetLife, item.censorType);
+  }
+  autoSave();
+  renderTestItems();
+  const btn = document.getElementById("tp-calc-all");
+  if (btn) toast(btn, "计算完成", 1500);
+}
+
+function importFromFmea() {
+  const fmea = currentModel.modules?.fmea;
+  if (!fmea || !fmea.items || fmea.items.length === 0) {
+    alert("FMEA 模块暂无数据，请先在 FMEA 模块中添加失效模式。");
+    return;
+  }
+
+  const existingNames = new Set(
+    currentModel.modules.testPlan.testItems.map((i) => i.name)
+  );
+  const params = currentModel.modules.testPlan.globalParams;
+  let imported = 0;
+
+  for (const fmeaItem of fmea.items) {
+    const name = fmeaItem.failureMode || fmeaItem.function;
+    if (!name || existingNames.has(name)) continue;
+
+    const item = createNewTestItem();
+    item.name = name;
+    item.benchCondition = fmeaItem.function || "";
+    item.sampleSize = calculateSampleSize(
+      item.targetReliability,
+      params.confidence,
+      params.allowedFailures
+    );
+    item.testDuration = calculateTestDuration(item.targetLife, item.censorType);
+    currentModel.modules.testPlan.testItems.push(item);
+    existingNames.add(name);
+    imported++;
+  }
+
+  if (imported === 0) {
+    alert("未导入新项目（可能全部已存在）。");
+    return;
+  }
+
+  autoSave();
+  renderTestItems();
+  const btn = document.getElementById("tp-import-fmea");
+  if (btn) toast(btn, `已导入 ${imported} 项`, 1500);
+}
+
+function calculateAccelFactor(plan) {
+  const stressType = plan.stressType;
+  const model = plan.accelModel;
+  const useStress = Number(plan.useStress) || 0;
+  const accel1 = Number(plan.accelStress1) || 0;
+
+  if (!useStress || !accel1) return null;
+
+  switch (model) {
+    case "arrhenius": {
+      const Ea = 0.7;
+      const k = 8.617e-5;
+      const T_use = useStress + 273.15;
+      const T_accel = accel1 + 273.15;
+      return Math.exp((Ea / k) * (1 / T_use - 1 / T_accel));
+    }
+    case "coffinManson": {
+      const n = 2.5;
+      if (useStress <= 0) return null;
+      return Math.pow(accel1 / useStress, n);
+    }
+    case "inversePower": {
+      const n = stressType === "voltage" ? 5 : stressType === "vibration" ? 3 : 4;
+      if (useStress <= 0) return null;
+      return Math.pow(accel1 / useStress, n);
+    }
+    default:
+      return null;
+  }
+}
+
+function createNewAltPlan() {
+  return {
+    id: genId(),
+    name: "",
+    stressType: "temperature",
+    accelModel: "arrhenius",
+    useStress: 25,
+    accelStress1: 60,
+    accelStress2: 85,
+    accelFactor: 0,
+    testDuration: 1000,
+    sampleSize: 10,
+  };
+}
+
+function bindAltEvents() {
+  const addBtn = document.getElementById("tp-add-alt");
+  const tbody = document.getElementById("tp-alt-tbody");
+
+  if (addBtn) addBtn.addEventListener("click", addAltPlan);
+
+  if (tbody) {
+    tbody.addEventListener("change", (e) => {
+      const el = e.target.closest("[data-field]");
+      if (!el) return;
+      const tr = el.closest("tr");
+      const id = tr.dataset.id;
+      const field = el.dataset.field;
+      const plan = currentModel.modules.testPlan.altPlans.find((p) => p.id === id);
+      if (!plan) return;
+
+      let val = el.value;
+      if (el.type === "number") val = Number(val) || 0;
+      plan[field] = val;
+
+      if (
+        field === "stressType" ||
+        field === "accelModel" ||
+        field === "useStress" ||
+        field === "accelStress1"
+      ) {
+        const af = calculateAccelFactor(plan);
+        plan.accelFactor = af ? parseFloat(af.toFixed(2)) : 0;
+      }
+
+      autoSave();
+      renderAltPlans();
+    });
+
+    tbody.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-action='delete']");
+      if (!btn) return;
+      const tr = btn.closest("tr");
+      const id = tr.dataset.id;
+      if (!confirm("确定删除该 ALT 计划？")) return;
+      currentModel.modules.testPlan.altPlans =
+        currentModel.modules.testPlan.altPlans.filter((p) => p.id !== id);
+      autoSave();
+      renderAltPlans();
+    });
+  }
+}
+
+function renderAltPlans() {
+  const tbody = document.getElementById("tp-alt-tbody");
+  const empty = document.getElementById("tp-alt-empty");
+  const plans = currentModel.modules.testPlan.altPlans;
+
+  if (!tbody) return;
+
+  if (!plans || plans.length === 0) {
+    tbody.innerHTML = "";
+    if (empty) empty.style.display = "";
+    return;
+  }
+  if (empty) empty.style.display = "none";
+
+  tbody.innerHTML = plans
+    .map((plan, idx) => {
+      const stressOptions = Object.entries(STRESS_TYPES)
+        .map(
+          ([k, v]) =>
+            `<option value="${k}" ${plan.stressType === k ? "selected" : ""}>${v}</option>`
+        )
+        .join("");
+      const modelOptions = Object.entries(ACCEL_MODELS)
+        .map(
+          ([k, v]) =>
+            `<option value="${k}" ${plan.accelModel === k ? "selected" : ""}>${v}</option>`
+        )
+        .join("");
+
+      return `
+      <tr data-id="${plan.id}">
+        <td>${idx + 1}</td>
+        <td><input type="text" data-field="name" value="${escapeHtml(plan.name)}" class="item-input" placeholder="试验名称" /></td>
+        <td>
+          <select data-field="stressType" class="item-input">
+            ${stressOptions}
+          </select>
+        </td>
+        <td>
+          <select data-field="accelModel" class="item-input">
+            ${modelOptions}
+          </select>
+        </td>
+        <td><input type="number" data-field="useStress" value="${plan.useStress}" class="item-input" step="0.1" /></td>
+        <td><input type="number" data-field="accelStress1" value="${plan.accelStress1}" class="item-input" step="0.1" /></td>
+        <td><input type="number" data-field="accelStress2" value="${plan.accelStress2}" class="item-input" step="0.1" /></td>
+        <td class="tp-af-cell">${plan.accelFactor ? plan.accelFactor.toFixed(2) + "×" : "-"}</td>
+        <td><input type="number" data-field="testDuration" value="${plan.testDuration}" min="0" class="item-input" step="1" /></td>
+        <td><input type="number" data-field="sampleSize" value="${plan.sampleSize}" min="1" class="item-input" step="1" /></td>
+        <td><button type="button" data-action="delete" class="btn-sm btn-ghost" style="color: var(--danger);">删除</button></td>
+      </tr>`;
+    })
+    .join("");
+}
+
+function addAltPlan() {
+  const plan = createNewAltPlan();
+  const af = calculateAccelFactor(plan);
+  plan.accelFactor = af ? parseFloat(af.toFixed(2)) : 0;
+  currentModel.modules.testPlan.altPlans.push(plan);
+  autoSave();
+  renderAltPlans();
+
+  const tbody = document.getElementById("tp-alt-tbody");
+  const lastRow = tbody?.lastElementChild;
+  if (lastRow) {
+    const firstInput = lastRow.querySelector("input[data-field='name']");
+    if (firstInput) firstInput.focus();
+  }
+}
+
+function createNewHaltTest() {
+  return {
+    id: genId(),
+    name: "",
+    startDate: "",
+    endDate: "",
+    purpose: "",
+    steps: [],
+  };
+}
+
+function createNewHaltStep() {
+  return {
+    id: genId(),
+    stressType: "highTemp",
+    stressLevel: "",
+    durationMin: 30,
+    failures: 0,
+    description: "",
+  };
+}
+
+function getHaltTotalFailures(test) {
+  if (!test.steps || test.steps.length === 0) return 0;
+  return test.steps.reduce((sum, s) => sum + (Number(s.failures) || 0), 0);
+}
+
+function bindHaltEvents() {
+  const addBtn = document.getElementById("tp-add-halt");
+  const container = document.getElementById("tp-halt-container");
+
+  if (addBtn) addBtn.addEventListener("click", addHaltTest);
+
+  if (container) {
+    container.addEventListener("click", (e) => {
+      const addStepBtn = e.target.closest("button[data-action='add-step']");
+      if (addStepBtn) {
+        const testId = addStepBtn.dataset.testId;
+        addHaltStep(testId);
+        return;
+      }
+
+      const deleteTestBtn = e.target.closest("button[data-action='delete-test']");
+      if (deleteTestBtn) {
+        const testId = deleteTestBtn.dataset.testId;
+        deleteHaltTest(testId);
+        return;
+      }
+
+      const deleteStepBtn = e.target.closest("button[data-action='delete-step']");
+      if (deleteStepBtn) {
+        const testId = deleteStepBtn.dataset.testId;
+        const stepId = deleteStepBtn.dataset.stepId;
+        deleteHaltStep(testId, stepId);
+        return;
+      }
+    });
+
+    container.addEventListener("change", (e) => {
+      const el = e.target.closest("[data-field]");
+      if (!el) return;
+
+      const testEl = el.closest("[data-test-id]");
+      if (!testEl) return;
+      const testId = testEl.dataset.testId;
+      const test = currentModel.modules.testPlan.haltTests.find((t) => t.id === testId);
+      if (!test) return;
+
+      const stepEl = el.closest("[data-step-id]");
+      if (stepEl) {
+        const stepId = stepEl.dataset.stepId;
+        const step = test.steps.find((s) => s.id === stepId);
+        if (!step) return;
+        const field = el.dataset.field;
+        let val = el.value;
+        if (el.type === "number") val = Number(val) || 0;
+        step[field] = val;
+      } else {
+        const field = el.dataset.field;
+        test[field] = el.value;
+      }
+
+      autoSave();
+      renderHaltTests();
+    });
+  }
+}
+
+function renderHaltTests() {
+  const container = document.getElementById("tp-halt-container");
+  const empty = document.getElementById("tp-halt-empty");
+  const tests = currentModel.modules.testPlan.haltTests;
+
+  if (!container) return;
+
+  if (!tests || tests.length === 0) {
+    if (empty) empty.style.display = "";
+    const existing = container.querySelectorAll(".halt-test-card");
+    existing.forEach((el) => el.remove());
+    return;
+  }
+  if (empty) empty.style.display = "none";
+
+  container.innerHTML =
+    (empty ? empty.outerHTML : "") +
+    tests
+      .map((test, idx) => {
+        const totalFailures = getHaltTotalFailures(test);
+        const stepsHtml = renderHaltSteps(test);
+        return `
+        <div class="halt-test-card" data-test-id="${test.id}">
+          <div class="halt-test-header">
+            <div class="halt-test-title">
+              <span class="halt-test-index">试验 ${idx + 1}</span>
+              <input type="text" data-field="name" value="${escapeHtml(test.name)}" class="item-input halt-test-name" placeholder="HALT 试验名称" />
+            </div>
+            <div class="halt-test-stats">
+              <span class="halt-stat">总失效数: <strong>${totalFailures}</strong></span>
+              <span class="halt-stat">步数: <strong>${test.steps?.length || 0}</strong></span>
+            </div>
+            <div class="halt-test-actions">
+              <button type="button" data-action="delete-test" data-test-id="${test.id}" class="btn-sm btn-ghost" style="color: var(--danger);">删除试验</button>
+            </div>
+          </div>
+          <div class="halt-test-body">
+            <div class="form-row">
+              <div class="form-group">
+                <label>开始日期</label>
+                <input type="date" data-field="startDate" value="${escapeHtml(test.startDate)}" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label>结束日期</label>
+                <input type="date" data-field="endDate" value="${escapeHtml(test.endDate)}" class="form-input" />
+              </div>
+              <div class="form-group full-width">
+                <label>试验目的</label>
+                <input type="text" data-field="purpose" value="${escapeHtml(test.purpose)}" class="form-input" placeholder="试验目的说明" />
+              </div>
+            </div>
+            <div class="halt-steps-section">
+              <div class="halt-steps-header">
+                <h4>应力步记录</h4>
+                <button type="button" data-action="add-step" data-test-id="${test.id}" class="btn-sm btn-secondary">
+                  <span>➕</span> 添加应力步
+                </button>
+              </div>
+              ${stepsHtml}
+            </div>
+          </div>
+        </div>`;
+      })
+      .join("");
+
+  const emptyEl = container.querySelector("#tp-halt-empty");
+  if (emptyEl) emptyEl.style.display = "none";
+}
+
+function renderHaltSteps(test) {
+  if (!test.steps || test.steps.length === 0) {
+    return `<div class="halt-steps-empty">暂无应力步记录，点击「添加应力步」开始记录。</div>`;
+  }
+
+  const rows = test.steps
+    .map((step, idx) => {
+      const stressOptions = Object.entries(HALT_STRESS_TYPES)
+        .map(
+          ([k, v]) =>
+            `<option value="${k}" ${step.stressType === k ? "selected" : ""}>${v}</option>`
+        )
+        .join("");
+
+      return `
+      <tr data-step-id="${step.id}">
+        <td>${idx + 1}</td>
+        <td>
+          <select data-field="stressType" class="item-input">
+            ${stressOptions}
+          </select>
+        </td>
+        <td><input type="text" data-field="stressLevel" value="${escapeHtml(step.stressLevel)}" class="item-input" placeholder="如: 85°C / 10Grms" /></td>
+        <td><input type="number" data-field="durationMin" value="${step.durationMin}" min="0" class="item-input" step="1" /></td>
+        <td><input type="number" data-field="failures" value="${step.failures}" min="0" class="item-input" step="1" /></td>
+        <td><input type="text" data-field="description" value="${escapeHtml(step.description)}" class="item-input" placeholder="失效描述" /></td>
+        <td><button type="button" data-action="delete-step" data-test-id="${test.id}" data-step-id="${step.id}" class="btn-sm btn-ghost" style="color: var(--danger);">删除</button></td>
+      </tr>`;
+    })
+    .join("");
+
+  return `
+  <div class="table-wrap">
+    <table class="data-table halt-steps-table">
+      <thead>
+        <tr>
+          <th style="width: 50px;">序号</th>
+          <th style="width: 120px;">应力类型</th>
+          <th style="width: 150px;">应力水平</th>
+          <th style="width: 130px;">持续时间 (min)</th>
+          <th style="width: 100px;">失效数</th>
+          <th style="min-width: 180px;">失效描述</th>
+          <th style="width: 70px;">操作</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function addHaltTest() {
+  const test = createNewHaltTest();
+  currentModel.modules.testPlan.haltTests.push(test);
+  autoSave();
+  renderHaltTests();
+
+  const container = document.getElementById("tp-halt-container");
+  const lastCard = container?.querySelector(".halt-test-card:last-child");
+  if (lastCard) {
+    const nameInput = lastCard.querySelector("input[data-field='name']");
+    if (nameInput) nameInput.focus();
+  }
+}
+
+function deleteHaltTest(testId) {
+  if (!confirm("确定删除该 HALT 试验？此操作不可恢复。")) return;
+  currentModel.modules.testPlan.haltTests =
+    currentModel.modules.testPlan.haltTests.filter((t) => t.id !== testId);
+  autoSave();
+  renderHaltTests();
+}
+
+function addHaltStep(testId) {
+  const test = currentModel.modules.testPlan.haltTests.find((t) => t.id === testId);
+  if (!test) return;
+  if (!test.steps) test.steps = [];
+  test.steps.push(createNewHaltStep());
+  autoSave();
+  renderHaltTests();
+}
+
+function deleteHaltStep(testId, stepId) {
+  const test = currentModel.modules.testPlan.haltTests.find((t) => t.id === testId);
+  if (!test) return;
+  test.steps = test.steps.filter((s) => s.id !== stepId);
+  autoSave();
+  renderHaltTests();
+}
+
+function escapeHtml(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
