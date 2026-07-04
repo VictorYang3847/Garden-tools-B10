@@ -64,82 +64,93 @@ function initApp() {
       closeSidebarMobile();
     });
   });
+
+  initGlobalTooltip();
 }
 
 let globalTooltipEl = null;
-let tooltipHideTimer = null;
 
 function initGlobalTooltip() {
   globalTooltipEl = document.createElement("div");
   globalTooltipEl.className = "global-help-tooltip";
-  globalTooltipEl.style.cssText = `
-    position: fixed;
-    z-index: 100000;
-    background: #1a1a2e;
-    color: #fff;
-    padding: 8px 12px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: normal;
-    line-height: 1.5;
-    max-width: 300px;
-    width: max-content;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-    border: 1px solid #2d2d44;
-    pointer-events: none;
-    display: none;
-    text-align: left;
-    word-wrap: break-word;
-  `;
+  globalTooltipEl.style.cssText = [
+    "position: fixed",
+    "z-index: 100000",
+    "background: #1a1a2e",
+    "color: #fff",
+    "padding: 8px 12px",
+    "border-radius: 6px",
+    "font-size: 12px",
+    "font-weight: normal",
+    "line-height: 1.5",
+    "max-width: 300px",
+    "width: max-content",
+    "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5)",
+    "border: 1px solid #2d2d44",
+    "pointer-events: none",
+    "display: none",
+    "text-align: left",
+    "word-wrap: break-word",
+    "opacity: 0",
+    "transition: opacity 0.15s",
+  ].join("; ") + ";";
   document.body.appendChild(globalTooltipEl);
 
-  document.addEventListener("mouseover", (e) => {
-    const icon = e.target.closest(".help-icon");
-    if (!icon || !icon.dataset.tooltip) return;
-    showGlobalTooltip(icon);
-  });
+  document.addEventListener("mouseover", onTooltipMouseOver);
+  document.addEventListener("mouseout", onTooltipMouseOut);
+}
 
-  document.addEventListener("mouseout", (e) => {
-    const icon = e.target.closest(".help-icon");
-    if (!icon) return;
-    const related = e.relatedTarget;
-    if (related && related.closest && related.closest(".help-icon")) return;
-    hideGlobalTooltip();
-  });
+function onTooltipMouseOver(e) {
+  const icon = e.target.closest(".help-icon");
+  if (!icon || !icon.dataset.tooltip) return;
+  showGlobalTooltip(icon);
+}
 
-  window.addEventListener("scroll", hideGlobalTooltip, true);
-  window.addEventListener("resize", hideGlobalTooltip);
+function onTooltipMouseOut(e) {
+  const icon = e.target.closest(".help-icon");
+  if (!icon) return;
+  const related = e.relatedTarget;
+  if (related && related.closest && related.closest(".help-icon")) return;
+  hideGlobalTooltip();
 }
 
 function showGlobalTooltip(icon) {
   if (!globalTooltipEl) return;
-  clearTimeout(tooltipHideTimer);
 
   globalTooltipEl.textContent = icon.dataset.tooltip;
   globalTooltipEl.style.display = "block";
+  globalTooltipEl.style.opacity = "0";
 
-  const iconRect = icon.getBoundingClientRect();
-  const tooltipRect = globalTooltipEl.getBoundingClientRect();
+  requestAnimationFrame(() => {
+    const iconRect = icon.getBoundingClientRect();
+    const tooltipRect = globalTooltipEl.getBoundingClientRect();
 
-  let top = iconRect.top - tooltipRect.height - 8;
-  let left = iconRect.left + (iconRect.width / 2) - (tooltipRect.width / 2);
+    let top = iconRect.top - tooltipRect.height - 8;
+    let left = iconRect.left + (iconRect.width / 2) - (tooltipRect.width / 2);
 
-  if (top < 8) {
-    top = iconRect.bottom + 8;
-  }
+    if (top < 8) {
+      top = iconRect.bottom + 8;
+    }
 
-  if (left < 8) left = 8;
-  if (left + tooltipRect.width > window.innerWidth - 8) {
-    left = window.innerWidth - tooltipRect.width - 8;
-  }
+    if (left < 8) left = 8;
+    if (left + tooltipRect.width > window.innerWidth - 8) {
+      left = window.innerWidth - tooltipRect.width - 8;
+    }
 
-  globalTooltipEl.style.top = `${top}px`;
-  globalTooltipEl.style.left = `${left}px`;
+    globalTooltipEl.style.top = top + "px";
+    globalTooltipEl.style.left = left + "px";
+    globalTooltipEl.style.opacity = "1";
+  });
 }
 
 function hideGlobalTooltip() {
   if (!globalTooltipEl) return;
-  globalTooltipEl.style.display = "none";
+  globalTooltipEl.style.opacity = "0";
+  setTimeout(() => {
+    if (globalTooltipEl && globalTooltipEl.style.opacity === "0") {
+      globalTooltipEl.style.display = "none";
+    }
+  }, 150);
 }
 
 function handleRouteChange(routeKey, route) {
