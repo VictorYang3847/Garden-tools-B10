@@ -81,9 +81,8 @@ function initGlobalTooltip() {
     "padding: 8px 12px",
     "border-radius: 6px",
     "font-size: 12px",
-    "font-weight: normal",
     "line-height: 1.5",
-    "max-width: 300px",
+    "max-width: 280px",
     "width: max-content",
     "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5)",
     "border: 1px solid #2d2d44",
@@ -91,27 +90,32 @@ function initGlobalTooltip() {
     "display: none",
     "text-align: left",
     "word-wrap: break-word",
-    "opacity: 0",
-    "transition: opacity 0.15s",
   ].join("; ") + ";";
   document.body.appendChild(globalTooltipEl);
 
-  document.addEventListener("mouseover", onTooltipMouseOver);
-  document.addEventListener("mouseout", onTooltipMouseOut);
+  bindHelpIcons();
+
+  const observer = new MutationObserver(() => {
+    bindHelpIcons();
+  });
+  observer.observe(document.getElementById("main-content"), {
+    childList: true,
+    subtree: true,
+  });
 }
 
-function onTooltipMouseOver(e) {
-  const icon = e.target.closest(".help-icon");
-  if (!icon || !icon.dataset.tooltip) return;
-  showGlobalTooltip(icon);
-}
-
-function onTooltipMouseOut(e) {
-  const icon = e.target.closest(".help-icon");
-  if (!icon) return;
-  const related = e.relatedTarget;
-  if (related && related.closest && related.closest(".help-icon")) return;
-  hideGlobalTooltip();
+function bindHelpIcons() {
+  const icons = document.querySelectorAll(".help-icon");
+  icons.forEach((icon) => {
+    if (icon.dataset.tooltipBound) return;
+    icon.dataset.tooltipBound = "1";
+    icon.addEventListener("mouseenter", () => {
+      showGlobalTooltip(icon);
+    });
+    icon.addEventListener("mouseleave", () => {
+      hideGlobalTooltip();
+    });
+  });
 }
 
 function showGlobalTooltip(icon) {
@@ -119,38 +123,29 @@ function showGlobalTooltip(icon) {
 
   globalTooltipEl.textContent = icon.dataset.tooltip;
   globalTooltipEl.style.display = "block";
-  globalTooltipEl.style.opacity = "0";
 
-  requestAnimationFrame(() => {
-    const iconRect = icon.getBoundingClientRect();
-    const tooltipRect = globalTooltipEl.getBoundingClientRect();
+  const iconRect = icon.getBoundingClientRect();
+  const tooltipRect = globalTooltipEl.getBoundingClientRect();
 
-    let top = iconRect.top - tooltipRect.height - 8;
-    let left = iconRect.left + (iconRect.width / 2) - (tooltipRect.width / 2);
+  let top = iconRect.top - tooltipRect.height - 8;
+  let left = iconRect.left + (iconRect.width / 2) - (tooltipRect.width / 2);
 
-    if (top < 8) {
-      top = iconRect.bottom + 8;
-    }
+  if (top < 8) {
+    top = iconRect.bottom + 8;
+  }
 
-    if (left < 8) left = 8;
-    if (left + tooltipRect.width > window.innerWidth - 8) {
-      left = window.innerWidth - tooltipRect.width - 8;
-    }
+  if (left < 8) left = 8;
+  if (left + tooltipRect.width > window.innerWidth - 8) {
+    left = window.innerWidth - tooltipRect.width - 8;
+  }
 
-    globalTooltipEl.style.top = top + "px";
-    globalTooltipEl.style.left = left + "px";
-    globalTooltipEl.style.opacity = "1";
-  });
+  globalTooltipEl.style.top = top + "px";
+  globalTooltipEl.style.left = left + "px";
 }
 
 function hideGlobalTooltip() {
   if (!globalTooltipEl) return;
-  globalTooltipEl.style.opacity = "0";
-  setTimeout(() => {
-    if (globalTooltipEl && globalTooltipEl.style.opacity === "0") {
-      globalTooltipEl.style.display = "none";
-    }
-  }, 150);
+  globalTooltipEl.style.display = "none";
 }
 
 function handleRouteChange(routeKey, route) {
