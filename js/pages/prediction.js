@@ -1117,41 +1117,68 @@ function calcAllocation() {
     return;
   }
 
+  const beta = allocationData.beta || 2.2;
+
+  // 1. 计算各子系统综合评分和总分
   let totalScore = 0;
   allocationData.subsystems.forEach((s) => {
     s.totalScore = (s.complexity || 0) + (s.maturity || 0) + (s.environment || 0) + (s.mission || 0);
     totalScore += s.totalScore;
   });
 
+  // 2. 计算权重
   const targetB10 = allocationData.targetB10 || 150;
   allocationData.subsystems.forEach((s) => {
     s.weight = totalScore > 0 ? s.totalScore / totalScore : 0;
-    if (allocationData.systemStructure === "series") {
-      s.allocB10 = s.weight > 0 ? targetB10 / s.weight : 0;
-    } else {
-      s.allocB10 = s.weight > 0 ? targetB10 * s.weight : 0;
-    }
   });
 
+  // 3. 分配B10
+  // Weibull串联: 1/B10_sys^β = Σ(1/B10_i^β) → B10_i = B10_sys / w_i^(1/β)
+  // Weibull并联: 各子系统权重越大(越复杂)，单机B10要求可适当放宽
+  if (allocationData.systemStructure === "series") {
+    allocationData.subsystems.forEach((s) => {
+      s.allocB10 = s.weight > 0 ? targetB10 / Math.pow(s.weight, 1 / beta) : 0;
+    });
+  } else {
+    // 并联：简化为 B10_i = B10_sys / w_i^(1/β) × n（n为冗余度，近似并联增益）
+    const n = allocationData.subsystems.length;
+    allocationData.subsystems.forEach((s) => {
+      s.allocB10 = s.weight > 0 ? (targetB10 * Math.pow(n, 1 / beta)) / Math.pow(s.weight, 1 / beta) : 0;
+    });
+  }
+
+  // 4. 验算系统B10
   let calcSysB10 = 0;
   if (allocationData.systemStructure === "series") {
-    let sumInvB10 = 0;
+    // 串联验算: B10_sys = (Σ 1/B10_i^β)^(-1/β)
+    let sumInvB10Beta = 0;
     allocationData.subsystems.forEach((s) => {
-      if (s.allocB10 > 0) sumInvB10 += 1 / s.allocB10;
+      if (s.allocB10 > 0) sumInvB10Beta += 1 / Math.pow(s.allocB10, beta);
     });
-    calcSysB10 = sumInvB10 > 0 ? 1 / sumInvB10 : 0;
+    calcSysB10 = sumInvB10Beta > 0 ? Math.pow(sumInvB10Beta, -1 / beta) : 0;
   } else {
-    let sumR = 1;
-    allocationData.subsystems.forEach((s) => {
-      const r = Math.exp(-Math.pow(1 / (s.allocB10 || 1), allocationData.beta || 2.2) * Math.pow(1, allocationData.beta || 2.2));
-      sumR *= (1 - r);
-    });
-    const sysR = 1 - sumR;
-    if (sysR > 0 && sysR < 1) {
-      const t = 1;
-      const lambda = -Math.log(sysR) / t;
-      calcSysB10 = -Math.log(0.9) / lambda;
+    // 并联验算: R_sys(t) = 1 - Π(1 - R_i(t))
+    // 用数值方法找到 R_sys = 0.9 对应的 t（即系统B10）
+    const b10Reliability = 0.9;
+    let lo = 1, hi = targetB10 * 10;
+    for (let iter = 0; iter < 50; iter++) {
+      const mid = (lo + hi) / 2;
+      let prodFail = 1;
+      allocationData.subsystems.forEach((s) => {
+        if (s.allocB10 > 0) {
+          const etaI = s.allocB10 / Math.pow(-Math.log(b10Reliability), 1 / beta);
+          const rI = Math.exp(-Math.pow(mid / etaI, beta));
+          prodFail *= (1 - rI);
+        }
+      });
+      const sysR = 1 - prodFail;
+      if (sysR > b10Reliability) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
     }
+    calcSysB10 = (lo + hi) / 2;
   }
   allocationData.calcSysB10 = calcSysB10;
 }
