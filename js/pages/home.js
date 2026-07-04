@@ -3,7 +3,6 @@ import {
   targetB10WithoutMargin,
   weibullEta,
   failureRate,
-  calcMtbf,
 } from "../calculator.js";
 
 let currentModel = null;
@@ -22,6 +21,38 @@ export function render(container, model) {
 
   bindEvents();
   calculate();
+}
+
+function gammaApprox(x) {
+  if (x <= 0) return Infinity;
+  if (x === 1) return 1;
+  if (x < 1) {
+    return gammaApprox(x + 1) / x;
+  }
+  const g = 7;
+  const c = [
+    0.99999999999980993,
+    676.5203681218851,
+    -1259.1392167224028,
+    771.32342877765313,
+    -176.61502916214059,
+    12.507343278686905,
+    -0.13857109526572012,
+    9.9843695780195716e-6,
+    1.5056327351493116e-7,
+  ];
+  x -= 1;
+  let a = c[0];
+  const t = x + g + 0.5;
+  for (let i = 1; i < g + 2; i++) {
+    a += c[i] / (x + i);
+  }
+  return Math.sqrt(2 * Math.PI) * Math.pow(t, x + 0.5) * Math.exp(-t) * a;
+}
+
+function calcMtbf(eta, beta) {
+  if (eta <= 0 || beta <= 0) return 0;
+  return eta * gammaApprox(1 + 1 / beta);
 }
 
 function bindEvents() {
