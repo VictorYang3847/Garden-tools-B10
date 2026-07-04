@@ -252,6 +252,13 @@ function updateComponentCalculations(component) {
   component.lambdaOp = calcLambdaOp(component);
 }
 
+function updateRowDisplay(tr, component) {
+  const piTCell = tr.querySelector(".pred-factor-cell");
+  const lambdaOpCell = tr.querySelector(".pred-lambda-cell");
+  if (piTCell) piTCell.textContent = component.piT.toFixed(3);
+  if (lambdaOpCell) lambdaOpCell.textContent = component.lambdaOp.toFixed(4);
+}
+
 function handleInputChange(container, e) {
   const input = e.target;
   if (!input.matches("[data-field]")) return;
@@ -274,12 +281,14 @@ function handleInputChange(container, e) {
     const baseLambda = COMPONENT_BASE_LAMBDA[component.type];
     if (baseLambda !== undefined) {
       component.lambdaBase = baseLambda;
+      const lambdaBaseInput = tr.querySelector("input[data-field='lambdaBase']");
+      if (lambdaBaseInput) lambdaBaseInput.value = component.lambdaBase;
     }
   }
 
   updateComponentCalculations(component);
+  updateRowDisplay(tr, component);
   saveData();
-  renderTable(container);
   updateResults(container);
   drawBarChart(container);
   drawSystemDiagram(container);
@@ -1318,6 +1327,38 @@ function deleteAllocationSubsystem(container, id) {
   drawPieChart(container);
 }
 
+function updateAllAllocationRows(container) {
+  const tbody = container.querySelector("#alloc-table-body");
+  if (!tbody) return;
+
+  const rows = tbody.querySelectorAll("tr[data-id]");
+  rows.forEach((tr) => {
+    const id = tr.dataset.id;
+    const subsystem = allocationData.subsystems.find((s) => s.id === id);
+    if (!subsystem) return;
+
+    const scoreCell = tr.querySelector(".alloc-score-cell");
+    const weightCell = tr.querySelector(".alloc-weight-cell");
+    const b10Cell = tr.querySelector(".alloc-b10-cell");
+
+    if (scoreCell) scoreCell.textContent = subsystem.totalScore || 0;
+    if (weightCell) weightCell.textContent = ((subsystem.weight || 0) * 100).toFixed(2) + "%";
+    if (b10Cell) b10Cell.textContent = (subsystem.allocB10 || 0).toFixed(2);
+
+    const numInputs = tr.querySelectorAll("input.alloc-num-input");
+    numInputs.forEach((inp) => {
+      const field = inp.dataset.field;
+      if (field && subsystem[field] !== undefined) {
+        const currentVal = Number(inp.value);
+        const actualVal = Number(subsystem[field]);
+        if (currentVal !== actualVal) {
+          inp.value = actualVal;
+        }
+      }
+    });
+  });
+}
+
 function handleAllocationInputChange(container, e) {
   const input = e.target;
   if (!input.matches("[data-field]")) return;
@@ -1339,8 +1380,8 @@ function handleAllocationInputChange(container, e) {
   }
 
   calcAllocation();
+  updateAllAllocationRows(container);
   saveData();
-  renderAllocationTable(container);
   renderAllocationResults(container);
   drawPieChart(container);
 }
