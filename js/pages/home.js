@@ -1,3 +1,11 @@
+import {
+  targetB10,
+  targetB10WithoutMargin,
+  weibullEta,
+  failureRate,
+  calcMtbf,
+} from "../calculator.js";
+
 let currentModel = null;
 let onSaveCallback = null;
 
@@ -17,42 +25,24 @@ export function render(container, model) {
 }
 
 function bindEvents() {
-  const betaInput = document.getElementById("home-beta");
-  const etaInput = document.getElementById("home-eta");
-  const reliabilitySlider = document.getElementById("home-reliability-slider");
-  const reliabilityValue = document.getElementById("home-reliability-value");
-  const timeInput = document.getElementById("home-time");
+  const ids = [
+    "home-warranty-years",
+    "home-hours-per-year",
+    "home-allow-fail-rate",
+    "home-beta",
+    "home-safety-margin",
+    "home-time",
+  ];
+
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener("input", calculate);
+    }
+  });
+
   const formulaToggle = document.getElementById("home-formula-toggle");
   const formulaContent = document.getElementById("home-formula-content");
-
-  if (betaInput) {
-    betaInput.addEventListener("input", calculate);
-  }
-  if (etaInput) {
-    etaInput.addEventListener("input", calculate);
-  }
-  if (reliabilitySlider) {
-    reliabilitySlider.addEventListener("input", () => {
-      if (reliabilityValue) {
-        reliabilityValue.value = reliabilitySlider.value;
-      }
-      calculate();
-    });
-  }
-  if (reliabilityValue) {
-    reliabilityValue.addEventListener("input", () => {
-      let val = Number(reliabilityValue.value);
-      if (val < 50) val = 50;
-      if (val > 99) val = 99;
-      if (reliabilitySlider) {
-        reliabilitySlider.value = val;
-      }
-      calculate();
-    });
-  }
-  if (timeInput) {
-    timeInput.addEventListener("input", calculate);
-  }
   if (formulaToggle && formulaContent) {
     formulaToggle.addEventListener("click", () => {
       const isHidden = formulaContent.style.display === "none";
@@ -62,74 +52,45 @@ function bindEvents() {
   }
 }
 
-function gammaApprox(x) {
-  if (x <= 0) return Infinity;
-  if (x === 1) return 1;
-  if (x < 1) {
-    return gammaApprox(x + 1) / x;
-  }
-  const g = 7;
-  const c = [
-    0.99999999999980993,
-    676.5203681218851,
-    -1259.1392167224028,
-    771.32342877765313,
-    -176.61502916214059,
-    12.507343278686905,
-    -0.13857109526572012,
-    9.9843695780195716e-6,
-    1.5056327351493116e-7,
-  ];
-  x -= 1;
-  let a = c[0];
-  const t = x + g + 0.5;
-  for (let i = 1; i < g + 2; i++) {
-    a += c[i] / (x + i);
-  }
-  return Math.sqrt(2 * Math.PI) * Math.pow(t, x + 0.5) * Math.exp(-t) * a;
-}
-
 function calculate() {
-  const betaInput = document.getElementById("home-beta");
-  const etaInput = document.getElementById("home-eta");
-  const reliabilitySlider = document.getElementById("home-reliability-slider");
-  const timeInput = document.getElementById("home-time");
+  const warrantyYears = Number(document.getElementById("home-warranty-years")?.value) || 0;
+  const hoursPerYear = Number(document.getElementById("home-hours-per-year")?.value) || 0;
+  const allowFailRate = Number(document.getElementById("home-allow-fail-rate")?.value) || 0;
+  const beta = Number(document.getElementById("home-beta")?.value) || 0;
+  const safetyMargin = Number(document.getElementById("home-safety-margin")?.value) || 0;
+  const t = Number(document.getElementById("home-time")?.value) || 0;
 
+  const twEl = document.getElementById("home-tw");
   const b10El = document.getElementById("home-b10");
+  const b10NoMarginEl = document.getElementById("home-b10-no-margin");
+  const etaEl = document.getElementById("home-eta");
   const mtbfEl = document.getElementById("home-mtbf");
   const reliabilityTEl = document.getElementById("home-reliability-t");
-  const reliabilityTPctEl = document.getElementById("home-reliability-t-pct");
   const failureTEl = document.getElementById("home-failure-t");
-  const failureTPctEl = document.getElementById("home-failure-t-pct");
 
-  if (!betaInput || !etaInput || !reliabilitySlider || !timeInput) return;
-
-  const beta = Number(betaInput.value) || 0;
-  const eta = Number(etaInput.value) || 0;
-  const reliabilityPct = Number(reliabilitySlider.value) || 0;
-  const t = Number(timeInput.value) || 0;
-
-  if (beta <= 0 || eta <= 0) {
-    if (b10El) b10El.textContent = "—";
-    if (mtbfEl) mtbfEl.textContent = "—";
-    if (reliabilityTEl) reliabilityTEl.textContent = "—";
-    if (reliabilityTPctEl) reliabilityTPctEl.textContent = "—";
-    if (failureTEl) failureTEl.textContent = "—";
-    if (failureTPctEl) failureTPctEl.textContent = "—";
+  if (warrantyYears <= 0 || hoursPerYear <= 0 || allowFailRate <= 0 || beta <= 0) {
+    [twEl, b10El, b10NoMarginEl, etaEl, mtbfEl, reliabilityTEl, failureTEl].forEach((el) => {
+      if (el) el.textContent = "—";
+    });
     return;
   }
 
-  const p = 1 - reliabilityPct / 100;
-  const bp = eta * Math.pow(-Math.log(1 - p), 1 / beta);
-  const b10 = eta * Math.pow(-Math.log(0.9), 1 / beta);
-  const mtbf = eta * gammaApprox(1 + 1 / beta);
-  const rt = Math.exp(-Math.pow(t / eta, beta));
-  const ft = 1 - rt;
+  const tw = warrantyYears * hoursPerYear;
+  const fw = allowFailRate / 100;
+  const margin = safetyMargin / 100;
 
-  if (b10El) b10El.textContent = b10.toFixed(1);
+  const b10WithMargin = targetB10(tw, fw, beta, margin);
+  const b10NoMargin = targetB10WithoutMargin(tw, fw, beta);
+  const eta = weibullEta(b10WithMargin, beta);
+  const mtbf = calcMtbf(eta, beta);
+  const ft = failureRate(t, b10WithMargin, beta);
+  const rt = 1 - ft;
+
+  if (twEl) twEl.textContent = tw.toFixed(0);
+  if (b10El) b10El.textContent = b10WithMargin.toFixed(1);
+  if (b10NoMarginEl) b10NoMarginEl.textContent = b10NoMargin.toFixed(1);
+  if (etaEl) etaEl.textContent = eta.toFixed(1);
   if (mtbfEl) mtbfEl.textContent = mtbf.toFixed(1);
   if (reliabilityTEl) reliabilityTEl.textContent = (rt * 100).toFixed(2);
-  if (reliabilityTPctEl) reliabilityTPctEl.textContent = "%";
   if (failureTEl) failureTEl.textContent = (ft * 100).toFixed(2);
-  if (failureTPctEl) failureTPctEl.textContent = "%";
 }

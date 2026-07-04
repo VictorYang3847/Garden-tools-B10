@@ -162,70 +162,101 @@
         <div class="home-section">
           <div class="card b10-quick-card">
             <div class="card-header">
-              <h3>B10 / MTBF 快速计算器</h3>
+              <h3>B10 目标定义计算器</h3>
             </div>
             <div class="card-body">
               <div class="b10-calc-layout">
                 <div class="b10-calc-inputs">
                   <div class="form-group">
-                    <label>形状参数 β</label>
+                    <label>质保期 (年)</label>
+                    <input type="number" id="home-warranty-years" class="form-input" min="0.5" max="10" step="0.5" value="2" />
+                  </div>
+                  <div class="form-group">
+                    <label>年使用时长 (小时/年)</label>
+                    <input type="number" id="home-hours-per-year" class="form-input" min="1" max="1000" step="1" value="25" />
+                  </div>
+                  <div class="form-group">
+                    <label>允许失效率 (%)</label>
+                    <input type="number" id="home-allow-fail-rate" class="form-input" min="0.1" max="10" step="0.1" value="2" />
+                  </div>
+                  <div class="form-group">
+                    <label>形状参数 β<span class="help-icon" data-tooltip="Weibull形状参数：β>1磨损失效(典型2.0~2.5)，β=1随机失效，β<1早期失效">?</span></label>
                     <input type="number" id="home-beta" class="form-input" min="0.1" step="0.1" value="2.2" />
                   </div>
                   <div class="form-group">
-                    <label>特征寿命 η (小时)</label>
-                    <input type="number" id="home-eta" class="form-input" min="1" step="1" value="180" />
+                    <label>安全余量 (%)<span class="help-icon" data-tooltip="设计余量，行业常用20%~30%，考虑制造波动和使用条件变化">?</span></label>
+                    <input type="number" id="home-safety-margin" class="form-input" min="0" max="50" step="5" value="20" />
                   </div>
                   <div class="form-group">
-                    <label>目标可靠度</label>
-                    <div class="slider-row">
-                      <input type="range" id="home-reliability-slider" class="slider-input" min="50" max="99" value="90" />
-                      <input type="number" id="home-reliability-value" class="form-input reliability-number" min="50" max="99" step="1" value="90" />
-                      <span class="slider-unit">%</span>
-                    </div>
-                  </div>
-                  <div class="form-group">
-                    <label>指定时间 t (小时)</label>
-                    <input type="number" id="home-time" class="form-input" min="0" step="1" value="40" />
+                    <label>指定时间 t (小时)<span class="help-icon" data-tooltip="查询该时刻的可靠度，例如质保总时长或设计寿命">?</span></label>
+                    <input type="number" id="home-time" class="form-input" min="0" step="1" value="50" />
                   </div>
                 </div>
                 <div class="b10-calc-results">
+                  <div class="metric-card">
+                    <div class="metric-label">质保总时长 Tw</div>
+                    <div class="metric-value" id="home-tw">—</div>
+                    <div class="metric-unit">小时</div>
+                  </div>
                   <div class="metric-card b10-highlight">
-                    <div class="metric-label">B10 寿命</div>
+                    <div class="metric-label">目标 B10 (含余量)</div>
                     <div class="metric-value" id="home-b10">—</div>
                     <div class="metric-unit">小时</div>
                   </div>
                   <div class="metric-card">
-                    <div class="metric-label">MTBF / MTTF</div>
+                    <div class="metric-label">目标 B10 (不含余量)</div>
+                    <div class="metric-value" id="home-b10-no-margin">—</div>
+                    <div class="metric-unit">小时</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">所需特征寿命 η</div>
+                    <div class="metric-value" id="home-eta">—</div>
+                    <div class="metric-unit">小时</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">所需 MTBF</div>
                     <div class="metric-value" id="home-mtbf">—</div>
                     <div class="metric-unit">小时</div>
                   </div>
                   <div class="metric-card">
                     <div class="metric-label">t 时刻可靠度</div>
                     <div class="metric-value" id="home-reliability-t">—</div>
-                    <div class="metric-unit" id="home-reliability-t-pct">—</div>
+                    <div class="metric-unit">%</div>
                   </div>
                   <div class="metric-card">
                     <div class="metric-label">t 时刻失效概率</div>
                     <div class="metric-value" id="home-failure-t">—</div>
-                    <div class="metric-unit" id="home-failure-t-pct">—</div>
+                    <div class="metric-unit">%</div>
                   </div>
                   <div class="formula-section">
                     <button type="button" class="formula-toggle" id="home-formula-toggle">📐 查看计算公式</button>
                     <div class="formula-content" id="home-formula-content" style="display: none;">
                       <div class="formula-item">
-                        <h4>威布尔可靠度公式</h4>
-                        <div class="formula-equation">R(t) = exp(-(t/η)<sup>β</sup>)</div>
-                        <div class="formula-vars">
-                          <div class="var-row"><span class="var-name">R(t)</span><span class="var-desc">时刻 t 的可靠度</span></div>
-                          <div class="var-row"><span class="var-name">t</span><span class="var-desc">时间（小时）</span></div>
-                          <div class="var-row"><span class="var-name">η</span><span class="var-desc">特征寿命（尺度参数）</span></div>
-                          <div class="var-row"><span class="var-name">β</span><span class="var-desc">形状参数</span></div>
-                        </div>
+                        <h4>质保总时长</h4>
+                        <div class="formula-equation">Tw = 质保年数 × 年使用时长</div>
                       </div>
                       <div class="formula-item">
-                        <h4>B10 寿命公式</h4>
-                        <div class="formula-equation">B10 = η × [-ln(0.9)]<sup>1/β</sup></div>
-                        <div class="formula-note">可靠度为90%时对应的寿命，即10%产品失效的时间</div>
+                        <h4>目标 B10 寿命（含安全余量）</h4>
+                        <div class="formula-equation">B10 = Tw × [ln(10/9) / -ln(1-Fw)]<sup>1/β</sup> × (1 + margin)</div>
+                        <div class="formula-vars">
+                          <div class="var-row"><span class="var-name">Tw</span><span class="var-desc">质保总时长（小时）</span></div>
+                          <div class="var-row"><span class="var-name">Fw</span><span class="var-desc">允许失效率（如2%=0.02）</span></div>
+                          <div class="var-row"><span class="var-name">β</span><span class="var-desc">形状参数</span></div>
+                          <div class="var-row"><span class="var-name">margin</span><span class="var-desc">安全余量（如20%=0.2）</span></div>
+                        </div>
+                        <div class="formula-note">ln(10/9)≈0.10536，是B10点对应的标准常数</div>
+                      </div>
+                      <div class="formula-item">
+                        <h4>特征寿命 η</h4>
+                        <div class="formula-equation">η = B10 / [ln(10/9)]<sup>1/β</sup></div>
+                      </div>
+                      <div class="formula-item">
+                        <h4>MTBF</h4>
+                        <div class="formula-equation">MTBF = η × Γ(1 + 1/β)</div>
+                      </div>
+                      <div class="formula-item">
+                        <h4>时刻可靠度</h4>
+                        <div class="formula-equation">R(t) = exp(-(t/η)<sup>β</sup>)</div>
                       </div>
                     </div>
                   </div>
