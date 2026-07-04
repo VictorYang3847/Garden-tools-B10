@@ -16,6 +16,8 @@ import {
   deleteModel,
   exportData,
   importData,
+  createModuleData,
+  persistState,
 } from "./store.js";
 import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js";
 
@@ -28,6 +30,7 @@ const sidebarToggle = document.getElementById("sidebar-toggle");
 const importBtn = document.getElementById("import-btn");
 const exportBtn = document.getElementById("export-btn");
 const importFile = document.getElementById("import-file");
+const clearDataBtn = document.getElementById("btn-clear-data");
 
 const navItems = document.querySelectorAll(".nav-item");
 
@@ -37,6 +40,7 @@ function initApp() {
   initSelectors();
   initSidebar();
   initImportExport();
+  initClearData();
 
   initRouter({
     mainContent: mainContent,
@@ -164,6 +168,28 @@ function initImportExport() {
     importFile.click();
   });
   importFile.addEventListener("change", onImport);
+}
+
+function initClearData() {
+  if (!clearDataBtn) return;
+  clearDataBtn.addEventListener("click", onClearData);
+}
+
+function onClearData() {
+  const current = getCurrentModel();
+  if (!current) {
+    alert("请先选择一个型号");
+    return;
+  }
+  const confirmed = window.confirm(
+    `确定要清空当前型号「${current.name}」的所有模块数据吗？此操作不可恢复。`
+  );
+  if (!confirmed) return;
+  current.modules = createModuleData();
+  current.lastResult = null;
+  persistState();
+  refreshAllSelectors();
+  refreshCurrentRoute();
 }
 
 function onExport() {

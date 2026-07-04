@@ -94,6 +94,7 @@
                 <span class="selector-label">型号</span>
                 <select id="model-select" class="header-select"></select>
               </label>
+              <button type="button" class="btn-secondary btn-clear-data" id="btn-clear-data" title="清空当前型号的所有模块数据">清空数据</button>
             </div>
             <div class="header-actions">
               <button type="button" id="import-btn" class="btn-icon" title="导入">
@@ -308,26 +309,15 @@
             <table class="data-table fmea-table">
               <thead>
                 <tr>
+                  <th style="width: 40px;"></th>
                   <th style="width: 50px;">序号</th>
-                  <th style="min-width: 180px;">功能/过程要求</th>
-                  <th style="min-width: 180px;">失效模式</th>
-                  <th style="min-width: 180px;">失效后果</th>
-                  <th style="width: 70px;">严重度 (S)</th>
-                  <th style="min-width: 180px;">失效原因</th>
-                  <th style="width: 70px;">发生度 (O)</th>
-                  <th style="min-width: 150px;">现行控制 - 预防</th>
-                  <th style="min-width: 150px;">现行控制 - 探测</th>
-                  <th style="width: 70px;">探测度 (D)</th>
+                  <th style="min-width: 160px;">功能/要求</th>
+                  <th style="min-width: 160px;">失效模式</th>
+                  <th style="width: 70px;">S</th>
+                  <th style="width: 70px;">O</th>
+                  <th style="width: 70px;">D</th>
                   <th style="width: 70px;">RPN</th>
                   <th style="width: 70px;">AP</th>
-                  <th style="min-width: 180px;">建议措施</th>
-                  <th style="min-width: 120px;">责任部门/人</th>
-                  <th style="width: 120px;">目标完成日期</th>
-                  <th style="width: 90px;">措施结果 - S(新)</th>
-                  <th style="width: 90px;">措施结果 - O(新)</th>
-                  <th style="width: 90px;">措施结果 - D(新)</th>
-                  <th style="width: 80px;">RPN(新)</th>
-                  <th style="width: 70px;">AP(新)</th>
                   <th style="width: 70px;">操作</th>
                 </tr>
               </thead>

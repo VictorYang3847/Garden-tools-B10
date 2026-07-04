@@ -4,6 +4,7 @@ let currentFilter = "all";
 let fmeaData = null;
 let currentRatingInput = null;
 let currentRatingType = null;
+const expandedRows = new Set();
 
 const SEVERITY_RATINGS = [
   { score: 10, desc: "危及安全/违反法规，无预警" },
@@ -119,30 +120,75 @@ function apBadge(ap) {
 }
 
 function renderRow(item, index) {
+  const expanded = expandedRows.has(item.id);
   return `
-    <tr data-id="${item.id}">
+    <tr data-id="${item.id}" class="fmea-main-row">
+      <td class="fmea-toggle-cell">
+        <button type="button" class="fmea-toggle-btn" data-action="toggle" title="${expanded ? "折叠" : "展开"}">${expanded ? "▼" : "▶"}</button>
+      </td>
       <td class="fmea-index">${index + 1}</td>
       <td><input type="text" class="item-input" data-field="function" value="${escapeHtml(item.function)}" placeholder="功能/过程要求" /></td>
       <td><input type="text" class="item-input" data-field="failureMode" value="${escapeHtml(item.failureMode)}" placeholder="失效模式" /></td>
-      <td><input type="text" class="item-input" data-field="effect" value="${escapeHtml(item.effect)}" placeholder="失效后果" /></td>
       <td><input type="number" class="item-input fmea-num-input" data-field="severity" value="${item.severity}" min="1" max="10" /></td>
-      <td><input type="text" class="item-input" data-field="cause" value="${escapeHtml(item.cause)}" placeholder="失效原因" /></td>
       <td><input type="number" class="item-input fmea-num-input" data-field="occurrence" value="${item.occurrence}" min="1" max="10" /></td>
-      <td><input type="text" class="item-input" data-field="controlPrevention" value="${escapeHtml(item.controlPrevention)}" placeholder="预防控制" /></td>
-      <td><input type="text" class="item-input" data-field="controlDetection" value="${escapeHtml(item.controlDetection)}" placeholder="探测控制" /></td>
       <td><input type="number" class="item-input fmea-num-input" data-field="detection" value="${item.detection}" min="1" max="10" /></td>
-      <td class="fmea-rpn-cell">${item.rpn}</td>
-      <td class="fmea-ap-cell">${apBadge(item.ap)}</td>
-      <td><input type="text" class="item-input" data-field="action" value="${escapeHtml(item.action)}" placeholder="建议措施" /></td>
-      <td><input type="text" class="item-input" data-field="responsible" value="${escapeHtml(item.responsible)}" placeholder="责任部门/人" /></td>
-      <td><input type="date" class="item-input" data-field="targetDate" value="${escapeHtml(item.targetDate)}" /></td>
-      <td><input type="number" class="item-input fmea-num-input" data-field="newSeverity" value="${item.newSeverity}" min="0" max="10" /></td>
-      <td><input type="number" class="item-input fmea-num-input" data-field="newOccurrence" value="${item.newOccurrence}" min="0" max="10" /></td>
-      <td><input type="number" class="item-input fmea-num-input" data-field="newDetection" value="${item.newDetection}" min="0" max="10" /></td>
-      <td class="fmea-rpn-cell">${item.newRpn || "-"}</td>
-      <td class="fmea-ap-cell">${item.newAp ? apBadge(item.newAp) : '<span class="ap-badge ap-l">-</span>'}</td>
+      <td class="fmea-rpn-cell" data-rpn>${item.rpn}</td>
+      <td class="fmea-ap-cell" data-ap>${apBadge(item.ap)}</td>
       <td class="fmea-action-cell">
         <button type="button" class="fmea-delete-btn" data-action="delete" title="删除">🗑️</button>
+      </td>
+    </tr>
+    ${renderDetailRow(item, expanded)}
+  `;
+}
+
+function renderDetailRow(item, expanded) {
+  const newApBadge = item.newAp
+    ? apBadge(item.newAp)
+    : '<span class="ap-badge ap-l">-</span>';
+  return `
+    <tr data-id="${item.id}" class="fmea-detail-row" style="display: ${expanded ? "table-row" : "none"};">
+      <td colspan="10">
+        <div class="fmea-detail-grid">
+          <div class="fmea-detail-item">
+            <label>失效后果</label>
+            <input type="text" class="item-input" data-field="effect" value="${escapeHtml(item.effect)}" placeholder="失效后果" />
+          </div>
+          <div class="fmea-detail-item">
+            <label>失效原因</label>
+            <input type="text" class="item-input" data-field="cause" value="${escapeHtml(item.cause)}" placeholder="失效原因" />
+          </div>
+          <div class="fmea-detail-item">
+            <label>现行控制 - 预防</label>
+            <input type="text" class="item-input" data-field="controlPrevention" value="${escapeHtml(item.controlPrevention)}" placeholder="预防控制" />
+          </div>
+          <div class="fmea-detail-item">
+            <label>现行控制 - 探测</label>
+            <input type="text" class="item-input" data-field="controlDetection" value="${escapeHtml(item.controlDetection)}" placeholder="探测控制" />
+          </div>
+          <div class="fmea-detail-item">
+            <label>建议措施</label>
+            <input type="text" class="item-input" data-field="action" value="${escapeHtml(item.action)}" placeholder="建议措施" />
+          </div>
+          <div class="fmea-detail-item">
+            <label>责任部门/人 · 目标完成日期</label>
+            <div class="fmea-detail-pair">
+              <input type="text" class="item-input" data-field="responsible" value="${escapeHtml(item.responsible)}" placeholder="责任部门/人" />
+              <input type="date" class="item-input" data-field="targetDate" value="${escapeHtml(item.targetDate)}" />
+            </div>
+          </div>
+          <div class="fmea-detail-item fmea-detail-result">
+            <label>措施结果（S新 / O新 / D新 → RPN新 / AP新）</label>
+            <div class="fmea-detail-result-row">
+              <input type="number" class="item-input fmea-num-input" data-field="newSeverity" value="${item.newSeverity}" min="0" max="10" placeholder="S新" />
+              <input type="number" class="item-input fmea-num-input" data-field="newOccurrence" value="${item.newOccurrence}" min="0" max="10" placeholder="O新" />
+              <input type="number" class="item-input fmea-num-input" data-field="newDetection" value="${item.newDetection}" min="0" max="10" placeholder="D新" />
+              <span class="fmea-detail-arrow">→</span>
+              <span class="fmea-detail-rpn" data-new-rpn>${item.newRpn || "-"}</span>
+              <span class="fmea-detail-ap" data-new-ap>${newApBadge}</span>
+            </div>
+          </div>
+        </div>
       </td>
     </tr>
   `;
@@ -239,7 +285,33 @@ function handleInputChange(container, e) {
 
   updateItemCalculations(item);
   saveData();
-  renderTable(container);
+
+  let mainRow = null;
+  let detailRow = null;
+  if (tr.classList.contains("fmea-main-row")) {
+    mainRow = tr;
+    detailRow = tr.nextElementSibling;
+  } else if (tr.classList.contains("fmea-detail-row")) {
+    mainRow = tr.previousElementSibling;
+    detailRow = tr;
+  }
+
+  if (mainRow) {
+    const rpnCell = mainRow.querySelector("[data-rpn]");
+    const apCell = mainRow.querySelector("[data-ap]");
+    if (rpnCell) rpnCell.textContent = item.rpn;
+    if (apCell) apCell.innerHTML = apBadge(item.ap);
+  }
+  if (detailRow) {
+    const newRpnCell = detailRow.querySelector("[data-new-rpn]");
+    const newApCell = detailRow.querySelector("[data-new-ap]");
+    if (newRpnCell) newRpnCell.textContent = item.newRpn || "-";
+    if (newApCell) {
+      newApCell.innerHTML = item.newAp
+        ? apBadge(item.newAp)
+        : '<span class="ap-badge ap-l">-</span>';
+    }
+  }
 }
 
 function handleDeleteClick(container, e) {
@@ -254,9 +326,37 @@ function handleDeleteClick(container, e) {
 
   if (!confirm("确定要删除这一行吗？")) return;
 
+  expandedRows.delete(id);
   fmeaData.items = fmeaData.items.filter((i) => i.id !== id);
   saveData();
   renderTable(container);
+}
+
+function handleToggleRow(container, e) {
+  const btn = e.target.closest("[data-action='toggle']");
+  if (!btn) return;
+
+  const tr = btn.closest("tr");
+  if (!tr) return;
+
+  const id = tr.dataset.id;
+  if (!id) return;
+
+  const detailRow = tr.nextElementSibling;
+  if (!detailRow || !detailRow.classList.contains("fmea-detail-row")) return;
+
+  const isExpanded = expandedRows.has(id);
+  if (isExpanded) {
+    expandedRows.delete(id);
+    detailRow.style.display = "none";
+    btn.textContent = "▶";
+    btn.title = "展开";
+  } else {
+    expandedRows.add(id);
+    detailRow.style.display = "table-row";
+    btn.textContent = "▼";
+    btn.title = "折叠";
+  }
 }
 
 function handleTabClick(container, e) {
@@ -278,7 +378,7 @@ function handleAddRow(container) {
   renderTable(container);
 
   const tbody = container.querySelector("#fmea-table-body");
-  const lastRow = tbody.lastElementChild;
+  const lastRow = tbody.querySelector(`tr.fmea-main-row[data-id="${newItem.id}"]`);
   if (lastRow) {
     const firstInput = lastRow.querySelector("input[data-field='function']");
     if (firstInput) firstInput.focus();
@@ -388,10 +488,14 @@ function handleRatingInputClick(container, e) {
   if (!input) return;
 
   const field = input.dataset.field;
-  if (field !== "severity" && field !== "occurrence" && field !== "detection") return;
+  let type = field;
+  if (field === "newSeverity") type = "severity";
+  else if (field === "newOccurrence") type = "occurrence";
+  else if (field === "newDetection") type = "detection";
+  else if (field !== "severity" && field !== "occurrence" && field !== "detection") return;
 
   e.preventDefault();
-  openRatingPanel(field, input, container);
+  openRatingPanel(type, input, container);
 }
 
 function handleRatingPanelClose(container, e) {
@@ -495,6 +599,7 @@ function bindEvents(container) {
   const tbody = container.querySelector("#fmea-table-body");
   tbody.addEventListener("input", (e) => handleInputChange(container, e));
   tbody.addEventListener("click", (e) => {
+    handleToggleRow(container, e);
     handleDeleteClick(container, e);
     handleRatingInputClick(container, e);
   });

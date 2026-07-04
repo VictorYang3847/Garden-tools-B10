@@ -271,6 +271,26 @@ body {
   color: var(--accent);
 }
 
+.btn-clear-data {
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-clear-data:hover {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 .main-content {
   flex: 1;
   padding: 1.5rem;
@@ -1131,7 +1151,7 @@ button:hover {
 
 .fmea-table {
   font-size: 0.8rem;
-  min-width: 2400px;
+  width: 100%;
 }
 
 .fmea-table thead th {
@@ -1148,12 +1168,20 @@ button:hover {
   transition: background-color 0.15s ease;
 }
 
-.fmea-table tbody tr:nth-child(even) {
+.fmea-table tbody tr.fmea-main-row:nth-child(4n+3) {
   background: rgba(255, 255, 255, 0.015);
 }
 
-.fmea-table tbody tr:hover {
+.fmea-table tbody tr.fmea-main-row:hover {
   background: rgba(59, 158, 255, 0.06);
+}
+
+.fmea-detail-row {
+  background: var(--surface-2);
+}
+
+.fmea-detail-row:hover {
+  background: var(--surface-2);
 }
 
 .fmea-table td {
@@ -1257,6 +1285,114 @@ button:hover {
   font-size: 0.8rem;
 }
 
+.fmea-toggle-cell {
+  text-align: center;
+  padding: 0.3rem;
+}
+
+.fmea-toggle-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--text-muted);
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.fmea-toggle-btn:hover {
+  background: var(--surface);
+  color: var(--accent);
+  border-color: var(--border);
+}
+
+.fmea-detail-row > td {
+  padding: 0.75rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.fmea-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem 1rem;
+}
+
+.fmea-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.fmea-detail-item > label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fmea-detail-item > .item-input,
+.fmea-detail-item .fmea-detail-pair .item-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.fmea-detail-pair {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.fmea-detail-pair .item-input {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.fmea-detail-pair input[type="date"] {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.fmea-detail-result {
+  grid-column: 1 / -1;
+}
+
+.fmea-detail-result-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.fmea-detail-result-row .item-input {
+  width: 70px;
+  flex: 0 0 auto;
+}
+
+.fmea-detail-arrow {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 0 0.15rem;
+}
+
+.fmea-detail-rpn {
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 0.85rem;
+  min-width: 28px;
+  text-align: center;
+}
+
+.fmea-detail-ap {
+  display: inline-flex;
+  align-items: center;
+}
+
 @media (max-width: 768px) {
   .fmea-toolbar {
     flex-direction: column;
@@ -1265,6 +1401,10 @@ button:hover {
 
   .fmea-toolbar-right {
     justify-content: space-between;
+  }
+
+  .fmea-detail-grid {
+    grid-template-columns: 1fr;
   }
 }
 
