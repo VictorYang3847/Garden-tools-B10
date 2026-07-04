@@ -93,6 +93,7 @@ function bindEvents() {
   bindDefinitionEvents();
   bindDataEntryEvents();
   bindAnalysisEvents();
+  bindWeaknessEvents();
 }
 
 function switchTab(tabName) {
@@ -108,6 +109,9 @@ function switchTab(tabName) {
 
   if (tabName === "analysis") {
     updateAnalysisResults();
+  }
+  if (tabName === "weakness") {
+    updateWeaknessAnalysis();
   }
 }
 
@@ -711,6 +715,8 @@ function bindAnalysisEvents() {
   const distSelect = document.getElementById("ld-distribution");
   const methodSelect = document.getElementById("ld-method");
   const reliabilityTimeInput = document.getElementById("ld-reliability-time");
+  const formulaToggle = document.getElementById("ld-formula-toggle");
+  const formulaContent = document.getElementById("ld-formula-content");
 
   if (distSelect) {
     distSelect.addEventListener("change", () => {
@@ -732,6 +738,13 @@ function bindAnalysisEvents() {
     });
     reliabilityTimeInput.addEventListener("change", () => {
       updateReliabilityCalculator();
+    });
+  }
+  if (formulaToggle && formulaContent) {
+    formulaToggle.addEventListener("click", () => {
+      const isHidden = formulaContent.style.display === "none";
+      formulaContent.style.display = isHidden ? "" : "none";
+      formulaToggle.textContent = isHidden ? "📐 收起公式" : "📐 查看计算公式";
     });
   }
 }
@@ -777,9 +790,11 @@ function getFailureAndCensoredTimes() {
   const censored = [];
   for (const batch of batches) {
     for (const item of batch.items || []) {
-      if (item.failed && item.time > 0) {
+      if (item.time <= 0) continue;
+      const failed = isItemFailed(item);
+      if (failed) {
         failures.push(item.time);
-      } else if (!item.failed && item.time > 0) {
+      } else {
         censored.push(item.time);
       }
     }
@@ -805,6 +820,16 @@ function updateFitMetrics(fit, distribution, targetB10) {
 
   document.getElementById("ld-total-samples").textContent = hasData ? fit.totalCount : "—";
   document.getElementById("ld-failure-count").textContent = hasData ? fit.failureCount : "—";
+
+  const censoredMetric = document.getElementById("ld-metric-censored");
+  const censoredCount = hasData ? fit.totalCount - fit.failureCount : 0;
+  if (censoredCount > 0) {
+    censoredMetric.style.display = "";
+    document.getElementById("ld-censored-count").textContent = censoredCount;
+  } else {
+    censoredMetric.style.display = "none";
+  }
+
   document.getElementById("ld-b10").textContent = hasData ? fmt(fit.b10, 1) + " h" : "—";
   document.getElementById("ld-b50").textContent = hasData && fit.b50 != null ? fmt(fit.b50, 1) + " h" : "—";
   document.getElementById("ld-r2").textContent = hasData && fit.rSquared != null ? fmt(fit.rSquared, 3) : "—";
@@ -1218,4 +1243,395 @@ function escapeHtml(s) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function isItemFailed(item) {
+  if (item.failed != null) return item.failed === true;
+  if (item.status != null) return item.status === "failed";
+  return false;
+}
+
+function bindWeaknessEvents() {
+  const batchTabs = document.getElementById("ld-weakness-batch-tabs");
+  if (batchTabs) {
+    batchTabs.addEventListener("click", (e) => {
+      const tab = e.target.closest(".batch-tab");
+      if (!tab) return;
+      activeBatchId = tab.dataset.id;
+      currentModel.modules.lifeData.activeBatchId = activeBatchId;
+      save();
+      renderWeaknessBatchTabs();
+      updateWeaknessAnalysis();
+    });
+  }
+}
+
+function renderWeaknessBatchTabs() {
+  const container = document.getElementById("ld-weakness-batch-tabs");
+  const batches = currentModel.modules.lifeData.batches;
+  if (!container) return;
+  if (batches.length === 0) {
+    container.innerHTML = '<p class="hint" style="margin-top: 0.75rem;">暂无批次数据</p>';
+    return;
+  }
+  container.innerHTML = batches
+    .map(
+      (b) => `
+      <button type="button" class="batch-tab ${b.id === activeBatchId ? "active" : ""}" data-id="${b.id}">
+        ${escapeHtml(b.name)}
+        <span class="batch-count">${b.items?.length || 0} 条</span>
+      </button>`
+    )
+    .join("");
+}
+
+function getWeaknessBatchData() {
+  const batch = getActiveBatch();
+  if (!batch || !batch.items || batch.items.length === 0) return null;
+
+  const failureModeGroups = {};
+  let totalFailures = 0;
+  let totalSamples = 0;
+
+  for (const item of batch.items) {
+    if (item.time <= 0) continue;
+    totalSamples++;
+    const failed = isItemFailed(item);
+    if (failed && item.failureMode && item.failureMode.trim()) {
+      const mode = item.failureMode.trim();
+      if (!failureModeGroups[mode]) {
+        failureModeGroups[mode] = { failures: [], censored: [], failureCount: 0 };
+      }
+      failureModeGroups[mode].failures.push(item.time);
+      failureModeGroups[mode].failureCount++;
+      totalFailures++;
+    }
+  }
+
+  const results = [];
+  for (const [mode, group] of Object.entries(failureModeGroups)) {
+    if (group.failures.length < 2) {
+      results.push({
+        mode,
+        failureCount: group.failures.length,
+        totalCount: group.failures.length,
+        b10: null,
+        beta: null,
+        eta: null,
+        mtbf: null,
+        sufficient: false,
+      });
+      continue;
+    }
+
+    const estTotal = totalFailures > 0 ? Math.round((group.failures.length / totalFailures) * totalSamples) : group.failures.length;
+    const censoredCount = Math.max(0, estTotal - group.failures.length);
+    const maxTime = Math.max(...batch.items.filter((i) => i.time > 0).map((i) => i.time));
+    const censoredTimes = [];
+    for (let i = 0; i < censoredCount; i++) {
+      censoredTimes.push(maxTime);
+    }
+
+    const fit = fitDistribution("weibull", "rrx", group.failures, censoredTimes);
+
+    let mtbf = null;
+    if (fit && fit.eta && fit.beta) {
+      const gamma = 1 + 1 / fit.beta;
+      mtbf = fit.eta * gammaApprox(gamma);
+    }
+
+    results.push({
+      mode,
+      failureCount: group.failures.length,
+      totalCount: estTotal,
+      b10: fit?.b10 ?? null,
+      beta: fit?.beta ?? null,
+      eta: fit?.eta ?? null,
+      mtbf,
+      rSquared: fit?.rSquared ?? null,
+      sufficient: true,
+      fit,
+    });
+  }
+
+  results.sort((a, b) => {
+    if (a.b10 == null && b.b10 == null) return 0;
+    if (a.b10 == null) return 1;
+    if (b.b10 == null) return -1;
+    return a.b10 - b.b10;
+  });
+
+  return { results, totalFailures, totalSamples, batch };
+}
+
+function gammaApprox(s) {
+  if (s <= 0) return 1;
+  const g = 7;
+  const c = [
+    0.99999999999980993,
+    676.5203681218851,
+    -1259.1392167224028,
+    771.32342877765313,
+    -176.61502916214059,
+    12.507343278686905,
+    -0.13857109526572012,
+    9.9843695780195716e-6,
+    1.5056327351493116e-7,
+  ];
+  if (s < 0.5) {
+    return Math.PI / (Math.sin(Math.PI * s) * gammaApprox(1 - s));
+  }
+  s -= 1;
+  let x = c[0];
+  for (let i = 1; i < g + 2; i++) {
+    x += c[i] / (s + i);
+  }
+  const t = s + g + 0.5;
+  return Math.sqrt(2 * Math.PI) * Math.pow(t, s + 0.5) * Math.exp(-t) * x;
+}
+
+function updateWeaknessAnalysis() {
+  renderWeaknessBatchTabs();
+
+  const data = getWeaknessBatchData();
+  const coreCard = document.getElementById("ld-weakness-core-card");
+  const tableCard = document.getElementById("ld-weakness-table-card");
+  const chartsCard = document.getElementById("ld-weakness-charts-card");
+  const emptyCard = document.getElementById("ld-weakness-empty-card");
+
+  if (!data || data.results.length === 0 || data.results.filter((r) => r.sufficient).length < 1) {
+    if (coreCard) coreCard.style.display = "none";
+    if (tableCard) tableCard.style.display = "none";
+    if (chartsCard) chartsCard.style.display = "none";
+    if (emptyCard) emptyCard.style.display = "";
+    return;
+  }
+
+  const validResults = data.results.filter((r) => r.sufficient);
+  if (validResults.length === 0) {
+    if (coreCard) coreCard.style.display = "none";
+    if (tableCard) tableCard.style.display = "none";
+    if (chartsCard) chartsCard.style.display = "none";
+    if (emptyCard) emptyCard.style.display = "";
+    return;
+  }
+
+  if (emptyCard) emptyCard.style.display = "none";
+  if (coreCard) coreCard.style.display = "";
+  if (tableCard) tableCard.style.display = "";
+  if (chartsCard) chartsCard.style.display = "";
+
+  const coreWeakness = validResults[0];
+  const corePct = data.totalFailures > 0 ? (coreWeakness.failureCount / data.totalFailures) * 100 : 0;
+
+  const coreModeEl = document.getElementById("ld-weakness-core-mode");
+  if (coreModeEl) coreModeEl.textContent = coreWeakness.mode;
+  const coreB10El = document.getElementById("ld-weakness-core-b10");
+  if (coreB10El) coreB10El.textContent = fmt(coreWeakness.b10, 1);
+  const corePctEl = document.getElementById("ld-weakness-core-pct");
+  if (corePctEl) corePctEl.textContent = fmt(corePct, 1);
+  const coreCountEl = document.getElementById("ld-weakness-core-count");
+  if (coreCountEl) coreCountEl.textContent = coreWeakness.failureCount;
+
+  renderWeaknessTable(data.results);
+  drawWeaknessBarChart(validResults);
+  drawWeaknessPieChart(data.results, data.totalFailures);
+}
+
+function renderWeaknessTable(results) {
+  const tbody = document.getElementById("ld-weakness-tbody");
+  if (!tbody) return;
+
+  tbody.innerHTML = results
+    .map((r) => {
+      const isWeakest = r.sufficient && r.b10 != null && results[0]?.b10 === r.b10;
+      return `
+      <tr class="${isWeakest ? "weakness-row-highlight" : ""}">
+        <td>${isWeakest ? "🔴 " : ""}${escapeHtml(r.mode)}</td>
+        <td>${r.totalCount}</td>
+        <td>${r.failureCount}</td>
+        <td>${r.beta != null ? fmt(r.beta, 2) : "—"}</td>
+        <td>${r.eta != null ? fmt(r.eta, 0) : "—"}</td>
+        <td class="${r.sufficient ? "" : "text-muted"}">${r.b10 != null ? fmt(r.b10, 1) : "数据不足"}</td>
+        <td>${r.mtbf != null ? fmt(r.mtbf, 0) : "—"}</td>
+      </tr>`;
+    })
+    .join("");
+}
+
+const WEAKNESS_COLORS = [
+  "#ef4444",
+  "#f97316",
+  "#eab308",
+  "#22c55e",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+  "#14b8a6",
+];
+
+function drawWeaknessBarChart(data) {
+  const canvas = document.getElementById("ld-weakness-bar-canvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const padL = 80,
+    padR = 30,
+    padT = 30,
+    padB = 80;
+  const plotW = w - padL - padR;
+  const plotH = h - padT - padB;
+
+  ctx.fillStyle = "#1e293b";
+  ctx.fillRect(padL, padT, plotW, plotH);
+  ctx.strokeStyle = "#475569";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(padL, padT, plotW, plotH);
+
+  if (!data || data.length === 0) {
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "14px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("无有效数据", w / 2, h / 2);
+    return;
+  }
+
+  const maxB10 = Math.max(...data.map((d) => d.b10 || 0)) * 1.2 || 100;
+  const barCount = data.length;
+  const barGap = 20;
+  const barWidth = Math.min(80, (plotW - barGap * (barCount + 1)) / barCount);
+  const xStart = padL + (plotW - (barWidth * barCount + barGap * (barCount - 1))) / 2;
+
+  ctx.strokeStyle = "#334155";
+  ctx.lineWidth = 0.5;
+  const yTicks = 5;
+  for (let i = 0; i <= yTicks; i++) {
+    const y = padT + (plotH / yTicks) * i;
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + plotW, y);
+    ctx.stroke();
+    const val = maxB10 - (maxB10 / yTicks) * i;
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(fmt(val, 0), padL - 8, y + 4);
+  }
+
+  for (let i = 0; i < barCount; i++) {
+    const d = data[i];
+    const x = xStart + i * (barWidth + barGap);
+    const barH = (d.b10 / maxB10) * plotH;
+    const y = padT + plotH - barH;
+    const color = WEAKNESS_COLORS[i % WEAKNESS_COLORS.length];
+
+    const gradient = ctx.createLinearGradient(0, y, 0, padT + plotH);
+    gradient.addColorStop(0, color);
+    gradient.addColorStop(1, color + "66");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x, y, barWidth, barH);
+
+    ctx.fillStyle = "#f1f5f9";
+    ctx.font = "bold 12px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(fmt(d.b10, 0) + "h", x + barWidth / 2, y - 6);
+
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "center";
+    const modeLabel = d.mode.length > 8 ? d.mode.slice(0, 8) + "..." : d.mode;
+    ctx.save();
+    ctx.translate(x + barWidth / 2, padT + plotH + 12);
+    ctx.rotate(-Math.PI / 6);
+    ctx.fillText(modeLabel, 0, 0);
+    ctx.restore();
+  }
+
+  ctx.fillStyle = "#f1f5f9";
+  ctx.font = "12px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("B10 寿命 (小时)", w / 2, h - 8);
+}
+
+function drawWeaknessPieChart(data, totalFailures) {
+  const canvas = document.getElementById("ld-weakness-pie-canvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const validData = data.filter((d) => d.failureCount > 0);
+  const total = validData.reduce((sum, d) => sum + d.failureCount, 0);
+
+  const cx = w * 0.4;
+  const cy = h / 2;
+  const radius = Math.min(w * 0.3, h * 0.35);
+
+  if (validData.length === 0 || total === 0) {
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "14px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("无失效数据", w / 2, h / 2);
+    return;
+  }
+
+  let startAngle = -Math.PI / 2;
+
+  for (let i = 0; i < validData.length; i++) {
+    const d = validData[i];
+    const sliceAngle = (d.failureCount / total) * Math.PI * 2;
+    const color = WEAKNESS_COLORS[i % WEAKNESS_COLORS.length];
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, startAngle, startAngle + sliceAngle);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = "#1e293b";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const midAngle = startAngle + sliceAngle / 2;
+    const labelRadius = radius * 0.65;
+    const lx = cx + Math.cos(midAngle) * labelRadius;
+    const ly = cy + Math.sin(midAngle) * labelRadius;
+    const pct = (d.failureCount / total) * 100;
+    if (pct > 8) {
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(fmt(pct, 0) + "%", lx, ly + 4);
+    }
+
+    startAngle += sliceAngle;
+  }
+
+  const legendX = cx + radius + 40;
+  let legendY = cy - radius + 10;
+  const legendItemH = 26;
+
+  for (let i = 0; i < validData.length; i++) {
+    const d = validData[i];
+    const color = WEAKNESS_COLORS[i % WEAKNESS_COLORS.length];
+
+    ctx.fillStyle = color;
+    ctx.fillRect(legendX, legendY, 14, 14);
+
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "12px sans-serif";
+    ctx.textAlign = "left";
+    const modeLabel = d.mode.length > 12 ? d.mode.slice(0, 12) + "..." : d.mode;
+    ctx.fillText(modeLabel, legendX + 22, legendY + 11);
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "11px sans-serif";
+    ctx.fillText(`${d.failureCount}个 (${fmt((d.failureCount / total) * 100, 1)}%)`, legendX + 22, legendY + 26);
+
+    legendY += legendItemH + 8;
+  }
 }

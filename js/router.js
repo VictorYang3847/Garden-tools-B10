@@ -1,4 +1,9 @@
 const routes = {
+  home: {
+    path: "home",
+    title: "首页",
+    module: () => import("./pages/home.js"),
+  },
   fmea: {
     path: "fmea",
     title: "FMEA",
@@ -18,6 +23,11 @@ const routes = {
     path: "test-plan",
     title: "测试计划",
     module: () => import("./pages/test-plan.js"),
+  },
+  "sample-size": {
+    path: "sample-size",
+    title: "样本量计算",
+    module: () => import("./pages/sample-size.js"),
   },
   fta: {
     path: "fta",
@@ -51,7 +61,7 @@ const routes = {
   },
 };
 
-const defaultRoute = "fmea";
+const defaultRoute = "home";
 
 let currentRoute = null;
 let currentModule = null;

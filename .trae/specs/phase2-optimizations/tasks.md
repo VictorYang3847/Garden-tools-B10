@@ -1,0 +1,121 @@
+# 可靠性工具平台优化（第二阶段）- Implementation Plan
+
+## [x] Task 1: 新增首页/快速计算页面
+- **Priority**: high
+- **Depends On**: None
+- **Description**:
+  - 在 index.html 新增 home-template 模板
+  - 在 js/pages/ 下新增 home.js 页面逻辑
+  - 首页内容：欢迎标题 + 8个工具快捷卡片 + B10快速计算器
+  - 侧边栏新增"首页"导航（放在最顶部）
+  - 修改 router.js，将默认路由改为 home
+  - B10快速计算器：输入β、η、目标可靠度、指定时间，实时计算B10/MTBF/可靠度
+- **Acceptance Criteria Addressed**: AC-1, AC-2, AC-9
+- **Test Requirements**:
+  - `programmatic` TR-1.1: 打开网站默认显示首页
+  - `programmatic` TR-1.2: 侧边栏有"首页"导航项，点击切换正常
+  - `programmatic` TR-1.3: B10快速计算器输入β=2.2、η=180，B10计算结果≈168小时
+  - `programmatic` TR-1.4: 8个工具卡片点击可跳转到对应模块
+  - `human-judgement` TR-1.5: 首页布局清晰美观，视觉层级合理
+- **Notes**: 这是用户体验提升最大的一项，放在第一个做
+
+## [x] Task 2: 新增样本量计算器模块
+- **Priority**: high
+- **Depends On**: None
+- **Description**:
+  - 在 index.html 新增 sample-size-template 模板
+  - 在 js/pages/ 下新增 sample-size.js
+  - 两种模式Tab切换：
+    - 模式一：合格性验证（二项分布）
+      - 输入：目标可靠度、置信度、允许失效数、试验时长、β
+      - 输出：最少样本量 + 计算公式
+      - 行业参考：部件级6~8台，整机10~20台
+    - 模式二：寿命测定（威布尔拟合）
+      - 输入：目标精度、置信度、预期失效比例、β
+      - 输出：推荐样本量、预期失效数
+  - 实时计算，输入即出结果
+  - 侧边栏新增导航（放在"测试计划"下面）
+- **Acceptance Criteria Addressed**: AC-3, AC-4, AC-8
+- **Test Requirements**:
+  - `programmatic` TR-2.1: 合格性验证：R=90%, CL=90%, r=0 → n≈22（二项分布）
+  - `programmatic` TR-2.2: 模式切换正常，两种模式互不干扰
+  - `programmatic` TR-2.3: 侧边栏有"样本量计算"导航
+  - `programmatic` TR-2.4: 公式说明区存在，点击可展开/折叠
+  - `human-judgement` TR-2.5: 布局合理，输入区和结果区分明
+- **Notes**: 填补工具空白，实用性强
+
+## [x] Task 3: 寿命分析 - 短板分析（竞争失效）
+- **Priority**: high
+- **Depends On**: None
+- **Description**:
+  - 在寿命数据分析模块新增第4个Tab："短板分析"
+  - 自动按失效模式分组数据
+  - 每组分别拟合威布尔分布（MLE）
+  - 结果展示：
+    - 各失效模式拟合参数对比表（β、η、B10、MTBF）
+    - B10对比柱状图（Canvas绘制）
+    - 失效模式占比饼图/帕累托图
+    - "核心短板"自动识别（B10最低的失效模式）
+  - 更新默认案例数据，确保有多种失效模式可用于演示
+  - 更新 store.js 中默认项目的寿命数据
+- **Acceptance Criteria Addressed**: AC-5, AC-6, AC-7, AC-9
+- **Test Requirements**:
+  - `programmatic` TR-3.1: 寿命分析有"短板分析"Tab
+  - `programmatic` TR-3.2: 默认案例数据有至少3种失效模式
+  - `programmatic` TR-3.3: 每种失效模式都能独立拟合出β和η
+  - `programmatic` TR-3.4: 核心短板识别正确（B10最低的）
+  - `human-judgement` TR-3.5: 柱状图和饼图清晰，颜色区分好
+  - `human-judgement` TR-3.6: 分析结果有洞察力，不只是堆数据
+- **Notes**: 深度功能，提升专业度。复用 calculator.js 中的拟合函数
+
+## [x] Task 4: 公式说明折叠区（全局）
+- **Priority**: high
+- **Depends On**: None
+- **Description**:
+  - 在寿命分析的"分析结果"Tab中增加公式说明区
+  - 在样本量计算器中增加公式说明区
+  - 在可靠性预测中增加公式说明区
+  - 每个公式说明区包含：
+    - 折叠/展开按钮（📐 查看公式）
+    - 公式（用HTML/CSS排版，可用上标下标）
+    - 变量说明表
+    - 代入数值的计算过程（可选）
+  - 覆盖的公式：
+    - 威布尔可靠度 R(t) = exp(-(t/η)^β)
+    - B10寿命 B10 = η × [-ln(0.9)]^(1/β)
+    - MTBF = η × Γ(1+1/β)
+    - 二项分布样本量 n = ln(1-CL) / ln(R)
+    - 串联系统失效率 λ总 = λ1 + λ2 + ... + λn
+- **Acceptance Criteria Addressed**: AC-8
+- **Test Requirements**:
+  - `programmatic` TR-4.1: 寿命分析结果页有"查看公式"按钮
+  - `programmatic` TR-4.2: 点击可展开/折叠，默认折叠
+  - `programmatic` TR-4.3: 公式显示正确，变量有说明
+  - `human-judgement` TR-4.4: 公式排版清晰易读
+  - `human-judgement` TR-4.5: 教育价值高，帮助用户理解
+- **Notes**: 实现成本低，教育价值高。不需要KaTeX，纯HTML足够
+
+## [x] Task 5: 默认案例数据补充与整体验证
+- **Priority**: high
+- **Depends On**: Task 1-4
+- **Description**:
+  - 更新 store.js 中的 createDefaultProject() 函数
+  - 为新模块补充默认数据：
+    - 样本量计算器不需要（工具类，无持久化数据）
+    - 短板分析依赖寿命数据（已有的失效模式数据）
+  - 全流程测试：
+    - 打开网站 → 默认首页
+    - 首页快速计算器可用
+    - 各模块切换正常
+    - 寿命分析短板分析有数据
+    - 样本量计算器可用
+    - 公式说明可展开
+  - 数据兼容测试：确保旧数据不会报错
+- **Acceptance Criteria Addressed**: AC-9
+- **Test Requirements**:
+  - `programmatic` TR-5.1: 所有5个JS文件语法检查通过
+  - `programmatic` TR-5.2: 12个HTML模板全部存在
+  - `programmatic` TR-5.3: 默认项目所有模块有数据
+  - `programmatic` TR-5.4: 路由切换无报错
+  - `human-judgement` TR-5.5: 整体视觉风格统一
+- **Notes**: 最后做整体验证，确保所有功能正常工作

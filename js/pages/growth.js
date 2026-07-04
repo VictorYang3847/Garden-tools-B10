@@ -4,6 +4,36 @@ import { fmt } from "../utils.js";
 let currentModel = null;
 let onSaveCallback = null;
 
+let improvLibraryCategory = "all";
+let improvLibraryKeyword = "";
+
+const IMPROVEMENT_LIBRARY = [
+  { id: 'gear-carburizing', name: '齿轮渗碳淬火', category: 'gear', improvement: '3~5倍寿命', desc: '齿面硬度提升至HRC58~62，大幅提升接触疲劳寿命', applicable: '齿轮箱齿面磨损、点蚀' },
+  { id: 'gear-grease', name: '换高温合成润滑脂', category: 'gear', improvement: '1.5~2倍寿命', desc: '高温下润滑脂不流失不稀化，保持油膜强度', applicable: '高温环境齿轮箱磨损' },
+  { id: 'gear-seal', name: '增加迷宫密封防尘', category: 'gear', improvement: '1.3~1.8倍寿命', desc: '阻挡粉尘侵入，减少磨粒磨损', applicable: '多粉尘环境、密封差' },
+  { id: 'gear-profile', name: '齿廓修形优化', category: 'gear', improvement: '1.2~1.5倍寿命', desc: '降低齿面接触应力，减少偏磨', applicable: '齿轮偏磨、接触不良' },
+  { id: 'bearing-sealed', name: '换双面密封轴承', category: 'motor', improvement: '2~3倍寿命', desc: '双面密封轴承防止粉尘和润滑脂流失', applicable: '开式轴承磨损、进灰' },
+  { id: 'bearing-alignment', name: '优化装配同轴度', category: 'motor', improvement: '1.2~1.5倍寿命', desc: '减少偏心受力，降低附加载荷', applicable: '轴承偏磨、异响' },
+  { id: 'bearing-grease', name: '选用高速润滑脂', category: 'motor', improvement: '1.2倍寿命', desc: '高速高温下润滑性能更好', applicable: '高转速电机' },
+  { id: 'switch-agni', name: '换银镍合金触点', category: 'switch', improvement: '5倍以上寿命', desc: '银镍合金抗电弧磨损能力远强于铜镀层', applicable: '开关触点磨损、接触不良' },
+  { id: 'switch-dust', name: '增加硅胶防尘罩', category: 'switch', improvement: '1.5~2倍寿命', desc: '防止粉尘进入触点区域', applicable: '多尘环境开关失效' },
+  { id: 'switch-derating', name: '电流降额使用', category: 'switch', improvement: '1.5倍寿命', desc: '降低触点电流，减少电弧侵蚀', applicable: '额定电流接近上限' },
+  { id: 'battery-derating', name: '放电倍率降额', category: 'battery', improvement: '1.3~1.5倍寿命', desc: '放电倍率从1C降至0.8C，降低发热和衰减', applicable: '高倍率放电应用' },
+  { id: 'battery-bms', name: 'BMS策略优化', category: 'battery', improvement: '1.2倍寿命', desc: '收窄充放电截止电压，避免过充过放', applicable: 'BMS策略激进' },
+  { id: 'battery-cooling', name: '电芯间散热优化', category: 'battery', improvement: '1.1~1.3倍寿命', desc: '电芯间预留散热间隙，降低工作温度', applicable: '高温环境、密集排布' },
+  { id: 'pcb-coating', name: 'PCB喷涂三防漆', category: 'pcb', improvement: '1.5~2倍寿命', desc: '防潮、防霉、防盐雾，保护电路板', applicable: '潮湿、腐蚀环境' },
+  { id: 'pcb-derating', name: '功率器件降额50%', category: 'pcb', improvement: '2倍以上寿命', desc: '降低结温，大幅提升器件寿命', applicable: '功率器件发热严重' },
+  { id: 'pcb-heatsink', name: '增加散热片', category: 'pcb', improvement: '1.5~2倍寿命', desc: '降低器件结温，每降10℃寿命翻倍', applicable: '高温环境、散热差' },
+];
+
+const CATEGORY_LABELS = {
+  gear: '齿轮磨损',
+  motor: '电机轴承',
+  switch: '开关触点',
+  battery: '锂电池',
+  pcb: 'PCB电子',
+};
+
 const PHASE_COLORS = [
   "#3b9eff",
   "#34d399",
@@ -27,10 +57,12 @@ export function render(container, model) {
   container.appendChild(content);
 
   ensurePhases();
+  loadCustomImprovements();
   bindEvents();
   renderPhaseSelector();
   renderPhaseInfo();
   renderFailureTable();
+  renderImprovementList();
   updateParamsAndChart();
   renderComparisonTable();
   drawComparisonChart();
@@ -72,6 +104,7 @@ function ensurePhases() {
   if (g.targetMtbf === undefined) g.targetMtbf = null;
   for (const phase of g.phases) {
     if (!Array.isArray(phase.failures)) phase.failures = [];
+    if (!Array.isArray(phase.improvements)) phase.improvements = [];
     if (phase.totalTime === undefined) phase.totalTime = null;
     if (!phase.phaseNumber) phase.phaseNumber = 1;
     if (!phase.name) phase.name = `第${phase.phaseNumber}轮`;
@@ -170,6 +203,7 @@ function addPhase() {
     phaseNumber: newNumber,
     description: "",
     failures: [],
+    improvements: [],
     totalTime: null,
     startDate: null,
   });
@@ -178,6 +212,7 @@ function addPhase() {
   renderPhaseSelector();
   renderPhaseInfo();
   renderFailureTable();
+  renderImprovementList();
   updateParamsAndChart();
   renderComparisonTable();
   drawComparisonChart();
@@ -204,6 +239,7 @@ function deletePhase() {
   renderPhaseSelector();
   renderPhaseInfo();
   renderFailureTable();
+  renderImprovementList();
   updateParamsAndChart();
   renderComparisonTable();
   drawComparisonChart();
@@ -255,6 +291,7 @@ function bindEvents() {
       save();
       renderPhaseInfo();
       renderFailureTable();
+      renderImprovementList();
       updateParamsAndChart();
     });
   }
@@ -346,6 +383,83 @@ function bindEvents() {
       renderComparisonTable();
       drawComparisonChart();
       renderGrowthSummary();
+    });
+  }
+
+  const openLibraryBtn = document.getElementById("growth-open-library");
+  if (openLibraryBtn) {
+    openLibraryBtn.addEventListener("click", () => openImprovementLibrary());
+  }
+
+  const closeLibraryBtn = document.getElementById("growth-improv-library-close");
+  if (closeLibraryBtn) {
+    closeLibraryBtn.addEventListener("click", () => closeImprovementLibrary());
+  }
+
+  const libraryOverlay = document.getElementById("growth-improv-library-overlay");
+  if (libraryOverlay) {
+    libraryOverlay.addEventListener("click", () => closeImprovementLibrary());
+  }
+
+  const searchInput = document.getElementById("growth-improv-search");
+  if (searchInput) {
+    searchInput.addEventListener("input", () => handleImprovSearch());
+  }
+
+  const categories = document.getElementById("growth-improv-categories");
+  if (categories) {
+    categories.addEventListener("click", (e) => {
+      const btn = e.target.closest(".improv-cat-btn");
+      if (btn) {
+        handleImprovCategoryChange(btn.dataset.category);
+      }
+    });
+  }
+
+  const libraryList = document.getElementById("growth-improv-library-list");
+  if (libraryList) {
+    libraryList.addEventListener("click", (e) => {
+      const addBtn = e.target.closest("[data-add-improv]");
+      if (addBtn) {
+        const improvId = addBtn.dataset.addImprov;
+        addImprovementFromLibrary(improvId);
+      }
+    });
+  }
+
+  const addCustomBtn = document.getElementById("growth-add-custom-improv");
+  if (addCustomBtn) {
+    addCustomBtn.addEventListener("click", () => openCustomImprovementModal());
+  }
+
+  const closeCustomBtn = document.getElementById("growth-custom-improv-close");
+  if (closeCustomBtn) {
+    closeCustomBtn.addEventListener("click", () => closeCustomImprovementModal());
+  }
+
+  const customOverlay = document.getElementById("growth-custom-improv-overlay");
+  if (customOverlay) {
+    customOverlay.addEventListener("click", () => closeCustomImprovementModal());
+  }
+
+  const cancelCustomBtn = document.getElementById("growth-custom-improv-cancel");
+  if (cancelCustomBtn) {
+    cancelCustomBtn.addEventListener("click", () => closeCustomImprovementModal());
+  }
+
+  const saveCustomBtn = document.getElementById("growth-custom-improv-save");
+  if (saveCustomBtn) {
+    saveCustomBtn.addEventListener("click", () => handleSaveCustomImprovement());
+  }
+
+  const improvementList = document.getElementById("growth-improvement-list");
+  if (improvementList) {
+    improvementList.addEventListener("click", (e) => {
+      const deleteBtn = e.target.closest("[data-delete-improv]");
+      if (deleteBtn) {
+        const id = deleteBtn.dataset.deleteImprov;
+        deleteImprovement(id);
+      }
     });
   }
 }
@@ -1314,6 +1428,326 @@ function formatTick(val) {
   if (val >= 10) return val.toFixed(0);
   if (val >= 1) return val.toFixed(0);
   return val.toFixed(1);
+}
+
+let customImprovements = [];
+
+function loadCustomImprovements() {
+  try {
+    const saved = localStorage.getItem("growth_custom_improvements");
+    if (saved) {
+      customImprovements = JSON.parse(saved);
+    }
+  } catch (e) {
+    customImprovements = [];
+  }
+}
+
+function saveCustomImprovements() {
+  try {
+    localStorage.setItem("growth_custom_improvements", JSON.stringify(customImprovements));
+  } catch (e) {}
+}
+
+function getAllImprovements() {
+  return [...IMPROVEMENT_LIBRARY, ...customImprovements];
+}
+
+function ensureImprovements() {
+  const phase = getActivePhase();
+  if (phase && !Array.isArray(phase.improvements)) {
+    phase.improvements = [];
+  }
+}
+
+function openImprovementLibrary() {
+  const modal = document.getElementById("growth-improv-library-modal");
+  if (modal) {
+    modal.style.display = "flex";
+    improvLibraryCategory = "all";
+    improvLibraryKeyword = "";
+    const searchInput = document.getElementById("growth-improv-search");
+    if (searchInput) searchInput.value = "";
+    updateCategoryTabs();
+    renderImprovementLibrary();
+  }
+}
+
+function closeImprovementLibrary() {
+  const modal = document.getElementById("growth-improv-library-modal");
+  if (modal) {
+    modal.style.display = "none";
+  }
+}
+
+function handleImprovSearch() {
+  const searchInput = document.getElementById("growth-improv-search");
+  if (searchInput) {
+    improvLibraryKeyword = searchInput.value.trim().toLowerCase();
+    renderImprovementLibrary();
+  }
+}
+
+function handleImprovCategoryChange(category) {
+  improvLibraryCategory = category;
+  updateCategoryTabs();
+  renderImprovementLibrary();
+}
+
+function updateCategoryTabs() {
+  const btns = document.querySelectorAll("#growth-improv-categories .improv-cat-btn");
+  btns.forEach((btn) => {
+    if (btn.dataset.category === improvLibraryCategory) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+}
+
+function renderImprovementLibrary() {
+  const listEl = document.getElementById("growth-improv-library-list");
+  if (!listEl) return;
+
+  const all = getAllImprovements();
+  let filtered = all;
+
+  if (improvLibraryCategory !== "all") {
+    filtered = filtered.filter((item) => item.category === improvLibraryCategory);
+  }
+
+  if (improvLibraryKeyword) {
+    const kw = improvLibraryKeyword;
+    filtered = filtered.filter(
+      (item) =>
+        item.name.toLowerCase().includes(kw) ||
+        (item.desc && item.desc.toLowerCase().includes(kw)) ||
+        (item.applicable && item.applicable.toLowerCase().includes(kw))
+    );
+  }
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = `
+      <div class="lib-empty-state">
+        <div class="lib-empty-icon">🔍</div>
+        <div>没有找到匹配的措施</div>
+      </div>
+    `;
+    return;
+  }
+
+  let html = "";
+  filtered.forEach((item) => {
+    const isCustom = customImprovements.some((c) => c.id === item.id);
+    html += `
+      <div class="improv-lib-card">
+        <div class="improv-lib-header">
+          <div class="improv-lib-name">${escapeHtml(item.name)}</div>
+          ${isCustom ? '<span class="improv-custom-tag">自定义</span>' : ""}
+        </div>
+        <div class="improv-lib-cat">
+          <span class="improv-cat-badge improv-cat-${item.category}">${CATEGORY_LABELS[item.category] || item.category}</span>
+        </div>
+        <div class="improv-lib-improvement">
+          <span class="improv-improvement-label">预期提升：</span>
+          <span class="improv-improvement-value">${escapeHtml(item.improvement || "—")}</span>
+        </div>
+        <div class="improv-lib-desc">${escapeHtml(item.desc || "")}</div>
+        ${item.applicable ? `<div class="improv-lib-applicable">适用：${escapeHtml(item.applicable)}</div>` : ""}
+        <button type="button" class="improv-lib-add-btn" data-add-improv="${item.id}">➕ 添加到当前轮次</button>
+      </div>
+    `;
+  });
+
+  listEl.innerHTML = html;
+}
+
+function addImprovementFromLibrary(improvId) {
+  const phase = getActivePhase();
+  if (!phase) return;
+  ensureImprovements();
+
+  const all = getAllImprovements();
+  const item = all.find((i) => i.id === improvId);
+  if (!item) return;
+
+  const exists = phase.improvements.some((imp) => imp.id === improvId);
+  if (exists) {
+    showImprovToast("该措施已在当前轮次中");
+    return;
+  }
+
+  phase.improvements.push({
+    id: item.id,
+    name: item.name,
+    category: item.category,
+    improvement: item.improvement || "",
+    desc: item.desc || "",
+    status: "pending",
+    responsible: "",
+    targetDate: "",
+  });
+
+  save();
+  renderImprovementList();
+  closeImprovementLibrary();
+  showImprovToast("已添加改进措施");
+}
+
+function openCustomImprovementModal() {
+  const modal = document.getElementById("growth-custom-improv-modal");
+  if (modal) {
+    modal.style.display = "flex";
+    document.getElementById("growth-custom-improv-name").value = "";
+    document.getElementById("growth-custom-improv-category").value = "gear";
+    document.getElementById("growth-custom-improv-improvement").value = "";
+    document.getElementById("growth-custom-improv-desc").value = "";
+    document.getElementById("growth-custom-improv-applicable").value = "";
+  }
+}
+
+function closeCustomImprovementModal() {
+  const modal = document.getElementById("growth-custom-improv-modal");
+  if (modal) {
+    modal.style.display = "none";
+  }
+}
+
+function handleSaveCustomImprovement() {
+  const name = document.getElementById("growth-custom-improv-name").value.trim();
+  const category = document.getElementById("growth-custom-improv-category").value;
+  const improvement = document.getElementById("growth-custom-improv-improvement").value.trim();
+  const desc = document.getElementById("growth-custom-improv-desc").value.trim();
+  const applicable = document.getElementById("growth-custom-improv-applicable").value.trim();
+
+  if (!name) {
+    alert("请输入措施名称");
+    return;
+  }
+
+  const customItem = {
+    id: "custom-" + genId(),
+    name,
+    category,
+    improvement,
+    desc,
+    applicable,
+    custom: true,
+  };
+
+  customImprovements.push(customItem);
+  saveCustomImprovements();
+
+  const phase = getActivePhase();
+  if (phase) {
+    ensureImprovements();
+    phase.improvements.push({
+      id: customItem.id,
+      name: customItem.name,
+      category: customItem.category,
+      improvement: customItem.improvement,
+      desc: customItem.desc,
+      status: "pending",
+      responsible: "",
+      targetDate: "",
+    });
+    save();
+    renderImprovementList();
+  }
+
+  closeCustomImprovementModal();
+  closeImprovementLibrary();
+  showImprovToast("已添加自定义措施");
+}
+
+function renderImprovementList() {
+  const listEl = document.getElementById("growth-improvement-list");
+  const emptyEl = document.getElementById("growth-improvement-empty");
+  if (!listEl) return;
+
+  const phase = getActivePhase();
+  if (!phase) return;
+  ensureImprovements();
+
+  const improvements = phase.improvements || [];
+
+  if (improvements.length === 0) {
+    listEl.innerHTML = "";
+    if (emptyEl) emptyEl.style.display = "";
+    return;
+  }
+
+  if (emptyEl) emptyEl.style.display = "none";
+
+  let html = "";
+  improvements.forEach((imp, idx) => {
+    const statusLabels = {
+      pending: "待实施",
+      in_progress: "进行中",
+      completed: "已完成",
+    };
+    const statusColors = {
+      pending: "var(--warning)",
+      in_progress: "var(--accent)",
+      completed: "var(--success)",
+    };
+    html += `
+      <div class="improvement-item" data-improv-id="${imp.id}">
+        <div class="improvement-item-header">
+          <div class="improvement-item-title">
+            <span class="improvement-item-index">${idx + 1}</span>
+            <span class="improvement-item-name">${escapeHtml(imp.name)}</span>
+          </div>
+          <div class="improvement-item-actions">
+            <span class="improv-status-badge" style="background: ${statusColors[imp.status] + '20'}; color: ${statusColors[imp.status]};">${statusLabels[imp.status] || '待实施'}</span>
+            <button type="button" class="btn-icon btn-sm" data-delete-improv="${imp.id}" title="删除" style="padding: 0.2rem 0.4rem;">
+              <span>🗑️</span>
+            </button>
+          </div>
+        </div>
+        <div class="improvement-item-body">
+          <div class="improvement-item-meta">
+            <span class="improv-cat-badge improv-cat-${imp.category}">${CATEGORY_LABELS[imp.category] || imp.category}</span>
+            ${imp.improvement ? `<span class="improvement-item-improvement">预期提升: ${escapeHtml(imp.improvement)}</span>` : ""}
+          </div>
+          ${imp.desc ? `<div class="improvement-item-desc">${escapeHtml(imp.desc)}</div>` : ""}
+        </div>
+      </div>
+    `;
+  });
+
+  listEl.innerHTML = html;
+}
+
+function deleteImprovement(id) {
+  const phase = getActivePhase();
+  if (!phase) return;
+  ensureImprovements();
+
+  if (!confirm("确定要删除这条改进措施吗？")) return;
+
+  phase.improvements = phase.improvements.filter((imp) => imp.id !== id);
+  save();
+  renderImprovementList();
+}
+
+function showImprovToast(message) {
+  const existing = document.querySelector(".growth-improv-toast");
+  if (existing) existing.remove();
+
+  const toast = document.createElement("div");
+  toast.className = "growth-improv-toast";
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.add("show");
+  });
+
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 300);
+  }, 2000);
 }
 
 function escapeHtml(s) {

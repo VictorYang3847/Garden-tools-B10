@@ -47,6 +47,36 @@ const COMPONENT_TYPE_LABELS = {
   other: "其他",
 };
 
+const COMPONENT_CATEGORY_LABELS = {
+  electronic: "电子类",
+  mechanical: "机械类",
+  electromechanical: "机电类",
+};
+
+const COMPONENT_LIBRARY = [
+  { id: 'r-carbon', name: '碳膜电阻', category: 'electronic', type: 'resistor', lambdaBase: 0.02, desc: '通用碳膜电阻，民用级' },
+  { id: 'r-metal', name: '金属膜电阻', category: 'electronic', type: 'resistor', lambdaBase: 0.01, desc: '高精度金属膜电阻，工业级' },
+  { id: 'c-ceramic', name: '陶瓷电容', category: 'electronic', type: 'capacitor', lambdaBase: 0.03, desc: 'MLCC多层陶瓷电容' },
+  { id: 'c-electrolytic', name: '电解电容', category: 'electronic', type: 'capacitor', lambdaBase: 0.1, desc: '铝电解电容，温度敏感' },
+  { id: 'ic-mcu', name: 'MCU芯片', category: 'electronic', type: 'ic_digital', lambdaBase: 0.3, desc: '通用微控制器，数字IC' },
+  { id: 'ic-power', name: '电源管理IC', category: 'electronic', type: 'ic_analog', lambdaBase: 0.5, desc: '模拟电源管理芯片' },
+  { id: 'mosfet', name: 'MOS管', category: 'electronic', type: 'transistor', lambdaBase: 0.3, desc: '功率MOSFET，结温敏感' },
+  { id: 'diode', name: '二极管', category: 'electronic', type: 'diode', lambdaBase: 0.1, desc: '普通硅二极管' },
+  { id: 'inductor-common', name: '普通电感', category: 'electronic', type: 'inductor', lambdaBase: 0.03, desc: '通用功率电感' },
+  { id: 'bearing-ball', name: '滚珠轴承 608', category: 'mechanical', type: 'other', lambdaBase: 0.5, desc: '深沟球轴承，转速负载相关' },
+  { id: 'gear-steel', name: '齿轮(渗碳淬火)', category: 'mechanical', type: 'other', lambdaBase: 0.8, desc: '渗碳淬火钢制齿轮，接触疲劳' },
+  { id: 'spring', name: '弹簧', category: 'mechanical', type: 'other', lambdaBase: 0.2, desc: '疲劳失效为主' },
+  { id: 'seal', name: '密封圈', category: 'mechanical', type: 'other', lambdaBase: 0.3, desc: '橡胶密封件，老化失效' },
+  { id: 'switch-micro', name: '微动开关', category: 'electromechanical', type: 'relay', lambdaBase: 0.5, desc: '机械开关，触点磨损' },
+  { id: 'relay', name: '继电器', category: 'electromechanical', type: 'relay', lambdaBase: 0.8, desc: '电磁继电器，触点寿命' },
+  { id: 'connector', name: '连接器', category: 'electromechanical', type: 'connector', lambdaBase: 0.1, desc: '接插件，插拔磨损' },
+  { id: 'motor', name: '无刷电机', category: 'electromechanical', type: 'other', lambdaBase: 2.0, desc: '无刷直流电机，轴承+绕组' },
+];
+
+let customComponentLibrary = [];
+let currentLibCategory = 'all';
+let currentLibKeyword = '';
+
 const CHART_COLORS = [
   "#3b9eff",
   "#34d399",
@@ -720,6 +750,302 @@ function drawArrow(ctx, x, y, direction) {
   ctx.fill();
 }
 
+function loadCustomComponents() {
+  try {
+    const saved = localStorage.getItem('COMPONENT_LIBRARY_CUSTOM');
+    if (saved) {
+      customComponentLibrary = JSON.parse(saved);
+    } else {
+      customComponentLibrary = [];
+    }
+  } catch (e) {
+    customComponentLibrary = [];
+  }
+}
+
+function saveCustomComponents() {
+  try {
+    localStorage.setItem('COMPONENT_LIBRARY_CUSTOM', JSON.stringify(customComponentLibrary));
+  } catch (e) {
+    console.error('保存自定义元器件失败:', e);
+  }
+}
+
+function getAllLibraryComponents() {
+  return [...COMPONENT_LIBRARY, ...customComponentLibrary];
+}
+
+function getFilteredComponents() {
+  const all = getAllLibraryComponents();
+  let filtered = all;
+
+  if (currentLibCategory !== 'all') {
+    filtered = filtered.filter(c => c.category === currentLibCategory);
+  }
+
+  if (currentLibKeyword && currentLibKeyword.trim()) {
+    const kw = currentLibKeyword.trim().toLowerCase();
+    filtered = filtered.filter(c =>
+      c.name.toLowerCase().includes(kw) ||
+      (c.desc && c.desc.toLowerCase().includes(kw))
+    );
+  }
+
+  return filtered;
+}
+
+function renderComponentLibrary(container) {
+  const listEl = container.querySelector('#component-library-list');
+  if (!listEl) return;
+
+  const components = getFilteredComponents();
+
+  if (components.length === 0) {
+    listEl.innerHTML = `
+      <div class="lib-empty-state">
+        <div class="lib-empty-icon">🔍</div>
+        <p>没有找到匹配的元器件</p>
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = components.map(comp => {
+    const categoryLabel = COMPONENT_CATEGORY_LABELS[comp.category] || comp.category;
+    const typeLabel = COMPONENT_TYPE_LABELS[comp.type] || comp.type;
+    const isCustom = customComponentLibrary.some(c => c.id === comp.id);
+    return `
+      <div class="lib-component-card" data-comp-id="${comp.id}" title="点击添加到BOM">
+        <div class="lib-comp-header">
+          <span class="lib-comp-name">${escapeHtml(comp.name)}</span>
+          ${isCustom ? '<span class="lib-comp-custom-tag">自定义</span>' : ''}
+        </div>
+        <div class="lib-comp-category">
+          <span class="lib-cat-badge lib-cat-${comp.category}">${categoryLabel}</span>
+          <span class="lib-type-label">${typeLabel}</span>
+        </div>
+        <div class="lib-comp-lambda">
+          <span class="lambda-label">λb</span>
+          <span class="lambda-value">${comp.lambdaBase}</span>
+          <span class="lambda-unit">FIT</span>
+        </div>
+        ${comp.desc ? `<div class="lib-comp-desc">${escapeHtml(comp.desc)}</div>` : ''}
+        <div class="lib-comp-add-btn">
+          <span>➕</span> 添加
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openComponentLibrary(container) {
+  const modal = container.querySelector('#component-library-modal');
+  if (modal) {
+    modal.style.display = 'flex';
+    loadCustomComponents();
+    renderComponentLibrary(container);
+    const searchInput = container.querySelector('#component-library-search-input');
+    if (searchInput) {
+      searchInput.value = '';
+      currentLibKeyword = '';
+      searchInput.focus();
+    }
+  }
+}
+
+function closeComponentLibrary(container) {
+  const modal = container.querySelector('#component-library-modal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+}
+
+function handleLibrarySearch(container, keyword) {
+  currentLibKeyword = keyword;
+  renderComponentLibrary(container);
+}
+
+function handleLibraryCategoryChange(container, category) {
+  currentLibCategory = category;
+
+  const catBtns = container.querySelectorAll('.lib-cat-btn');
+  catBtns.forEach(btn => {
+    if (btn.dataset.category === category) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
+  renderComponentLibrary(container);
+}
+
+function addComponentFromLibrary(container, compId) {
+  const all = getAllLibraryComponents();
+  const comp = all.find(c => c.id === compId);
+  if (!comp) return;
+
+  const newComponent = createNewComponent(comp.type);
+  newComponent.name = comp.name;
+  newComponent.lambdaBase = comp.lambdaBase;
+  newComponent.lambdaOp = calcLambdaOp(newComponent);
+
+  predictionData.components.push(newComponent);
+  saveData();
+  renderTable(container);
+  updateResults(container);
+  drawBarChart(container);
+  drawSystemDiagram(container);
+
+  showToast(container, `已添加: ${comp.name}`);
+}
+
+function openCustomComponentModal(container) {
+  const modal = container.querySelector('#custom-component-modal');
+  if (modal) {
+    modal.style.display = 'flex';
+    const nameInput = container.querySelector('#custom-comp-name');
+    if (nameInput) nameInput.focus();
+  }
+}
+
+function closeCustomComponentModal(container) {
+  const modal = container.querySelector('#custom-component-modal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+}
+
+function addCustomComponent(container, data) {
+  const newComp = {
+    id: 'custom-' + genId(),
+    name: data.name,
+    category: data.category,
+    type: data.type,
+    lambdaBase: data.lambdaBase,
+    desc: data.desc || '',
+  };
+
+  customComponentLibrary.push(newComp);
+  saveCustomComponents();
+  renderComponentLibrary(container);
+  showToast(container, `已添加自定义元器件: ${data.name}`);
+}
+
+function showToast(container, message) {
+  let toast = container.querySelector('.lib-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.className = 'lib-toast';
+    container.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.classList.add('show');
+
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 2000);
+}
+
+function bindComponentLibraryEvents(container) {
+  const libraryBtn = container.querySelector('#pred-component-library');
+  if (libraryBtn) {
+    libraryBtn.addEventListener('click', () => openComponentLibrary(container));
+  }
+
+  const closeBtn = container.querySelector('#component-library-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => closeComponentLibrary(container));
+  }
+
+  const overlay = container.querySelector('#component-library-overlay');
+  if (overlay) {
+    overlay.addEventListener('click', () => closeComponentLibrary(container));
+  }
+
+  const searchInput = container.querySelector('#component-library-search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => handleLibrarySearch(container, e.target.value));
+  }
+
+  const catBtns = container.querySelectorAll('.lib-cat-btn');
+  catBtns.forEach(btn => {
+    btn.addEventListener('click', () => handleLibraryCategoryChange(container, btn.dataset.category));
+  });
+
+  const listEl = container.querySelector('#component-library-list');
+  if (listEl) {
+    listEl.addEventListener('click', (e) => {
+      const card = e.target.closest('.lib-component-card');
+      if (card) {
+        const compId = card.dataset.compId;
+        if (compId) {
+          addComponentFromLibrary(container, compId);
+        }
+      }
+    });
+  }
+
+  const addCustomBtn = container.querySelector('#add-custom-component-btn');
+  if (addCustomBtn) {
+    addCustomBtn.addEventListener('click', () => openCustomComponentModal(container));
+  }
+
+  const customCloseBtn = container.querySelector('#custom-component-close');
+  if (customCloseBtn) {
+    customCloseBtn.addEventListener('click', () => closeCustomComponentModal(container));
+  }
+
+  const customOverlay = container.querySelector('#custom-component-overlay');
+  if (customOverlay) {
+    customOverlay.addEventListener('click', () => closeCustomComponentModal(container));
+  }
+
+  const customCancelBtn = container.querySelector('#custom-comp-cancel');
+  if (customCancelBtn) {
+    customCancelBtn.addEventListener('click', () => closeCustomComponentModal(container));
+  }
+
+  const customSaveBtn = container.querySelector('#custom-comp-save');
+  if (customSaveBtn) {
+    customSaveBtn.addEventListener('click', () => {
+      const nameInput = container.querySelector('#custom-comp-name');
+      const categorySelect = container.querySelector('#custom-comp-category');
+      const typeSelect = container.querySelector('#custom-comp-type');
+      const lambdaInput = container.querySelector('#custom-comp-lambda');
+      const descInput = container.querySelector('#custom-comp-desc');
+
+      const name = nameInput?.value?.trim();
+      if (!name) {
+        alert('请输入元器件名称');
+        nameInput?.focus();
+        return;
+      }
+
+      const lambdaBase = Number(lambdaInput?.value) || 0;
+      if (lambdaBase <= 0) {
+        alert('请输入有效的基础失效率');
+        lambdaInput?.focus();
+        return;
+      }
+
+      addCustomComponent(container, {
+        name: name,
+        category: categorySelect?.value || 'electronic',
+        type: typeSelect?.value || 'other',
+        lambdaBase: lambdaBase,
+        desc: descInput?.value?.trim() || '',
+      });
+
+      closeCustomComponentModal(container);
+
+      if (nameInput) nameInput.value = '';
+      if (lambdaInput) lambdaInput.value = '0.1';
+      if (descInput) descInput.value = '';
+    });
+  }
+}
+
 function bindEvents(container) {
   const tbody = container.querySelector("#pred-table-body");
   tbody.addEventListener("input", (e) => handleInputChange(container, e));
@@ -1235,6 +1561,8 @@ export function render(container, model) {
 
   renderTable(container);
   bindEvents(container);
+  bindComponentLibraryEvents(container);
+  loadCustomComponents();
   updateResults(container);
 
   initAllocationUI(container);

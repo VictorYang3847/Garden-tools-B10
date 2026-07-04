@@ -2,6 +2,47 @@ let onSaveCallback = null;
 let currentModel = null;
 let currentFilter = "all";
 let fmeaData = null;
+let currentRatingInput = null;
+let currentRatingType = null;
+
+const SEVERITY_RATINGS = [
+  { score: 10, desc: "危及安全/违反法规，无预警" },
+  { score: 9, desc: "危及安全/违反法规，有预警" },
+  { score: 8, desc: "系统完全失效，无法使用" },
+  { score: 7, desc: "性能严重下降，客户不满意" },
+  { score: 6, desc: "性能中度下降，客户有抱怨" },
+  { score: 5, desc: "性能轻微下降，客户可察觉" },
+  { score: 4, desc: "外观/舒适性有缺陷，多数客户发现" },
+  { score: 3, desc: "外观/舒适性有缺陷，部分客户发现" },
+  { score: 2, desc: "外观有轻微缺陷，挑剔客户发现" },
+  { score: 1, desc: "无影响，客户察觉不到" },
+];
+
+const OCCURRENCE_RATINGS = [
+  { score: 10, desc: "几乎必然发生，失效率≥1/2" },
+  { score: 9, desc: "很高，失效率≈1/3" },
+  { score: 8, desc: "高，失效率≈1/8" },
+  { score: 7, desc: "较高，失效率≈1/20" },
+  { score: 6, desc: "中等，失效率≈1/50" },
+  { score: 5, desc: "一般，失效率≈1/100" },
+  { score: 4, desc: "较低，失效率≈1/500" },
+  { score: 3, desc: "低，失效率≈1/2000" },
+  { score: 2, desc: "极低，失效率≈1/10000" },
+  { score: 1, desc: "几乎不可能，失效率≤1/100000" },
+];
+
+const DETECTION_RATINGS = [
+  { score: 10, desc: "完全无法探测，无任何检测手段" },
+  { score: 9, desc: "探测几率极低，几乎不可能发现" },
+  { score: 8, desc: "探测几率很低，依靠人工抽检" },
+  { score: 7, desc: "探测几率低，抽样检测" },
+  { score: 6, desc: "中等探测几率，100%人工检验" },
+  { score: 5, desc: "中等偏上，自动化检测覆盖率50%" },
+  { score: 4, desc: "较高探测几率，自动化检测覆盖率100%" },
+  { score: 3, desc: "高探测几率，多重检测" },
+  { score: 2, desc: "很高探测几率，防错设计" },
+  { score: 1, desc: "肯定能探测到，设计验证/防错" },
+];
 
 function genId() {
   return crypto.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -249,6 +290,128 @@ function handleFilterChange(container, e) {
   renderTable(container);
 }
 
+function getRatingData(type) {
+  switch (type) {
+    case "severity":
+      return { ratings: SEVERITY_RATINGS, title: "严重度 (S) 评分标准" };
+    case "occurrence":
+      return { ratings: OCCURRENCE_RATINGS, title: "发生度 (O) 评分标准" };
+    case "detection":
+      return { ratings: DETECTION_RATINGS, title: "探测度 (D) 评分标准" };
+    default:
+      return { ratings: [], title: "评分标准" };
+  }
+}
+
+function renderRatingContent(type) {
+  const { ratings, title } = getRatingData(type);
+  const panel = document.getElementById("fmea-rating-panel");
+  if (!panel) return;
+
+  const titleEl = panel.querySelector(".rating-panel-title");
+  const contentEl = panel.querySelector(".rating-panel-content");
+
+  if (titleEl) titleEl.textContent = title;
+
+  if (contentEl) {
+    contentEl.innerHTML = ratings
+      .map(
+        (item) => `
+      <div class="rating-item" data-score="${item.score}">
+        <span class="rating-score">${item.score}</span>
+        <span class="rating-desc">${item.desc}</span>
+      </div>
+    `
+      )
+      .join("");
+  }
+}
+
+function openRatingPanel(type, inputEl, container) {
+  const panel = document.getElementById("fmea-rating-panel");
+  if (!panel) return;
+
+  currentRatingInput = inputEl;
+  currentRatingType = type;
+
+  renderRatingContent(type);
+
+  panel.style.display = "block";
+
+  const rect = inputEl.getBoundingClientRect();
+  const panelRect = panel.getBoundingClientRect();
+
+  let top = rect.bottom + 4;
+  let left = rect.left;
+
+  if (top + panelRect.height > window.innerHeight) {
+    top = rect.top - panelRect.height - 4;
+  }
+
+  if (left + panelRect.width > window.innerWidth) {
+    left = window.innerWidth - panelRect.width - 8;
+  }
+
+  if (left < 8) left = 8;
+
+  panel.style.top = `${top + window.scrollY}px`;
+  panel.style.left = `${left + window.scrollX}px`;
+}
+
+function closeRatingPanel() {
+  const panel = document.getElementById("fmea-rating-panel");
+  if (!panel) return;
+
+  panel.style.display = "none";
+  currentRatingInput = null;
+  currentRatingType = null;
+}
+
+function handleRatingClick(container, e) {
+  const item = e.target.closest(".rating-item");
+  if (!item) return;
+
+  const score = Number(item.dataset.score);
+  if (isNaN(score) || !currentRatingInput) {
+    closeRatingPanel();
+    return;
+  }
+
+  currentRatingInput.value = score;
+  currentRatingInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+  closeRatingPanel();
+}
+
+function handleRatingInputClick(container, e) {
+  const input = e.target.closest(".fmea-num-input");
+  if (!input) return;
+
+  const field = input.dataset.field;
+  if (field !== "severity" && field !== "occurrence" && field !== "detection") return;
+
+  e.preventDefault();
+  openRatingPanel(field, input, container);
+}
+
+function handleRatingPanelClose(container, e) {
+  const closeBtn = e.target.closest(".rating-panel-close");
+  if (!closeBtn) return;
+
+  closeRatingPanel();
+}
+
+function handleDocumentClick(e) {
+  const panel = document.getElementById("fmea-rating-panel");
+  if (!panel || panel.style.display === "none") return;
+
+  if (panel.contains(e.target)) return;
+
+  if (e.target.closest(".fmea-num-input")) return;
+
+  closeRatingPanel();
+}
+
 function exportCsv() {
   if (!fmeaData || !fmeaData.items || fmeaData.items.length === 0) {
     alert("暂无数据可导出");
@@ -331,7 +494,10 @@ function exportCsv() {
 function bindEvents(container) {
   const tbody = container.querySelector("#fmea-table-body");
   tbody.addEventListener("input", (e) => handleInputChange(container, e));
-  tbody.addEventListener("click", (e) => handleDeleteClick(container, e));
+  tbody.addEventListener("click", (e) => {
+    handleDeleteClick(container, e);
+    handleRatingInputClick(container, e);
+  });
 
   const tabs = container.querySelector(".fmea-tabs");
   tabs.addEventListener("click", (e) => handleTabClick(container, e));
@@ -347,6 +513,16 @@ function bindEvents(container) {
 
   const exportBtn = container.querySelector("#fmea-export-csv");
   exportBtn.addEventListener("click", exportCsv);
+
+  const ratingPanel = container.querySelector("#fmea-rating-panel");
+  if (ratingPanel) {
+    ratingPanel.addEventListener("click", (e) => {
+      handleRatingClick(container, e);
+      handleRatingPanelClose(container, e);
+    });
+  }
+
+  document.addEventListener("click", handleDocumentClick);
 }
 
 export function init(model, onSave) {

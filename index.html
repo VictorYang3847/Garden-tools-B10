@@ -16,6 +16,10 @@
           </div>
         </div>
         <nav class="sidebar-nav">
+          <a href="#/home" class="nav-item" data-route="home">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">首页</span>
+          </a>
           <a href="#/fmea" class="nav-item" data-route="fmea">
             <span class="nav-icon">🔍</span>
             <span class="nav-label">FMEA</span>
@@ -31,6 +35,10 @@
           <a href="#/test-plan" class="nav-item" data-route="test-plan">
             <span class="nav-icon">📋</span>
             <span class="nav-label">测试计划</span>
+          </a>
+          <a href="#/sample-size" class="nav-item" data-route="sample-size">
+            <span class="nav-icon">🧮</span>
+            <span class="nav-label">样本量计算</span>
           </a>
           <a href="#/fta" class="nav-item" data-route="fta">
             <span class="nav-icon">🌳</span>
@@ -106,6 +114,164 @@
       </div>
     </div>
 
+    <template id="home-template">
+      <div class="module-page home-page">
+        <div class="home-welcome">
+          <h1 class="home-title">可靠性工具平台</h1>
+          <p class="home-subtitle">专业的锂电产品可靠性分析与计算工具</p>
+        </div>
+
+        <div class="home-section">
+          <h2 class="home-section-title">工具快捷入口</h2>
+          <div class="tool-cards-grid">
+            <a href="#/fmea" class="tool-card">
+              <div class="tool-card-icon">🔍</div>
+              <div class="tool-card-name">FMEA分析</div>
+              <div class="tool-card-desc">失效模式与影响分析</div>
+            </a>
+            <a href="#/prediction" class="tool-card">
+              <div class="tool-card-icon">📊</div>
+              <div class="tool-card-name">可靠性预测</div>
+              <div class="tool-card-desc">系统可靠性预计与分配</div>
+            </a>
+            <a href="#/life-data" class="tool-card">
+              <div class="tool-card-icon">📈</div>
+              <div class="tool-card-name">寿命数据分析</div>
+              <div class="tool-card-desc">Weibull分布与B10计算</div>
+            </a>
+            <a href="#/test-plan" class="tool-card">
+              <div class="tool-card-icon">📋</div>
+              <div class="tool-card-name">测试计划</div>
+              <div class="tool-card-desc">试验方案设计与评估</div>
+            </a>
+            <a href="#/test-plan" class="tool-card">
+              <div class="tool-card-icon">🧮</div>
+              <div class="tool-card-name">样本量计算</div>
+              <div class="tool-card-desc">试验样本量估算</div>
+            </a>
+            <a href="#/fta" class="tool-card">
+              <div class="tool-card-icon">🌳</div>
+              <div class="tool-card-name">故障树分析</div>
+              <div class="tool-card-desc">FTA故障树分析</div>
+            </a>
+            <a href="#/growth" class="tool-card">
+              <div class="tool-card-icon">📈</div>
+              <div class="tool-card-name">可靠性增长</div>
+              <div class="tool-card-desc">可靠性增长模型</div>
+            </a>
+            <a href="#/data" class="tool-card">
+              <div class="tool-card-icon">💾</div>
+              <div class="tool-card-name">数据管理</div>
+              <div class="tool-card-desc">项目数据导入导出</div>
+            </a>
+          </div>
+        </div>
+
+        <div class="home-section">
+          <div class="card b10-quick-card">
+            <div class="card-header">
+              <h3>B10 / MTBF 快速计算器</h3>
+            </div>
+            <div class="card-body">
+              <div class="b10-calc-layout">
+                <div class="b10-calc-inputs">
+                  <div class="form-group">
+                    <label>形状参数 β</label>
+                    <input type="number" id="home-beta" class="form-input" min="0.1" step="0.1" value="2.2" />
+                  </div>
+                  <div class="form-group">
+                    <label>特征寿命 η (小时)</label>
+                    <input type="number" id="home-eta" class="form-input" min="1" step="1" value="180" />
+                  </div>
+                  <div class="form-group">
+                    <label>目标可靠度</label>
+                    <div class="slider-row">
+                      <input type="range" id="home-reliability-slider" class="slider-input" min="50" max="99" value="90" />
+                      <input type="number" id="home-reliability-value" class="form-input reliability-number" min="50" max="99" step="1" value="90" />
+                      <span class="slider-unit">%</span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>指定时间 t (小时)</label>
+                    <input type="number" id="home-time" class="form-input" min="0" step="1" value="40" />
+                  </div>
+                </div>
+                <div class="b10-calc-results">
+                  <div class="metric-card b10-highlight">
+                    <div class="metric-label">B10 寿命</div>
+                    <div class="metric-value" id="home-b10">—</div>
+                    <div class="metric-unit">小时</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">MTBF / MTTF</div>
+                    <div class="metric-value" id="home-mtbf">—</div>
+                    <div class="metric-unit">小时</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">t 时刻可靠度</div>
+                    <div class="metric-value" id="home-reliability-t">—</div>
+                    <div class="metric-unit" id="home-reliability-t-pct">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">t 时刻失效概率</div>
+                    <div class="metric-value" id="home-failure-t">—</div>
+                    <div class="metric-unit" id="home-failure-t-pct">—</div>
+                  </div>
+                  <div class="formula-section">
+                    <button type="button" class="formula-toggle" id="home-formula-toggle">📐 查看计算公式</button>
+                    <div class="formula-content" id="home-formula-content" style="display: none;">
+                      <div class="formula-item">
+                        <h4>威布尔可靠度公式</h4>
+                        <div class="formula-equation">R(t) = exp(-(t/η)<sup>β</sup>)</div>
+                        <div class="formula-vars">
+                          <div class="var-row"><span class="var-name">R(t)</span><span class="var-desc">时刻 t 的可靠度</span></div>
+                          <div class="var-row"><span class="var-name">t</span><span class="var-desc">时间（小时）</span></div>
+                          <div class="var-row"><span class="var-name">η</span><span class="var-desc">特征寿命（尺度参数）</span></div>
+                          <div class="var-row"><span class="var-name">β</span><span class="var-desc">形状参数</span></div>
+                        </div>
+                      </div>
+                      <div class="formula-item">
+                        <h4>B10 寿命公式</h4>
+                        <div class="formula-equation">B10 = η × [-ln(0.9)]<sup>1/β</sup></div>
+                        <div class="formula-note">可靠度为90%时对应的寿命，即10%产品失效的时间</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="home-section">
+          <h2 class="home-section-title">快速开始</h2>
+          <div class="quick-start-steps">
+            <div class="step-card">
+              <div class="step-number">1</div>
+              <div class="step-content">
+                <h3>创建/选择项目型号</h3>
+                <p>在顶部选择器中创建或选择您的项目、产品和型号</p>
+              </div>
+            </div>
+            <div class="step-card">
+              <div class="step-number">2</div>
+              <div class="step-content">
+                <h3>使用工具进行分析</h3>
+                <p>从左侧导航或上方快捷入口进入所需的可靠性分析工具</p>
+              </div>
+            </div>
+            <div class="step-card">
+              <div class="step-number">3</div>
+              <div class="step-content">
+                <h3>导出结果或保存数据</h3>
+                <p>完成分析后，可导出结果或通过数据管理保存项目数据</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
     <template id="fmea-template">
       <div class="module-page fmea-page">
         <div class="module-header">
@@ -176,6 +342,14 @@
             </div>
           </div>
         </div>
+        <div class="fmea-rating-panel" id="fmea-rating-panel" style="display: none;">
+          <div class="rating-panel-header">
+            <span class="rating-panel-title">评分标准</span>
+            <button type="button" class="rating-panel-close">×</button>
+          </div>
+          <div class="rating-panel-content" id="rating-panel-content">
+          </div>
+        </div>
       </div>
     </template>
 
@@ -191,6 +365,7 @@
               <button type="button" class="life-data-tab active" data-tab="definition">产品定义</button>
               <button type="button" class="life-data-tab" data-tab="data-entry">数据录入</button>
               <button type="button" class="life-data-tab" data-tab="analysis">分析结果</button>
+              <button type="button" class="life-data-tab" data-tab="weakness">短板分析</button>
             </div>
           </div>
 
@@ -294,7 +469,7 @@
                     </div>
                     <div class="form-row">
                       <div class="form-group">
-                        <label>置信度 (%)</label>
+                        <label>置信度 (%)<span class="help-icon" data-tooltip="统计结果的可信程度，行业常用90%或95%">?</span></label>
                         <select name="confidence" class="form-input">
                           <option value="90">90%</option>
                           <option value="95">95%</option>
@@ -542,12 +717,16 @@
                     <div class="metric-label">失效数</div>
                     <div class="metric-value" id="ld-failure-count">—</div>
                   </div>
+                  <div class="metric-card" id="ld-metric-censored" style="display: none;">
+                    <div class="metric-label">右删失数<span class="help-icon" data-tooltip="试验结束时仍未失效的样品，只知道寿命大于某个值">?</span></div>
+                    <div class="metric-value" id="ld-censored-count">—</div>
+                  </div>
                   <div class="metric-card" id="ld-metric-beta">
-                    <div class="metric-label">形状参数 β</div>
+                    <div class="metric-label">形状参数 β<span class="help-icon" data-tooltip="β<1早期失效，β≈1偶然失效，β>1磨损失效。电动工具典型值2.0~2.5">?</span></div>
                     <div class="metric-value" id="ld-beta">—</div>
                   </div>
                   <div class="metric-card" id="ld-metric-eta">
-                    <div class="metric-label">特征寿命 η</div>
+                    <div class="metric-label">特征寿命 η<span class="help-icon" data-tooltip="可靠度为36.8%时的寿命时间，代表整体寿命量级">?</span></div>
                     <div class="metric-value" id="ld-eta">—</div>
                     <div class="metric-unit">h</div>
                   </div>
@@ -593,6 +772,35 @@
                     <div class="metric-label">差距</div>
                     <div class="metric-value" id="ld-result-gap-analysis">—</div>
                     <div class="metric-unit">h</div>
+                  </div>
+                </div>
+                <div class="formula-section">
+                  <button type="button" class="formula-toggle" id="ld-formula-toggle">📐 查看计算公式</button>
+                  <div class="formula-content" id="ld-formula-content" style="display: none;">
+                    <div class="formula-item">
+                      <h4>威布尔可靠度公式</h4>
+                      <div class="formula-equation">R(t) = exp(-(t/η)<sup>β</sup>)</div>
+                      <div class="formula-vars">
+                        <div class="var-row"><span class="var-name">R(t)</span><span class="var-desc">时刻 t 的可靠度</span></div>
+                        <div class="var-row"><span class="var-name">t</span><span class="var-desc">时间（小时）</span></div>
+                        <div class="var-row"><span class="var-name">η</span><span class="var-desc">特征寿命（尺度参数）</span></div>
+                        <div class="var-row"><span class="var-name">β</span><span class="var-desc">形状参数</span></div>
+                      </div>
+                    </div>
+                    <div class="formula-item">
+                      <h4>B10 寿命公式</h4>
+                      <div class="formula-equation">B10 = η × [-ln(0.9)]<sup>1/β</sup></div>
+                      <div class="formula-note">可靠度为90%时对应的寿命，即10%产品失效的时间</div>
+                    </div>
+                    <div class="formula-item">
+                      <h4>MTBF 公式</h4>
+                      <div class="formula-equation">MTBF = η × Γ(1 + 1/β)</div>
+                      <div class="formula-note">平均失效前时间，Γ为伽马函数</div>
+                    </div>
+                    <div class="formula-item">
+                      <h4>失效率公式</h4>
+                      <div class="formula-equation">h(t) = (β/η) × (t/η)<sup>β-1</sup></div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -647,6 +855,104 @@
               </div>
             </div>
           </div>
+
+          <div class="life-data-tab-content" id="life-tab-weakness" style="display: none;">
+            <div class="card">
+              <div class="card-header">
+                <h3>批次选择</h3>
+              </div>
+              <div class="card-body">
+                <div class="batch-tabs" id="ld-weakness-batch-tabs"></div>
+              </div>
+            </div>
+
+            <div class="card weakness-core-card" id="ld-weakness-core-card" style="display: none;">
+              <div class="card-header">
+                <h3>🔴 核心短板识别</h3>
+              </div>
+              <div class="card-body">
+                <div class="weakness-core-content">
+                  <div class="weakness-core-mode" id="ld-weakness-core-mode">—</div>
+                  <div class="weakness-core-metrics">
+                    <div class="metric-card weakness-highlight">
+                      <div class="metric-label">B10 寿命</div>
+                      <div class="metric-value" id="ld-weakness-core-b10">—</div>
+                      <div class="metric-unit">h</div>
+                    </div>
+                    <div class="metric-card">
+                      <div class="metric-label">失效占比</div>
+                      <div class="metric-value" id="ld-weakness-core-pct">—</div>
+                      <div class="metric-unit">%</div>
+                    </div>
+                    <div class="metric-card">
+                      <div class="metric-label">失效数</div>
+                      <div class="metric-value" id="ld-weakness-core-count">—</div>
+                    </div>
+                  </div>
+                  <div class="weakness-suggestion">
+                    <span class="suggestion-icon">💡</span>
+                    <span id="ld-weakness-suggestion">建议针对该失效模式优先优化，可显著提升整机寿命</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" id="ld-weakness-table-card" style="display: none;">
+              <div class="card-header">
+                <h3>拟合参数对比</h3>
+              </div>
+              <div class="card-body">
+                <div class="table-wrap">
+                  <table class="data-table weakness-table">
+                    <thead>
+                      <tr>
+                        <th style="min-width: 200px;">失效模式</th>
+                        <th style="width: 90px;">样本数</th>
+                        <th style="width: 90px;">失效数</th>
+                        <th style="width: 90px;">β</th>
+                        <th style="width: 110px;">η (h)</th>
+                        <th style="width: 110px;">B10 (h)</th>
+                        <th style="width: 110px;">MTBF (h)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="ld-weakness-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" id="ld-weakness-charts-card" style="display: none;">
+              <div class="card-header">
+                <h3>图表分析</h3>
+              </div>
+              <div class="card-body">
+                <div class="weakness-charts-row">
+                  <div class="weakness-chart-col">
+                    <h4 class="chart-title">B10 寿命对比</h4>
+                    <div class="chart-container">
+                      <canvas id="ld-weakness-bar-canvas" width="500" height="350"></canvas>
+                    </div>
+                  </div>
+                  <div class="weakness-chart-col">
+                    <h4 class="chart-title">失效模式占比</h4>
+                    <div class="chart-container">
+                      <canvas id="ld-weakness-pie-canvas" width="500" height="350"></canvas>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" id="ld-weakness-empty-card">
+              <div class="card-body">
+                <div class="empty-state">
+                  <div class="empty-icon">📊</div>
+                  <h3>数据不足，无法进行短板分析</h3>
+                  <p>请确保当前批次有至少2种失效模式，且每种失效模式至少有2个失效样本。</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -687,7 +993,7 @@
                     <input type="number" id="tp-allowed-failures" class="form-input" min="0" step="1" value="0" />
                   </div>
                   <div class="form-group">
-                    <label>默认截尾类型</label>
+                    <label>默认截尾类型<span class="help-icon" data-tooltip="定时截尾(到时停) vs 定数截尾(失效数够了停)">?</span></label>
                     <select id="tp-default-censor" class="form-input">
                       <option value="time">定时截尾</option>
                       <option value="failure">定数截尾</option>
@@ -727,7 +1033,7 @@
                         <th style="width: 120px;">目标可靠度</th>
                         <th style="width: 100px;">样本量</th>
                         <th style="width: 120px;">试验时长 (h)</th>
-                        <th style="width: 120px;">截尾类型</th>
+                        <th style="width: 120px;">截尾类型<span class="help-icon" data-tooltip="定时截尾(到时停) vs 定数截尾(失效数够了停)">?</span></th>
                         <th style="min-width: 150px;">台架条件</th>
                         <th style="width: 70px;">操作</th>
                       </tr>
@@ -763,9 +1069,9 @@
                         <th style="width: 50px;">序号</th>
                         <th style="min-width: 180px;">试验名称</th>
                         <th style="width: 100px;">应力类型</th>
-                        <th style="width: 140px;">加速模型</th>
+                        <th style="width: 140px;">加速模型<span class="help-icon" data-tooltip="Arrhenius温度加速、逆幂律负载加速等，根据失效机理选择">?</span></th>
                         <th style="width: 120px;">正常使用应力</th>
-                        <th style="width: 130px;">加速应力水平1</th>
+                        <th style="width: 130px;">加速应力水平1<span class="help-icon" data-tooltip="加速试验施加的应力等级，至少需要2个水平才能计算加速因子">?</span></th>
                         <th style="width: 130px;">加速应力水平2</th>
                         <th style="width: 110px;">加速因子</th>
                         <th style="width: 110px;">试验时长 (h)</th>
@@ -851,7 +1157,7 @@
                         <th style="min-width: 150px;">试验对象</th>
                         <th style="min-width: 200px;">试验工况</th>
                         <th style="width: 80px;">样本量</th>
-                        <th style="width: 120px;">截尾方式</th>
+                        <th style="width: 120px;">截尾方式<span class="help-icon" data-tooltip="定时截尾(到时停) vs 定数截尾(失效数够了停)">?</span></th>
                         <th style="min-width: 220px;">验收标准</th>
                         <th style="width: 100px;">试验结果</th>
                         <th style="min-width: 150px;">备注</th>
@@ -894,6 +1200,190 @@
       </div>
     </template>
 
+    <template id="sample-size-template">
+      <div class="module-page sample-size-page">
+        <div class="module-header">
+          <h2>样本量计算</h2>
+          <p>可靠性试验样本量估算 — 合格性验证与寿命测定</p>
+        </div>
+        <div class="module-content">
+          <div class="sample-size-toolbar">
+            <div class="sample-size-tabs">
+              <button type="button" class="sample-size-tab active" data-tab="qualification">合格性验证</button>
+              <button type="button" class="sample-size-tab" data-tab="life-test">寿命测定</button>
+            </div>
+          </div>
+
+          <div class="sample-size-tab-content" id="ss-tab-qualification">
+            <div class="sample-size-layout">
+              <div class="sample-size-inputs card">
+                <div class="card-header">
+                  <h3>输入参数（二项分布）</h3>
+                </div>
+                <div class="card-body">
+                  <div class="form-group">
+                    <label>目标可靠度 R<span class="help-icon" data-tooltip="要求达到的可靠度水平，如90%表示90%的产品能通过">?</span></label>
+                    <div class="slider-row">
+                      <input type="range" id="ss-qual-reliability-slider" class="slider-input" min="50" max="99" value="90" />
+                      <input type="number" id="ss-qual-reliability-value" class="form-input reliability-number" min="50" max="99" step="1" value="90" />
+                      <span class="slider-unit">%</span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>置信度 CL<span class="help-icon" data-tooltip="统计结论的把握程度，越高需要的样本量越大">?</span></label>
+                    <div class="slider-row">
+                      <input type="range" id="ss-qual-confidence-slider" class="slider-input" min="50" max="99" value="90" />
+                      <input type="number" id="ss-qual-confidence-value" class="form-input reliability-number" min="50" max="99" step="1" value="90" />
+                      <span class="slider-unit">%</span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>允许失效数 r<span class="help-icon" data-tooltip="试验中允许的失效数量，0失效要求最严格">?</span></label>
+                    <input type="number" id="ss-qual-allowed-failures" class="form-input" min="0" max="10" step="1" value="0" />
+                  </div>
+                  <div class="form-group">
+                    <label>试验时长 t <span class="hint">(小时)</span></label>
+                    <input type="number" id="ss-qual-test-time" class="form-input" min="1" step="1" value="200" />
+                  </div>
+                  <div class="form-group">
+                    <label>威布尔形状参数 β</label>
+                    <input type="number" id="ss-qual-beta" class="form-input" min="0.1" step="0.1" value="2.2" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="sample-size-results">
+                <div class="metric-card ss-result-highlight">
+                  <div class="metric-label">最少样本量 n</div>
+                  <div class="metric-value" id="ss-qual-result-n">—</div>
+                  <div class="metric-unit">台</div>
+                </div>
+                <div class="card">
+                  <div class="card-header">
+                    <h3>结果说明</h3>
+                  </div>
+                  <div class="card-body">
+                    <div class="ss-result-info" id="ss-qual-zero-fail-prob">
+                      <strong>0失效通过概率：</strong><span id="ss-qual-pass-prob">—</span>
+                    </div>
+                    <div class="ss-result-divider"></div>
+                    <div class="ss-result-reference">
+                      <h4>行业参考</h4>
+                      <ul>
+                        <li>部件级：6 ~ 8 台</li>
+                        <li>整机级：10 ~ 20 台</li>
+                      </ul>
+                    </div>
+                    <div class="formula-section">
+                      <button type="button" class="formula-toggle" id="ss-qual-formula-toggle">📐 查看计算公式</button>
+                      <div class="formula-content" id="ss-qual-formula-content" style="display: none;">
+                        <div class="formula-item">
+                          <h4>0失效时样本量公式</h4>
+                          <div class="formula-equation">n = ln(1 - CL) / ln(R)</div>
+                          <div class="formula-vars">
+                            <div class="var-row"><span class="var-name">n</span><span class="var-desc">最少样本量</span></div>
+                            <div class="var-row"><span class="var-name">CL</span><span class="var-desc">置信度（Confidence Level）</span></div>
+                            <div class="var-row"><span class="var-name">R</span><span class="var-desc">目标可靠度</span></div>
+                          </div>
+                        </div>
+                        <div class="formula-item">
+                          <h4>二项分布累积概率</h4>
+                          <div class="formula-equation">P(X ≤ r) = Σ<sub>k=0</sub><sup>r</sup> C(n,k) × (1-R)<sup>k</sup> × R<sup>n-k</sup></div>
+                          <div class="formula-note">n个样本中失效数不超过r的概率</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sample-size-tab-content" id="ss-tab-life-test" style="display: none;">
+            <div class="sample-size-layout">
+              <div class="sample-size-inputs card">
+                <div class="card-header">
+                  <h3>输入参数（威布尔拟合）</h3>
+                </div>
+                <div class="card-body">
+                  <div class="form-group">
+                    <label>目标精度（相对误差）<span class="help-icon" data-tooltip="B10估计值的相对误差要求，如20%表示误差不超过±20%">?</span></label>
+                    <div class="slider-row">
+                      <input type="range" id="ss-life-precision-slider" class="slider-input" min="5" max="50" value="20" />
+                      <input type="number" id="ss-life-precision-value" class="form-input reliability-number" min="5" max="50" step="1" value="20" />
+                      <span class="slider-unit">%</span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>置信度 CL<span class="help-icon" data-tooltip="统计结论的把握程度，越高需要的样本量越大">?</span></label>
+                    <div class="slider-row">
+                      <input type="range" id="ss-life-confidence-slider" class="slider-input" min="50" max="99" value="90" />
+                      <input type="number" id="ss-life-confidence-value" class="form-input reliability-number" min="50" max="99" step="1" value="90" />
+                      <span class="slider-unit">%</span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>预期失效比例<span class="help-icon" data-tooltip="试验结束时预计的失效比例，越高需要的总样本量越少">?</span></label>
+                    <div class="slider-row">
+                      <input type="range" id="ss-life-failure-ratio-slider" class="slider-input" min="30" max="100" value="60" />
+                      <input type="number" id="ss-life-failure-ratio-value" class="form-input reliability-number" min="30" max="100" step="1" value="60" />
+                      <span class="slider-unit">%</span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>威布尔形状参数 β</label>
+                    <input type="number" id="ss-life-beta" class="form-input" min="0.1" step="0.1" value="2.2" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="sample-size-results">
+                <div class="metric-card ss-result-highlight">
+                  <div class="metric-label">推荐样本量</div>
+                  <div class="metric-value" id="ss-life-result-n">—</div>
+                  <div class="metric-unit">台</div>
+                </div>
+                <div class="card">
+                  <div class="card-header">
+                    <h3>结果说明</h3>
+                  </div>
+                  <div class="card-body">
+                    <div class="ss-result-info">
+                      <strong>预期失效数：</strong><span id="ss-life-failure-count">—</span> 台
+                    </div>
+                    <div class="ss-result-divider"></div>
+                    <div class="ss-result-note">
+                      <p>基于统计精度近似公式估算，实际样本量可根据试验条件适当调整。</p>
+                      <p class="hint">预期失效比例越高，所需总样本量越少，但试验周期相应延长。</p>
+                    </div>
+                    <div class="formula-section">
+                      <button type="button" class="formula-toggle" id="ss-life-formula-toggle">📐 查看计算公式</button>
+                      <div class="formula-content" id="ss-life-formula-content" style="display: none;">
+                        <div class="formula-item">
+                          <h4>所需失效数近似公式</h4>
+                          <div class="formula-equation">r ≈ (z<sub>α</sub> / δ)² / 2</div>
+                          <div class="formula-vars">
+                            <div class="var-row"><span class="var-name">r</span><span class="var-desc">所需失效数</span></div>
+                            <div class="var-row"><span class="var-name">z<sub>α</sub></span><span class="var-desc">标准正态分布分位数（90%置信→1.645）</span></div>
+                            <div class="var-row"><span class="var-name">δ</span><span class="var-desc">目标相对精度（如20%即0.2）</span></div>
+                          </div>
+                        </div>
+                        <div class="formula-item">
+                          <h4>总样本量</h4>
+                          <div class="formula-equation">n = r / p</div>
+                          <div class="formula-note">p为预期失效比例</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
     <template id="prediction-template">
       <div class="module-page prediction-page">
         <div class="module-header">
@@ -925,6 +1415,10 @@
                 </div>
               </div>
               <div class="prediction-toolbar-right">
+                <button type="button" class="btn-icon" id="pred-component-library">
+                  <span>📚</span>
+                  <span class="btn-text">元器件库</span>
+                </button>
                 <button type="button" class="btn-icon" id="pred-add-component">
                   <span>➕</span>
                   <span class="btn-text">添加元器件</span>
@@ -1037,6 +1531,84 @@
                 </div>
               </div>
             </div>
+
+            <div class="component-library-modal" id="component-library-modal" style="display: none;">
+              <div class="component-library-overlay" id="component-library-overlay"></div>
+              <div class="component-library-panel">
+                <div class="component-library-header">
+                  <h3>📚 元器件库</h3>
+                  <button type="button" class="component-library-close" id="component-library-close">×</button>
+                </div>
+                <div class="component-library-search">
+                  <input type="text" id="component-library-search-input" class="form-input" placeholder="搜索元器件名称或描述..." />
+                </div>
+                <div class="component-library-categories">
+                  <button type="button" class="lib-cat-btn active" data-category="all">全部</button>
+                  <button type="button" class="lib-cat-btn" data-category="electronic">电子类</button>
+                  <button type="button" class="lib-cat-btn" data-category="mechanical">机械类</button>
+                  <button type="button" class="lib-cat-btn" data-category="electromechanical">机电类</button>
+                </div>
+                <div class="component-library-list" id="component-library-list">
+                </div>
+                <div class="component-library-footer">
+                  <button type="button" class="btn-secondary" id="add-custom-component-btn">
+                    <span>➕</span>
+                    <span>添加自定义元器件</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="custom-component-modal" id="custom-component-modal" style="display: none;">
+              <div class="custom-component-overlay" id="custom-component-overlay"></div>
+              <div class="custom-component-panel">
+                <div class="custom-component-header">
+                  <h3>添加自定义元器件</h3>
+                  <button type="button" class="custom-component-close" id="custom-component-close">×</button>
+                </div>
+                <div class="custom-component-body">
+                  <div class="form-group">
+                    <label>元器件名称</label>
+                    <input type="text" id="custom-comp-name" class="form-input" placeholder="请输入元器件名称" />
+                  </div>
+                  <div class="form-group">
+                    <label>类别</label>
+                    <select id="custom-comp-category" class="form-input">
+                      <option value="electronic">电子类</option>
+                      <option value="mechanical">机械类</option>
+                      <option value="electromechanical">机电类</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>类型</label>
+                    <select id="custom-comp-type" class="form-input">
+                      <option value="resistor">电阻</option>
+                      <option value="capacitor">电容</option>
+                      <option value="inductor">电感</option>
+                      <option value="diode">二极管</option>
+                      <option value="transistor">晶体管</option>
+                      <option value="ic_digital">IC(数字)</option>
+                      <option value="ic_analog">IC(模拟)</option>
+                      <option value="connector">连接器</option>
+                      <option value="relay">继电器</option>
+                      <option value="other">其他</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>基础失效率 λb (FIT)</label>
+                    <input type="number" id="custom-comp-lambda" class="form-input" min="0" step="0.01" value="0.1" />
+                  </div>
+                  <div class="form-group">
+                    <label>描述</label>
+                    <input type="text" id="custom-comp-desc" class="form-input" placeholder="可选：元器件描述" />
+                  </div>
+                </div>
+                <div class="custom-component-footer">
+                  <button type="button" class="btn-ghost" id="custom-comp-cancel">取消</button>
+                  <button type="button" class="btn-primary" id="custom-comp-save">保存</button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div id="pred-tab-allocation" class="pred-tab-content" style="display: none;">
@@ -1091,10 +1663,10 @@
                       <tr>
                         <th style="width: 50px;">序号</th>
                         <th style="min-width: 160px;">子系统名称</th>
-                        <th style="width: 100px;">复杂度</th>
-                        <th style="width: 110px;">成熟度(反)</th>
-                        <th style="width: 110px;">环境严酷度</th>
-                        <th style="width: 100px;">任务占比</th>
+                        <th style="width: 100px;">复杂度<span class="help-icon" data-tooltip="零件越多、装配越复杂，得分越高（1~10分）">?</span></th>
+                        <th style="width: 110px;">成熟度(反)<span class="help-icon" data-tooltip="供应链越成熟，得分越低（1~10分，反向计分）">?</span></th>
+                        <th style="width: 110px;">环境严酷度<span class="help-icon" data-tooltip="受力、温升、粉尘影响越大，得分越高（1~10分）">?</span></th>
+                        <th style="width: 100px;">任务占比<span class="help-icon" data-tooltip="全程带载工作时间占比越高，得分越高（1~10分）">?</span></th>
                         <th style="width: 90px;">总分</th>
                         <th style="width: 100px;">权重占比</th>
                         <th style="width: 120px;">分配 B10 (h)</th>
@@ -1388,6 +1960,27 @@
             </div>
           </div>
 
+          <div class="card">
+            <div class="card-header">
+              <h3>改进措施</h3>
+              <div class="card-actions">
+                <button type="button" class="btn-icon btn-sm btn-primary" id="growth-open-library">
+                  <span>📚</span>
+                  <span class="btn-text">从措施库选择</span>
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div id="growth-improvement-list" class="improvement-list">
+              </div>
+              <div id="growth-improvement-empty" class="empty-state" style="padding: 2rem 1rem;">
+                <div class="empty-icon">💡</div>
+                <h3>暂无改进措施</h3>
+                <p>点击「从措施库选择」按钮添加改进措施</p>
+              </div>
+            </div>
+          </div>
+
           <div class="growth-bottom-grid">
             <div class="card growth-params-card">
               <div class="card-header">
@@ -1533,6 +2126,74 @@
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="improvement-library-modal" id="growth-improv-library-modal" style="display: none;">
+          <div class="improvement-library-overlay" id="growth-improv-library-overlay"></div>
+          <div class="improvement-library-panel">
+            <div class="improvement-library-header">
+              <h3>📚 改进措施库</h3>
+              <button type="button" class="improvement-library-close" id="growth-improv-library-close">×</button>
+            </div>
+            <div class="improvement-library-search">
+              <input type="text" id="growth-improv-search" class="form-input" placeholder="搜索措施名称、描述、适用场景..." />
+            </div>
+            <div class="improvement-library-categories" id="growth-improv-categories">
+              <button type="button" class="improv-cat-btn active" data-category="all">全部</button>
+              <button type="button" class="improv-cat-btn" data-category="gear">齿轮磨损</button>
+              <button type="button" class="improv-cat-btn" data-category="motor">电机轴承</button>
+              <button type="button" class="improv-cat-btn" data-category="switch">开关触点</button>
+              <button type="button" class="improv-cat-btn" data-category="battery">锂电池</button>
+              <button type="button" class="improv-cat-btn" data-category="pcb">PCB电子</button>
+            </div>
+            <div class="improvement-library-list" id="growth-improv-library-list">
+            </div>
+            <div class="improvement-library-footer">
+              <button type="button" class="btn-secondary" id="growth-add-custom-improv">➕ 添加自定义措施</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="custom-improvement-modal" id="growth-custom-improv-modal" style="display: none;">
+          <div class="custom-improvement-overlay" id="growth-custom-improv-overlay"></div>
+          <div class="custom-improvement-panel">
+            <div class="custom-improvement-header">
+              <h3>添加自定义措施</h3>
+              <button type="button" class="custom-improvement-close" id="growth-custom-improv-close">×</button>
+            </div>
+            <div class="custom-improvement-body">
+              <div class="form-group">
+                <label>措施名称 *</label>
+                <input type="text" id="growth-custom-improv-name" class="form-input" placeholder="输入措施名称" />
+              </div>
+              <div class="form-group">
+                <label>分类 *</label>
+                <select id="growth-custom-improv-category" class="form-input">
+                  <option value="gear">齿轮磨损</option>
+                  <option value="motor">电机轴承</option>
+                  <option value="switch">开关触点</option>
+                  <option value="battery">锂电池</option>
+                  <option value="pcb">PCB电子</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>预期提升幅度</label>
+                <input type="text" id="growth-custom-improv-improvement" class="form-input" placeholder="如：1.5~2倍寿命" />
+              </div>
+              <div class="form-group">
+                <label>措施描述</label>
+                <textarea id="growth-custom-improv-desc" class="form-input" rows="2" placeholder="描述措施的技术原理"></textarea>
+              </div>
+              <div class="form-group">
+                <label>适用场景</label>
+                <input type="text" id="growth-custom-improv-applicable" class="form-input" placeholder="适用的失效模式或场景" />
+              </div>
+            </div>
+            <div class="custom-improvement-footer">
+              <button type="button" class="btn-ghost" id="growth-custom-improv-cancel">取消</button>
+              <button type="button" class="btn-primary" id="growth-custom-improv-save">保存并添加</button>
             </div>
           </div>
         </div>
