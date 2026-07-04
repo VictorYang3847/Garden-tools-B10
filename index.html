@@ -304,9 +304,9 @@
                   <th style="width: 50px;">序号</th>
                   <th style="min-width: 160px;">功能/要求</th>
                   <th style="min-width: 160px;">失效模式</th>
-                  <th style="width: 70px;">S</th>
-                  <th style="width: 70px;">O</th>
-                  <th style="width: 70px;">D</th>
+                  <th style="width: 70px;">S<span class="help-icon" data-tooltip="严重度(S): 失效后果严重程度，10=危及安全，1=轻微">?</span></th>
+                  <th style="width: 70px;">O<span class="help-icon" data-tooltip="发生度(O): 失效发生频率，10=几乎必然发生，1=极不可能">?</span></th>
+                  <th style="width: 70px;">D<span class="help-icon" data-tooltip="探测度(D): 现行控制探测失效的能力，10=无法探测，1=肯定能探测">?</span></th>
                   <th style="width: 70px;">RPN</th>
                   <th style="width: 70px;">AP</th>
                   <th style="width: 70px;">操作</th>
@@ -1797,6 +1797,7 @@
                         <th style="width: 90px;">总分</th>
                         <th style="width: 100px;">权重占比</th>
                         <th style="width: 120px;">分配 B10 (h)</th>
+                        <th style="width: 140px;">失效率 λ(10⁻⁶/h)<span class="help-icon" data-tooltip="λ = ln(10/9) / B10 × 10⁶，单位：10⁻⁶/h">?</span></th>
                         <th style="width: 70px;">操作</th>
                       </tr>
                     </thead>
@@ -1847,6 +1848,16 @@
                     <canvas id="alloc-pie-canvas" width="400" height="300"></canvas>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div class="card alloc-compare-card">
+              <div class="card-header">
+                <h3>🔍 与 FMEA 主观失效率比对</h3>
+                <span class="tp-optimize-hint">基于 FMEA 的 RPN 估算失效率，与分配结果比对验证</span>
+              </div>
+              <div class="card-body">
+                <div id="alloc-fmea-compare-panel"></div>
               </div>
             </div>
           </div>

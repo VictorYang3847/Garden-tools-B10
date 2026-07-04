@@ -448,6 +448,10 @@ function openRatingPanel(type, inputEl, container) {
     top = rect.top - panelRect.height - 4;
   }
 
+  if (top < 0) {
+    top = Math.max(8, (window.innerHeight - panelRect.height) / 2);
+  }
+
   if (left + panelRect.width > window.innerWidth) {
     left = window.innerWidth - panelRect.width - 8;
   }

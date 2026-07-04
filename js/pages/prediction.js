@@ -1138,12 +1138,14 @@ function calcAllocation() {
   if (allocationData.systemStructure === "series") {
     allocationData.subsystems.forEach((s) => {
       s.allocB10 = s.weight > 0 ? targetB10 / Math.pow(s.weight, 1 / beta) : 0;
+      s.lambda = s.allocB10 > 0 ? (0.10536 / s.allocB10) * 1000000 : 0;
     });
   } else {
     // 并联：简化为 B10_i = B10_sys / w_i^(1/β) × n（n为冗余度，近似并联增益）
     const n = allocationData.subsystems.length;
     allocationData.subsystems.forEach((s) => {
       s.allocB10 = s.weight > 0 ? (targetB10 * Math.pow(n, 1 / beta)) / Math.pow(s.weight, 1 / beta) : 0;
+      s.lambda = s.allocB10 > 0 ? (0.10536 / s.allocB10) * 1000000 : 0;
     });
   }
 
@@ -1205,6 +1207,7 @@ function renderAllocationTable(container) {
 function renderAllocationRow(item, index) {
   const weightPercent = item.weight ? (item.weight * 100).toFixed(2) : "0.00";
   const allocB10 = item.allocB10 ? item.allocB10.toFixed(2) : "0.00";
+  const lambda = item.lambda ? item.lambda.toFixed(2) : "0.00";
   const totalScore = item.totalScore || 0;
 
   return `
@@ -1218,6 +1221,7 @@ function renderAllocationRow(item, index) {
       <td class="alloc-score-cell">${totalScore}</td>
       <td class="alloc-weight-cell">${weightPercent}%</td>
       <td class="alloc-b10-cell">${allocB10}</td>
+      <td class="alloc-lambda-cell">${lambda}</td>
       <td class="alloc-action-cell">
         <button type="button" class="alloc-delete-btn" data-action="delete" title="删除">🗑️</button>
       </td>
@@ -1342,6 +1346,7 @@ function addAllocationSubsystem(container) {
   renderAllocationTable(container);
   renderAllocationResults(container);
   drawPieChart(container);
+  renderFmeaComparison(container);
 }
 
 function deleteAllocationSubsystem(container, id) {
@@ -1352,6 +1357,7 @@ function deleteAllocationSubsystem(container, id) {
   renderAllocationTable(container);
   renderAllocationResults(container);
   drawPieChart(container);
+  renderFmeaComparison(container);
 }
 
 function updateAllAllocationRows(container) {
@@ -1367,10 +1373,12 @@ function updateAllAllocationRows(container) {
     const scoreCell = tr.querySelector(".alloc-score-cell");
     const weightCell = tr.querySelector(".alloc-weight-cell");
     const b10Cell = tr.querySelector(".alloc-b10-cell");
+    const lambdaCell = tr.querySelector(".alloc-lambda-cell");
 
     if (scoreCell) scoreCell.textContent = subsystem.totalScore || 0;
     if (weightCell) weightCell.textContent = ((subsystem.weight || 0) * 100).toFixed(2) + "%";
     if (b10Cell) b10Cell.textContent = (subsystem.allocB10 || 0).toFixed(2);
+    if (lambdaCell) lambdaCell.textContent = (subsystem.lambda || 0).toFixed(2);
 
     const numInputs = tr.querySelectorAll("input.alloc-num-input");
     numInputs.forEach((inp) => {
@@ -1411,6 +1419,7 @@ function handleAllocationInputChange(container, e) {
   saveData();
   renderAllocationResults(container);
   drawPieChart(container);
+  renderFmeaComparison(container);
 }
 
 function handleAllocationDeleteClick(container, e) {
@@ -1434,6 +1443,7 @@ function handleTargetB10Change(container, e) {
   renderAllocationTable(container);
   renderAllocationResults(container);
   drawPieChart(container);
+  renderFmeaComparison(container);
 }
 
 function handleConfidenceChange(container, e) {
@@ -1448,6 +1458,7 @@ function handleAllocStructureChange(container, e) {
   renderAllocationTable(container);
   renderAllocationResults(container);
   drawPieChart(container);
+  renderFmeaComparison(container);
 }
 
 function handleBetaChange(container, e) {
@@ -1458,6 +1469,7 @@ function handleBetaChange(container, e) {
   renderAllocationTable(container);
   renderAllocationResults(container);
   drawPieChart(container);
+  renderFmeaComparison(container);
 }
 
 function switchPredTab(container, tabName) {
@@ -1547,6 +1559,160 @@ function bindAllocationEvents(container) {
   });
 }
 
+function getFmeaLambdaEstimate(occurrence) {
+  const OCCURRENCE_TO_LAMBDA = {
+    1: 10,
+    2: 100,
+    3: 500,
+    4: 2000,
+    5: 10000,
+    6: 20000,
+    7: 50000,
+    8: 125000,
+    9: 333333,
+    10: 500000,
+  };
+  return OCCURRENCE_TO_LAMBDA[occurrence] || 10000;
+}
+
+function getFmeaSubsystemData(subsystemName) {
+  if (!currentModel?.modules?.fmea?.items) return null;
+  
+  const items = currentModel.modules.fmea.items.filter(item => 
+    item.function && item.function.includes(subsystemName)
+  );
+  
+  if (items.length === 0) return null;
+  
+  const avgOccurrence = items.reduce((sum, item) => sum + (item.occurrence || 5), 0) / items.length;
+  const avgSeverity = items.reduce((sum, item) => sum + (item.severity || 5), 0) / items.length;
+  const avgRpn = items.reduce((sum, item) => sum + (item.rpn || 0), 0) / items.length;
+  
+  return {
+    occurrence: Math.round(avgOccurrence),
+    severity: Math.round(avgSeverity),
+    rpn: Math.round(avgRpn),
+    lambda: getFmeaLambdaEstimate(Math.round(avgOccurrence)),
+    itemCount: items.length,
+  };
+}
+
+function renderFmeaComparison(container) {
+  const panel = container.querySelector("#alloc-fmea-compare-panel");
+  if (!panel) return;
+
+  const subsystems = allocationData?.subsystems || [];
+  const fmeaData = currentModel?.modules?.fmea;
+
+  if (!fmeaData || !fmeaData.items || fmeaData.items.length === 0) {
+    panel.innerHTML = `
+      <div class="empty-state" style="padding: 1rem;">
+        <div class="empty-icon">📋</div>
+        <p style="margin-top: 0.5rem;">FMEA 模块暂无数据，无法进行比对</p>
+        <p style="font-size: 0.8rem; color: #8b9cb3;">请先在 FMEA 模块中录入失效模式数据</p>
+      </div>
+    `;
+    return;
+  }
+
+  if (!subsystems || subsystems.length === 0) {
+    panel.innerHTML = `
+      <div class="empty-state" style="padding: 1rem;">
+        <div class="empty-icon">📊</div>
+        <p style="margin-top: 0.5rem;">暂无子系统分配数据</p>
+      </div>
+    `;
+    return;
+  }
+
+  const comparisonData = subsystems.map(s => {
+    const fmeaInfo = getFmeaSubsystemData(s.name);
+    const allocLambda = s.lambda || 0;
+    const fmeaLambda = fmeaInfo?.lambda || 0;
+    
+    let diffPercent = 0;
+    let consistency = "未知";
+    let consistencyClass = "consistency-unknown";
+    
+    if (fmeaLambda > 0 && allocLambda > 0) {
+      diffPercent = ((allocLambda - fmeaLambda) / fmeaLambda * 100).toFixed(1);
+      const absDiff = Math.abs((allocLambda - fmeaLambda) / fmeaLambda * 100);
+      
+      if (absDiff <= 30) {
+        consistency = "一致";
+        consistencyClass = "consistency-match";
+      } else if (absDiff <= 60) {
+        consistency = "基本一致";
+        consistencyClass = "consistency-close";
+      } else if (absDiff <= 100) {
+        consistency = "差异较大";
+        consistencyClass = "consistency-warning";
+      } else {
+        consistency = "显著差异";
+        consistencyClass = "consistency-mismatch";
+      }
+    } else if (fmeaLambda === 0) {
+      consistency = "无匹配";
+      consistencyClass = "consistency-no-match";
+    }
+    
+    return {
+      name: s.name,
+      allocLambda: allocLambda.toFixed(2),
+      fmeaLambda: fmeaLambda.toFixed(2),
+      fmeaOccurrence: fmeaInfo?.occurrence || "-",
+      fmeaRpn: fmeaInfo?.rpn || "-",
+      fmeaItemCount: fmeaInfo?.itemCount || 0,
+      diffPercent: diffPercent,
+      consistency: consistency,
+      consistencyClass: consistencyClass,
+    };
+  });
+
+  const matchedCount = comparisonData.filter(d => d.consistencyClass !== "consistency-no-match").length;
+  const totalCount = comparisonData.length;
+
+  panel.innerHTML = `
+    <div style="margin-bottom: 1rem; font-size: 0.85rem; color: #8b9cb3;">
+      比对说明：基于 FMEA 发生度(O)估算主观失效率，与可靠性分配结果进行对比验证。
+      FMEA 失效率 = f(O)，O值越高，失效率越大。匹配数：${matchedCount}/${totalCount}
+    </div>
+    <div class="compare-table-wrap">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th style="min-width: 140px;">子系统名称</th>
+            <th style="width: 140px;">分配失效率<br/>λ(10⁻⁶/h)</th>
+            <th style="width: 140px;">FMEA主观失效率<br/>λ(10⁻⁶/h)</th>
+            <th style="width: 120px;">FMEA指标<br/>(O/RPN)</th>
+            <th style="width: 100px;">差异</th>
+            <th style="width: 100px;">一致性评价</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${comparisonData.map(d => `
+            <tr>
+              <td>${escapeHtml(d.name)}</td>
+              <td class="compare-value">${d.allocLambda}</td>
+              <td class="compare-value">${d.fmeaItemCount > 0 ? d.fmeaLambda : "-"}</td>
+              <td class="compare-value">${d.fmeaItemCount > 0 ? `${d.fmeaOccurrence}/${d.fmeaRpn}` : "-"}</td>
+              <td class="compare-value">${d.fmeaItemCount > 0 ? d.diffPercent + "%" : "-"}</td>
+              <td><span class="consistency-badge ${d.consistencyClass}">${d.consistency}</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(59, 158, 255, 0.1); border-radius: 8px; font-size: 0.8rem; color: #8b9cb3;">
+      <strong style="color: #3b9eff;">一致性评价标准：</strong><br/>
+      <span class="consistency-badge consistency-match" style="display: inline-block; margin-right: 0.5rem;">一致</span>差异 ≤30%<br/>
+      <span class="consistency-badge consistency-close" style="display: inline-block; margin-right: 0.5rem;">基本一致</span>差异 30%~60%<br/>
+      <span class="consistency-badge consistency-warning" style="display: inline-block; margin-right: 0.5rem;">差异较大</span>差异 60%~100%<br/>
+      <span class="consistency-badge consistency-mismatch" style="display: inline-block; margin-right: 0.5rem;">显著差异</span>差异 >100%<br/>
+    </div>
+  `;
+}
+
 function initAllocationUI(container) {
   ensureAllocationData();
 
@@ -1573,6 +1739,7 @@ function initAllocationUI(container) {
   renderAllocationTable(container);
   renderAllocationResults(container);
   bindAllocationEvents(container);
+  renderFmeaComparison(container);
 }
 
 export function init(model, onSave) {
