@@ -6495,40 +6495,11 @@ textarea.form-input {
 }
 
 .help-icon:hover::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1a1a2e;
-  color: #fff;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: normal;
-  white-space: normal;
-  width: max-content;
-  max-width: 280px;
-  z-index: 9999;
-  pointer-events: none;
-  margin-bottom: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  border: 1px solid #2d2d44;
-  line-height: 1.5;
-  text-align: left;
+  display: none;
 }
 
 .help-icon:hover::before {
-  content: '';
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 6px solid transparent;
-  border-top-color: #1a1a2e;
-  margin-bottom: -1px;
-  z-index: 9999;
-  pointer-events: none;
+  display: none;
 }
 
 .data-table th .help-icon {
