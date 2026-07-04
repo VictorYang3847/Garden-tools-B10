@@ -103,20 +103,9 @@ function initGlobalTooltip() {
   document.addEventListener("mouseout", (e) => {
     const icon = e.target.closest(".help-icon");
     if (!icon) return;
+    const related = e.relatedTarget;
+    if (related && related.closest && related.closest(".help-icon")) return;
     hideGlobalTooltip();
-  });
-
-  document.addEventListener("click", (e) => {
-    const icon = e.target.closest(".help-icon");
-    if (icon && icon.dataset.tooltip) {
-      e.stopPropagation();
-      e.preventDefault();
-      showGlobalTooltip(icon);
-      clearTimeout(tooltipHideTimer);
-      tooltipHideTimer = setTimeout(hideGlobalTooltip, 5000);
-    } else {
-      hideGlobalTooltip();
-    }
   });
 
   window.addEventListener("scroll", hideGlobalTooltip, true);
