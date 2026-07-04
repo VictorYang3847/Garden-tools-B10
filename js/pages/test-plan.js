@@ -74,6 +74,7 @@ function ensureTestPlan() {
     if (item.resultNote === undefined) item.resultNote = "";
     if (item.testLevel === undefined) item.testLevel = "system";
     if (item.beta === undefined) item.beta = tp.globalParams.defaultBeta || 2.2;
+    if (item.durationMultiplier === undefined) item.durationMultiplier = 1.2;
   }
 }
 
@@ -345,16 +346,22 @@ function lnGamma(z) {
   return Math.log(gammaFunc(z));
 }
 
-function calculateTestDuration(targetLife, censorType, beta, testLevel, strategy) {
+function calculateTestDuration(targetLife, censorType, beta, testLevel, strategy, multiplier) {
   const life = Number(targetLife) || 0;
   const strat = strategy || "standard";
+  const mult = Number(multiplier) || 0;
 
   if (strat === "optimized") {
-    const multiplier = testLevel === "component" ? 2.2 : 1.3;
-    return Math.ceil(life * multiplier);
+    const m = testLevel === "component" ? 2.2 : 1.3;
+    return Math.ceil(life * m);
   }
 
-  // standard 策略：保持原有系数
+  if (strat === "custom") {
+    if (mult > 0) {
+      return Math.ceil(life * mult);
+    }
+  }
+
   switch (censorType) {
     case "time":
       return Math.ceil(life * 1.2);
@@ -379,6 +386,7 @@ function createNewTestItem() {
     censorType: params.defaultCensorType || "time",
     testLevel: "system",
     beta: params.defaultBeta || 2.2,
+    durationMultiplier: 1.2,
     benchCondition: "",
     testObject: "",
     testCondition: "",
@@ -417,7 +425,8 @@ function bindTestItemsEvents() {
         field === "targetReliability" ||
         field === "censorType" ||
         field === "testLevel" ||
-        field === "beta"
+        field === "beta" ||
+        field === "durationMultiplier"
       ) {
         const params = currentModel.modules.testPlan.globalParams;
         item.sampleSize = calculateSampleSize(
@@ -429,7 +438,7 @@ function bindTestItemsEvents() {
           item.testDuration
         );
         item.testDuration = calculateTestDuration(
-          item.targetLife, item.censorType, item.beta, item.testLevel, params.strategy
+          item.targetLife, item.censorType, item.beta, item.testLevel, params.strategy, item.durationMultiplier
         );
         // 重新计算 sampleSize（testDuration 可能已变）
         item.sampleSize = calculateSampleSize(
@@ -502,6 +511,7 @@ function renderTestItems() {
           </select>
         </td>
         <td><input type="number" data-field="beta" value="${item.beta}" min="0.1" step="0.1" class="item-input" /></td>
+        <td><input type="number" data-field="durationMultiplier" value="${item.durationMultiplier}" min="0.5" max="5" step="0.1" class="item-input" /></td>
         <td class="tp-sample-size">${sampleDisplay}</td>
         <td class="tp-test-duration">${item.testDuration || "-"}</td>
         <td>
@@ -522,7 +532,7 @@ function addTestItem() {
   const item = createNewTestItem();
   const params = currentModel.modules.testPlan.globalParams;
   item.testDuration = calculateTestDuration(
-    item.targetLife, item.censorType, item.beta, item.testLevel, params.strategy
+    item.targetLife, item.censorType, item.beta, item.testLevel, params.strategy, item.durationMultiplier
   );
   item.sampleSize = calculateSampleSize(
     item.targetReliability,
@@ -551,7 +561,7 @@ function calculateAllTestItems() {
   const items = currentModel.modules.testPlan.testItems;
   for (const item of items) {
     item.testDuration = calculateTestDuration(
-      item.targetLife, item.censorType, item.beta, item.testLevel, params.strategy
+      item.targetLife, item.censorType, item.beta, item.testLevel, params.strategy, item.durationMultiplier
     );
     item.sampleSize = calculateSampleSize(
       item.targetReliability,
@@ -591,7 +601,7 @@ function importFromFmea() {
     item.name = name;
     item.benchCondition = fmeaItem.function || "";
     item.testDuration = calculateTestDuration(
-      item.targetLife, item.censorType, item.beta, item.testLevel, params.strategy
+      item.targetLife, item.censorType, item.beta, item.testLevel, params.strategy, item.durationMultiplier
     );
     item.sampleSize = calculateSampleSize(
       item.targetReliability,
@@ -1147,7 +1157,7 @@ function bindDvprEvents() {
     ) {
       const params = currentModel.modules.testPlan.globalParams;
       item.testDuration = calculateTestDuration(
-        item.targetLife, item.censorType, item.beta, item.testLevel, params.strategy
+        item.targetLife, item.censorType, item.beta, item.testLevel, params.strategy, item.durationMultiplier
       );
       item.sampleSize = calculateSampleSize(
         item.targetReliability,

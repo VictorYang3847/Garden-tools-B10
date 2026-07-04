@@ -2336,7 +2336,8 @@ textarea.form-input {
 }
 
 .test-items-table {
-  min-width: 1300px;
+  min-width: 900px;
+  width: 100%;
 }
 
 .alt-table {
