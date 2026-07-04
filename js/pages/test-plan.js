@@ -491,6 +491,23 @@ function renderTestItems() {
       const sampleDisplay = item.sampleSize < 0
         ? `\uD83D\uDCCD ${Math.abs(item.sampleSize)}`
         : (item.sampleSize || "-");
+
+      // 根据策略计算倍率显示值和是否可编辑
+      const strategy = currentModel.modules.testPlan.globalParams.strategy || "standard";
+      let multiplierDisplay;
+      let multiplierDisabled = false;
+      if (strategy === "optimized") {
+        multiplierDisplay = item.testLevel === "component" ? "2.2" : "1.3";
+        multiplierDisabled = true;
+      } else if (strategy === "standard") {
+        const stdMap = { time: "1.2", failure: "1.3", complete: "1.5" };
+        multiplierDisplay = stdMap[item.censorType] || "1.2";
+        multiplierDisabled = true;
+      } else {
+        // custom
+        multiplierDisplay = item.durationMultiplier ?? 1.2;
+        multiplierDisabled = false;
+      }
       return `
       <tr data-id="${item.id}">
         <td>${idx + 1}</td>
@@ -511,7 +528,7 @@ function renderTestItems() {
           </select>
         </td>
         <td><input type="number" data-field="beta" value="${item.beta}" min="0.1" step="0.1" class="item-input" /></td>
-        <td><input type="number" data-field="durationMultiplier" value="${item.durationMultiplier}" min="0.5" max="5" step="0.1" class="item-input" /></td>
+        <td><input type="number" data-field="durationMultiplier" value="${multiplierDisplay}" min="0.5" max="5" step="0.1" class="item-input" ${multiplierDisabled ? "disabled" : ""} /></td>
         <td class="tp-sample-size">${sampleDisplay}</td>
         <td class="tp-test-duration">${item.testDuration || "-"}</td>
         <td>
