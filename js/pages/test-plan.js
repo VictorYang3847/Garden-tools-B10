@@ -170,14 +170,44 @@ function renderGlobalParams() {
 function calculateSampleSize(reliability, confidence, allowedFailures) {
   const R = Number(reliability) || 0.9;
   const gamma = Number(confidence) || 0.9;
-  const r = Number(allowedFailures) || 0;
+  const r = Math.max(0, Math.floor(Number(allowedFailures) || 0));
+  const alpha = 1 - gamma;
 
+  if (R <= 0 || R >= 1) return 0;
+
+  // 二项分布：找到最小的 n，使得 P(≤r失效 | 真实可靠度=R) ≤ α
+  // 即 Σ C(n,k) * (1-R)^k * R^(n-k) ≤ α, k=0..r
   if (r === 0) {
-    return Math.ceil(Math.log(1 - gamma) / Math.log(R));
+    return Math.ceil(Math.log(alpha) / Math.log(R));
   }
 
-  const chiSquared = chiSquareInv(1 - gamma, 2 * (r + 1));
-  return Math.ceil(chiSquared / (2 * Math.log(1 / R)));
+  let n = r;
+  while (n < 10000) {
+    if (binomialCdf(r, n, 1 - R) <= alpha) {
+      return n;
+    }
+    n++;
+  }
+  return n;
+}
+
+function binomialCdf(maxFailures, n, p) {
+  let sum = 0;
+  for (let k = 0; k <= maxFailures; k++) {
+    sum += binomialCoeff(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
+  }
+  return sum;
+}
+
+function binomialCoeff(n, k) {
+  if (k < 0 || k > n) return 0;
+  if (k === 0 || k === n) return 1;
+  k = Math.min(k, n - k);
+  let result = 1;
+  for (let i = 0; i < k; i++) {
+    result = (result * (n - i)) / (i + 1);
+  }
+  return result;
 }
 
 function chiSquareInv(p, df) {
