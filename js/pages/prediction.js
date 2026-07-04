@@ -1,6 +1,8 @@
 let onSaveCallback = null;
 let currentModel = null;
 let predictionData = null;
+let activePredTab = "prediction";
+let allocationData = null;
 
 const K_BOLTZMANN = 8.617e-5;
 const T_REF = 25 + 273.15;
@@ -753,6 +755,432 @@ function bindEvents(container) {
   });
 }
 
+function ensureAllocationData() {
+  if (!predictionData.allocation) {
+    predictionData.allocation = {
+      targetB10: 150,
+      confidence: 0.9,
+      systemStructure: "series",
+      beta: 2.2,
+      subsystems: [],
+    };
+  }
+  if (!predictionData.allocation.subsystems || predictionData.allocation.subsystems.length === 0) {
+    predictionData.allocation.subsystems = [
+      { id: genId(), name: "行星齿轮箱", complexity: 8, maturity: 7, environment: 9, mission: 10 },
+      { id: genId(), name: "锂电池包", complexity: 6, maturity: 5, environment: 6, mission: 10 },
+      { id: genId(), name: "无刷电机总成", complexity: 5, maturity: 4, environment: 6, mission: 10 },
+      { id: genId(), name: "电控与操控系统", complexity: 6, maturity: 3, environment: 3, mission: 7 },
+    ];
+  }
+  allocationData = predictionData.allocation;
+  calcAllocation();
+}
+
+function calcAllocation() {
+  if (!allocationData || !allocationData.subsystems || allocationData.subsystems.length === 0) {
+    return;
+  }
+
+  let totalScore = 0;
+  allocationData.subsystems.forEach((s) => {
+    s.totalScore = (s.complexity || 0) + (s.maturity || 0) + (s.environment || 0) + (s.mission || 0);
+    totalScore += s.totalScore;
+  });
+
+  const targetB10 = allocationData.targetB10 || 150;
+  allocationData.subsystems.forEach((s) => {
+    s.weight = totalScore > 0 ? s.totalScore / totalScore : 0;
+    if (allocationData.systemStructure === "series") {
+      s.allocB10 = s.weight > 0 ? targetB10 / s.weight : 0;
+    } else {
+      s.allocB10 = s.weight > 0 ? targetB10 * s.weight : 0;
+    }
+  });
+
+  let calcSysB10 = 0;
+  if (allocationData.systemStructure === "series") {
+    let sumInvB10 = 0;
+    allocationData.subsystems.forEach((s) => {
+      if (s.allocB10 > 0) sumInvB10 += 1 / s.allocB10;
+    });
+    calcSysB10 = sumInvB10 > 0 ? 1 / sumInvB10 : 0;
+  } else {
+    let sumR = 1;
+    allocationData.subsystems.forEach((s) => {
+      const r = Math.exp(-Math.pow(1 / (s.allocB10 || 1), allocationData.beta || 2.2) * Math.pow(1, allocationData.beta || 2.2));
+      sumR *= (1 - r);
+    });
+    const sysR = 1 - sumR;
+    if (sysR > 0 && sysR < 1) {
+      const t = 1;
+      const lambda = -Math.log(sysR) / t;
+      calcSysB10 = -Math.log(0.9) / lambda;
+    }
+  }
+  allocationData.calcSysB10 = calcSysB10;
+}
+
+function renderAllocationTable(container) {
+  const tbody = container.querySelector("#alloc-table-body");
+  const emptyState = container.querySelector("#alloc-empty-state");
+  const countSpan = container.querySelector("#alloc-subsystem-count");
+
+  if (!allocationData?.subsystems || allocationData.subsystems.length === 0) {
+    tbody.innerHTML = "";
+    emptyState.style.display = "block";
+    countSpan.textContent = "0";
+    return;
+  }
+
+  emptyState.style.display = "none";
+  countSpan.textContent = allocationData.subsystems.length;
+  tbody.innerHTML = allocationData.subsystems
+    .map((item, index) => renderAllocationRow(item, index))
+    .join("");
+}
+
+function renderAllocationRow(item, index) {
+  const weightPercent = item.weight ? (item.weight * 100).toFixed(2) : "0.00";
+  const allocB10 = item.allocB10 ? item.allocB10.toFixed(2) : "0.00";
+  const totalScore = item.totalScore || 0;
+
+  return `
+    <tr data-id="${item.id}">
+      <td class="alloc-index">${index + 1}</td>
+      <td><input type="text" class="item-input" data-field="name" value="${escapeHtml(item.name)}" placeholder="子系统名称" /></td>
+      <td><input type="number" class="item-input alloc-num-input" data-field="complexity" value="${item.complexity || 0}" min="1" max="10" step="1" /></td>
+      <td><input type="number" class="item-input alloc-num-input" data-field="maturity" value="${item.maturity || 0}" min="1" max="10" step="1" /></td>
+      <td><input type="number" class="item-input alloc-num-input" data-field="environment" value="${item.environment || 0}" min="1" max="10" step="1" /></td>
+      <td><input type="number" class="item-input alloc-num-input" data-field="mission" value="${item.mission || 0}" min="1" max="10" step="1" /></td>
+      <td class="alloc-score-cell">${totalScore}</td>
+      <td class="alloc-weight-cell">${weightPercent}%</td>
+      <td class="alloc-b10-cell">${allocB10}</td>
+      <td class="alloc-action-cell">
+        <button type="button" class="alloc-delete-btn" data-action="delete" title="删除">🗑️</button>
+      </td>
+    </tr>
+  `;
+}
+
+function renderAllocationResults(container) {
+  const subsysCountEl = container.querySelector("#alloc-subsys-count");
+  const weightSumEl = container.querySelector("#alloc-weight-sum");
+  const targetB10El = container.querySelector("#alloc-target-b10-display");
+  const calcB10El = container.querySelector("#alloc-calc-b10");
+
+  const subsysCount = allocationData?.subsystems?.length || 0;
+  let weightSum = 0;
+  if (allocationData?.subsystems) {
+    weightSum = allocationData.subsystems.reduce((sum, s) => sum + (s.weight || 0), 0);
+  }
+
+  if (subsysCountEl) subsysCountEl.textContent = subsysCount;
+  if (weightSumEl) weightSumEl.textContent = (weightSum * 100).toFixed(2) + "%";
+  if (targetB10El) targetB10El.textContent = (allocationData?.targetB10 || 0).toFixed(1);
+  if (calcB10El) calcB10El.textContent = (allocationData?.calcSysB10 || 0).toFixed(2);
+}
+
+function drawPieChart(container) {
+  const canvas = container.querySelector("#alloc-pie-canvas");
+  if (!canvas) return;
+
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  const width = rect.width;
+  const height = rect.height;
+
+  ctx.clearRect(0, 0, width, height);
+
+  if (!allocationData?.subsystems || allocationData.subsystems.length === 0) {
+    ctx.fillStyle = "#8b9cb3";
+    ctx.font = "12px 'Segoe UI', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("暂无数据", width / 2, height / 2);
+    return;
+  }
+
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radius = Math.min(width, height) / 2 - 40;
+  const legendX = width - 120;
+  const legendY = 30;
+
+  let startAngle = -Math.PI / 2;
+  const subsystems = allocationData.subsystems;
+
+  subsystems.forEach((subsys, i) => {
+    const sliceAngle = (subsys.weight || 0) * Math.PI * 2;
+    const color = CHART_COLORS[i % CHART_COLORS.length];
+
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    ctx.strokeStyle = "#1a2332";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    startAngle += sliceAngle;
+  });
+
+  ctx.fillStyle = "#1a2332";
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, radius * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#e8edf4";
+  ctx.font = "bold 14px 'Segoe UI', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("权重", centerX, centerY - 10);
+  ctx.fillStyle = "#8b9cb3";
+  ctx.font = "12px 'Segoe UI', sans-serif";
+  ctx.fillText("分布图", centerX, centerY + 10);
+
+  const legendItemHeight = 20;
+  subsystems.forEach((subsys, i) => {
+    const y = legendY + i * legendItemHeight;
+    const color = CHART_COLORS[i % CHART_COLORS.length];
+
+    ctx.fillStyle = color;
+    ctx.fillRect(10, y, 12, 12);
+
+    ctx.fillStyle = "#8b9cb3";
+    ctx.font = "11px 'Segoe UI', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    const label = subsys.name.length > 8 ? subsys.name.slice(0, 8) + "..." : subsys.name;
+    const weightPct = ((subsys.weight || 0) * 100).toFixed(1) + "%";
+    ctx.fillText(`${label} ${weightPct}`, 28, y - 1);
+  });
+}
+
+function addAllocationSubsystem(container) {
+  const newSubsystem = {
+    id: genId(),
+    name: "新子系统",
+    complexity: 5,
+    maturity: 5,
+    environment: 5,
+    mission: 5,
+  };
+  allocationData.subsystems.push(newSubsystem);
+  calcAllocation();
+  saveData();
+  renderAllocationTable(container);
+  renderAllocationResults(container);
+  drawPieChart(container);
+}
+
+function deleteAllocationSubsystem(container, id) {
+  if (!confirm("确定要删除这个子系统吗？")) return;
+  allocationData.subsystems = allocationData.subsystems.filter((s) => s.id !== id);
+  calcAllocation();
+  saveData();
+  renderAllocationTable(container);
+  renderAllocationResults(container);
+  drawPieChart(container);
+}
+
+function handleAllocationInputChange(container, e) {
+  const input = e.target;
+  if (!input.matches("[data-field]")) return;
+
+  const tr = input.closest("tr");
+  if (!tr) return;
+
+  const id = tr.dataset.id;
+  const field = input.dataset.field;
+  const subsystem = allocationData.subsystems.find((s) => s.id === id);
+  if (!subsystem) return;
+
+  if (input.type === "number") {
+    let val = Number(input.value) || 0;
+    val = Math.max(1, Math.min(10, val));
+    subsystem[field] = val;
+  } else {
+    subsystem[field] = input.value;
+  }
+
+  calcAllocation();
+  saveData();
+  renderAllocationTable(container);
+  renderAllocationResults(container);
+  drawPieChart(container);
+}
+
+function handleAllocationDeleteClick(container, e) {
+  const btn = e.target.closest("[data-action='delete']");
+  if (!btn) return;
+
+  const tr = btn.closest("tr");
+  if (!tr) return;
+
+  const id = tr.dataset.id;
+  if (!id) return;
+
+  deleteAllocationSubsystem(container, id);
+}
+
+function handleTargetB10Change(container, e) {
+  const val = Number(e.target.value) || 0;
+  allocationData.targetB10 = Math.max(1, val);
+  calcAllocation();
+  saveData();
+  renderAllocationTable(container);
+  renderAllocationResults(container);
+  drawPieChart(container);
+}
+
+function handleConfidenceChange(container, e) {
+  allocationData.confidence = Number(e.target.value) || 0.9;
+  saveData();
+}
+
+function handleAllocStructureChange(container, e) {
+  allocationData.systemStructure = e.target.value;
+  calcAllocation();
+  saveData();
+  renderAllocationTable(container);
+  renderAllocationResults(container);
+  drawPieChart(container);
+}
+
+function handleBetaChange(container, e) {
+  const val = Number(e.target.value) || 2.2;
+  allocationData.beta = Math.max(0.1, val);
+  calcAllocation();
+  saveData();
+  renderAllocationTable(container);
+  renderAllocationResults(container);
+  drawPieChart(container);
+}
+
+function switchPredTab(container, tabName) {
+  activePredTab = tabName;
+
+  const tabs = container.querySelectorAll(".pred-tab");
+  tabs.forEach((tab) => {
+    if (tab.dataset.tab === tabName) {
+      tab.classList.add("active");
+    } else {
+      tab.classList.remove("active");
+    }
+  });
+
+  const tabPrediction = container.querySelector("#pred-tab-prediction");
+  const tabAllocation = container.querySelector("#pred-tab-allocation");
+
+  if (tabName === "prediction") {
+    tabPrediction.style.display = "block";
+    tabAllocation.style.display = "none";
+    requestAnimationFrame(() => {
+      drawBarChart(container);
+      drawSystemDiagram(container);
+    });
+  } else {
+    tabPrediction.style.display = "none";
+    tabAllocation.style.display = "block";
+    requestAnimationFrame(() => {
+      drawPieChart(container);
+    });
+  }
+}
+
+function bindAllocationEvents(container) {
+  const tbody = container.querySelector("#alloc-table-body");
+  if (tbody) {
+    tbody.addEventListener("input", (e) => handleAllocationInputChange(container, e));
+    tbody.addEventListener("click", (e) => handleAllocationDeleteClick(container, e));
+    tbody.addEventListener("change", (e) => handleAllocationInputChange(container, e));
+  }
+
+  const addBtn = container.querySelector("#alloc-add-subsystem");
+  if (addBtn) {
+    addBtn.addEventListener("click", () => addAllocationSubsystem(container));
+  }
+
+  const emptyAddBtn = container.querySelector("#alloc-empty-add-btn");
+  if (emptyAddBtn) {
+    emptyAddBtn.addEventListener("click", () => addAllocationSubsystem(container));
+  }
+
+  const targetB10Input = container.querySelector("#alloc-target-b10");
+  if (targetB10Input) {
+    targetB10Input.addEventListener("input", (e) => handleTargetB10Change(container, e));
+  }
+
+  const confidenceSelect = container.querySelector("#alloc-confidence");
+  if (confidenceSelect) {
+    confidenceSelect.addEventListener("change", (e) => handleConfidenceChange(container, e));
+  }
+
+  const structureSelect = container.querySelector("#alloc-system-structure");
+  if (structureSelect) {
+    structureSelect.addEventListener("change", (e) => handleAllocStructureChange(container, e));
+  }
+
+  const betaInput = container.querySelector("#alloc-beta");
+  if (betaInput) {
+    betaInput.addEventListener("input", (e) => handleBetaChange(container, e));
+  }
+
+  const tabs = container.querySelectorAll(".pred-tab");
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      switchPredTab(container, tab.dataset.tab);
+    });
+  });
+
+  let resizeTimeout;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      if (activePredTab === "allocation") {
+        drawPieChart(container);
+      }
+    }, 100);
+  });
+}
+
+function initAllocationUI(container) {
+  ensureAllocationData();
+
+  const targetB10Input = container.querySelector("#alloc-target-b10");
+  if (targetB10Input) {
+    targetB10Input.value = allocationData.targetB10;
+  }
+
+  const confidenceSelect = container.querySelector("#alloc-confidence");
+  if (confidenceSelect) {
+    confidenceSelect.value = String(allocationData.confidence);
+  }
+
+  const structureSelect = container.querySelector("#alloc-system-structure");
+  if (structureSelect) {
+    structureSelect.value = allocationData.systemStructure;
+  }
+
+  const betaInput = container.querySelector("#alloc-beta");
+  if (betaInput) {
+    betaInput.value = allocationData.beta;
+  }
+
+  renderAllocationTable(container);
+  renderAllocationResults(container);
+  bindAllocationEvents(container);
+}
+
 export function init(model, onSave) {
   currentModel = model;
   onSaveCallback = onSave;
@@ -808,6 +1236,8 @@ export function render(container, model) {
   renderTable(container);
   bindEvents(container);
   updateResults(container);
+
+  initAllocationUI(container);
 
   requestAnimationFrame(() => {
     drawBarChart(container);

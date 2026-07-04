@@ -33,6 +33,13 @@ const CENSOR_TYPES = {
   complete: "完全失效",
 };
 
+const RESULT_STATUS = {
+  not_started: "未开始",
+  in_progress: "进行中",
+  passed: "通过",
+  failed: "失败",
+};
+
 function ensureTestPlan() {
   if (!currentModel.modules) currentModel.modules = {};
   if (!currentModel.modules.testPlan) {
@@ -54,6 +61,14 @@ function ensureTestPlan() {
   if (!tp.testItems) tp.testItems = [];
   if (!tp.altPlans) tp.altPlans = [];
   if (!tp.haltTests) tp.haltTests = [];
+
+  for (const item of tp.testItems) {
+    if (item.testObject === undefined) item.testObject = "";
+    if (item.testCondition === undefined) item.testCondition = "";
+    if (item.acceptanceCriteria === undefined) item.acceptanceCriteria = "";
+    if (item.resultStatus === undefined) item.resultStatus = "not_started";
+    if (item.resultNote === undefined) item.resultNote = "";
+  }
 }
 
 function save() {
@@ -83,6 +98,7 @@ export function render(container, model) {
   renderTestItems();
   renderAltPlans();
   renderHaltTests();
+  renderDvprTable();
   switchTab(activeTab);
 }
 
@@ -100,6 +116,7 @@ function bindEvents() {
   bindTestItemsEvents();
   bindAltEvents();
   bindHaltEvents();
+  bindDvprEvents();
 }
 
 function switchTab(tabName) {
@@ -286,6 +303,11 @@ function createNewTestItem() {
     testDuration: 0,
     censorType: params.defaultCensorType || "time",
     benchCondition: "",
+    testObject: "",
+    testCondition: "",
+    acceptanceCriteria: "",
+    resultStatus: "not_started",
+    resultNote: "",
   };
 }
 
@@ -329,6 +351,7 @@ function bindTestItemsEvents() {
 
       autoSave();
       renderTestItems();
+      renderDvprTable();
     });
 
     tbody.addEventListener("click", (e) => {
@@ -341,6 +364,7 @@ function bindTestItemsEvents() {
         currentModel.modules.testPlan.testItems.filter((i) => i.id !== id);
       autoSave();
       renderTestItems();
+      renderDvprTable();
     });
   }
 }
@@ -402,6 +426,7 @@ function addTestItem() {
   currentModel.modules.testPlan.testItems.push(item);
   autoSave();
   renderTestItems();
+  renderDvprTable();
 
   const tbody = document.getElementById("tp-items-tbody");
   const lastRow = tbody?.lastElementChild;
@@ -424,6 +449,7 @@ function calculateAllTestItems() {
   }
   autoSave();
   renderTestItems();
+  renderDvprTable();
   const btn = document.getElementById("tp-calc-all");
   if (btn) toast(btn, "计算完成", 1500);
 }
@@ -466,6 +492,7 @@ function importFromFmea() {
 
   autoSave();
   renderTestItems();
+  renderDvprTable();
   const btn = document.getElementById("tp-import-fmea");
   if (btn) toast(btn, `已导入 ${imported} 项`, 1500);
 }
@@ -879,6 +906,135 @@ function deleteHaltStep(testId, stepId) {
   test.steps = test.steps.filter((s) => s.id !== stepId);
   autoSave();
   renderHaltTests();
+}
+
+function getResultStatusClass(status) {
+  switch (status) {
+    case "passed":
+      return "dvpr-status-passed";
+    case "failed":
+      return "dvpr-status-failed";
+    case "in_progress":
+      return "dvpr-status-progress";
+    case "not_started":
+    default:
+      return "dvpr-status-pending";
+  }
+}
+
+function renderDvprTable() {
+  const tbody = document.getElementById("dvpr-tbody");
+  const empty = document.getElementById("dvpr-empty");
+  const items = currentModel.modules.testPlan.testItems;
+
+  if (!tbody) return;
+
+  const totalEl = document.getElementById("dvpr-total");
+  const statTotal = document.getElementById("dvpr-stat-total");
+  const statPassed = document.getElementById("dvpr-stat-passed");
+  const statFailed = document.getElementById("dvpr-stat-failed");
+  const statProgress = document.getElementById("dvpr-stat-progress");
+  const statPending = document.getElementById("dvpr-stat-pending");
+
+  if (!items || items.length === 0) {
+    tbody.innerHTML = "";
+    if (empty) empty.style.display = "";
+    if (totalEl) totalEl.textContent = "0";
+    if (statTotal) statTotal.textContent = "0";
+    if (statPassed) statPassed.textContent = "0";
+    if (statFailed) statFailed.textContent = "0";
+    if (statProgress) statProgress.textContent = "0";
+    if (statPending) statPending.textContent = "0";
+    return;
+  }
+  if (empty) empty.style.display = "none";
+
+  let passed = 0, failed = 0, progress = 0, pending = 0;
+  for (const item of items) {
+    switch (item.resultStatus) {
+      case "passed": passed++; break;
+      case "failed": failed++; break;
+      case "in_progress": progress++; break;
+      default: pending++; break;
+    }
+  }
+
+  if (totalEl) totalEl.textContent = String(items.length);
+  if (statTotal) statTotal.textContent = String(items.length);
+  if (statPassed) statPassed.textContent = String(passed);
+  if (statFailed) statFailed.textContent = String(failed);
+  if (statProgress) statProgress.textContent = String(progress);
+  if (statPending) statPending.textContent = String(pending);
+
+  tbody.innerHTML = items
+    .map((item, idx) => {
+      const statusOptions = Object.entries(RESULT_STATUS)
+        .map(([k, v]) => `<option value="${k}" ${k === item.resultStatus ? "selected" : ""}>${v}</option>`)
+        .join("");
+
+      const censorOptions = Object.entries(CENSOR_TYPES)
+        .map(([k, v]) => `<option value="${k}" ${k === item.censorType ? "selected" : ""}>${v}</option>`)
+        .join("");
+
+      return `
+      <tr data-id="${item.id}">
+        <td>${idx + 1}</td>
+        <td><input type="text" data-field="name" value="${escapeHtml(item.name)}" class="item-input" placeholder="试验项目名称" /></td>
+        <td><input type="text" data-field="testObject" value="${escapeHtml(item.testObject)}" class="item-input" placeholder="试验对象" /></td>
+        <td><input type="text" data-field="testCondition" value="${escapeHtml(item.testCondition)}" class="item-input" placeholder="试验工况" /></td>
+        <td class="tp-sample-size">${item.sampleSize || "-"}</td>
+        <td>
+          <select data-field="censorType" class="item-input">
+            ${censorOptions}
+          </select>
+        </td>
+        <td><input type="text" data-field="acceptanceCriteria" value="${escapeHtml(item.acceptanceCriteria)}" class="item-input" placeholder="验收标准" /></td>
+        <td>
+          <select data-field="resultStatus" class="item-input ${getResultStatusClass(item.resultStatus)}">
+            ${statusOptions}
+          </select>
+        </td>
+        <td><input type="text" data-field="resultNote" value="${escapeHtml(item.resultNote)}" class="item-input" placeholder="备注" /></td>
+      </tr>`;
+    })
+    .join("");
+}
+
+function bindDvprEvents() {
+  const tbody = document.getElementById("dvpr-tbody");
+  if (!tbody) return;
+
+  tbody.addEventListener("change", (e) => {
+    const el = e.target.closest("[data-field]");
+    if (!el) return;
+    const tr = el.closest("tr");
+    const id = tr.dataset.id;
+    const field = el.dataset.field;
+    const item = currentModel.modules.testPlan.testItems.find((i) => i.id === id);
+    if (!item) return;
+
+    let val = el.value;
+    if (el.type === "number") val = Number(val) || 0;
+    item[field] = val;
+
+    if (
+      field === "targetLife" ||
+      field === "targetReliability" ||
+      field === "censorType"
+    ) {
+      const params = currentModel.modules.testPlan.globalParams;
+      item.sampleSize = calculateSampleSize(
+        item.targetReliability,
+        params.confidence,
+        params.allowedFailures
+      );
+      item.testDuration = calculateTestDuration(item.targetLife, item.censorType);
+    }
+
+    autoSave();
+    renderDvprTable();
+    renderTestItems();
+  });
 }
 
 function escapeHtml(s) {

@@ -710,6 +710,7 @@ function renderItemsTable(batch) {
 function bindAnalysisEvents() {
   const distSelect = document.getElementById("ld-distribution");
   const methodSelect = document.getElementById("ld-method");
+  const reliabilityTimeInput = document.getElementById("ld-reliability-time");
 
   if (distSelect) {
     distSelect.addEventListener("change", () => {
@@ -725,14 +726,36 @@ function bindAnalysisEvents() {
       updateAnalysisResults();
     });
   }
+  if (reliabilityTimeInput) {
+    reliabilityTimeInput.addEventListener("input", () => {
+      updateReliabilityCalculator();
+    });
+    reliabilityTimeInput.addEventListener("change", () => {
+      updateReliabilityCalculator();
+    });
+  }
 }
 
 function renderAnalysisTab() {
   const config = currentModel.modules.lifeData.analysisConfig;
   const distSelect = document.getElementById("ld-distribution");
   const methodSelect = document.getElementById("ld-method");
+  const reliabilityTimeInput = document.getElementById("ld-reliability-time");
+  const warrantyLabel = document.getElementById("ld-reliability-warranty-label");
   if (distSelect) distSelect.value = config.distribution || "weibull";
   if (methodSelect) methodSelect.value = config.method || "rrx";
+
+  const ld = currentModel.modules.lifeData;
+  const def = ld.definition;
+  if (def && reliabilityTimeInput) {
+    const warrantyHours = (def.warrantyYears || 0) * (def.hoursPerYear || 0);
+    if (warrantyHours > 0) {
+      reliabilityTimeInput.value = warrantyHours;
+    }
+    if (warrantyLabel) {
+      warrantyLabel.textContent = `质保期 (${def.warrantyYears || 0}年 × ${def.hoursPerYear || 0}h/年)`;
+    }
+  }
 }
 
 function getTargetB10() {
@@ -772,6 +795,7 @@ function updateAnalysisResults() {
   const fit = fitDistribution(config.distribution, config.method, failures, censored);
 
   updateFitMetrics(fit, config.distribution, targetB10);
+  updateReliabilityCalculator(fit, config.distribution);
   drawPPPlot(fit, config.distribution);
   drawCdfPlot(fit, config.distribution, targetB10);
 }
@@ -832,6 +856,78 @@ function updateFitMetrics(fit, distribution, targetB10) {
     passEl.style.color = "";
     gapEl.textContent = "—";
     gapEl.className = "metric-value";
+  }
+}
+
+function calculateReliability(t, fit, distribution) {
+  if (!fit || t <= 0) return null;
+  if (distribution === "weibull") {
+    if (fit.eta == null || fit.beta == null) return null;
+    return 1 - weibullCdf(t, fit.eta, fit.beta);
+  } else if (distribution === "exponential") {
+    if (fit.lambda == null) return null;
+    return 1 - exponentialCdf(t, fit.lambda);
+  } else if (distribution === "lognormal") {
+    if (fit.mu == null || fit.sigma == null) return null;
+    return 1 - lognormalCdf(t, fit.mu, fit.sigma);
+  }
+  return null;
+}
+
+function updateReliabilityCalculator(fitParam, distributionParam) {
+  const config = currentModel.modules.lifeData.analysisConfig;
+  const distribution = distributionParam || config.distribution || "weibull";
+
+  let fit;
+  if (fitParam) {
+    fit = fitParam;
+  } else {
+    const { failures, censored } = getFailureAndCensoredTimes();
+    fit = fitDistribution(distribution, config.method || "rrx", failures, censored);
+  }
+
+  const timeInput = document.getElementById("ld-reliability-time");
+  const reliabilityEl = document.getElementById("ld-reliability-value");
+  const failureRateEl = document.getElementById("ld-failure-rate-value");
+  const warrantyFailureRateEl = document.getElementById("ld-warranty-failure-rate");
+
+  if (!timeInput || !reliabilityEl || !failureRateEl || !warrantyFailureRateEl) return;
+
+  const t = Number(timeInput.value) || 0;
+  const hasData = fit && fit.b10 != null;
+
+  if (!hasData || t <= 0) {
+    reliabilityEl.textContent = "—";
+    failureRateEl.textContent = "—";
+    warrantyFailureRateEl.textContent = "—";
+    return;
+  }
+
+  const reliability = calculateReliability(t, fit, distribution);
+  if (reliability == null) {
+    reliabilityEl.textContent = "—";
+    failureRateEl.textContent = "—";
+  } else {
+    reliabilityEl.textContent = pct(reliability);
+    failureRateEl.textContent = pct(1 - reliability);
+  }
+
+  const ld = currentModel.modules.lifeData;
+  const def = ld.definition;
+  if (def) {
+    const warrantyHours = (def.warrantyYears || 0) * (def.hoursPerYear || 0);
+    if (warrantyHours > 0) {
+      const warrantyReliability = calculateReliability(warrantyHours, fit, distribution);
+      if (warrantyReliability != null) {
+        warrantyFailureRateEl.textContent = pct(1 - warrantyReliability);
+      } else {
+        warrantyFailureRateEl.textContent = "—";
+      }
+    } else {
+      warrantyFailureRateEl.textContent = "—";
+    }
+  } else {
+    warrantyFailureRateEl.textContent = "—";
   }
 }
 

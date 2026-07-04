@@ -4,6 +4,17 @@ import { fmt } from "../utils.js";
 let currentModel = null;
 let onSaveCallback = null;
 
+const PHASE_COLORS = [
+  "#3b9eff",
+  "#34d399",
+  "#fbbf24",
+  "#f87171",
+  "#a78bfa",
+  "#fb923c",
+  "#2dd4bf",
+  "#f472b6",
+];
+
 export function init(model, onSave) {
   currentModel = model;
   onSaveCallback = onSave;
@@ -15,27 +26,56 @@ export function render(container, model) {
   const content = template.content.cloneNode(true);
   container.appendChild(content);
 
-  ensureGrowthData();
+  ensurePhases();
   bindEvents();
+  renderPhaseSelector();
+  renderPhaseInfo();
   renderFailureTable();
   updateParamsAndChart();
+  renderComparisonTable();
+  drawComparisonChart();
+  renderGrowthSummary();
 }
 
-function ensureGrowthData() {
+function ensurePhases() {
   if (!currentModel.modules) currentModel.modules = {};
   if (!currentModel.modules.growth) {
     currentModel.modules.growth = {
-      failures: [],
+      phases: [],
+      activePhaseId: null,
       model: "duane",
       targetMtbf: null,
-      totalTime: null,
     };
   }
   const g = currentModel.modules.growth;
-  if (!Array.isArray(g.failures)) g.failures = [];
+  if (!Array.isArray(g.phases)) {
+    const oldFailures = Array.isArray(g.failures) ? g.failures : [];
+    const oldTotalTime = g.totalTime || null;
+    const firstPhaseId = genId();
+    g.phases = [
+      {
+        id: firstPhaseId,
+        name: "首轮试验",
+        phaseNumber: 1,
+        description: "迁移自旧数据",
+        failures: oldFailures,
+        totalTime: oldTotalTime,
+        startDate: null,
+      },
+    ];
+    g.activePhaseId = firstPhaseId;
+  }
+  if (!g.activePhaseId && g.phases.length > 0) {
+    g.activePhaseId = g.phases[0].id;
+  }
   if (!g.model) g.model = "duane";
   if (g.targetMtbf === undefined) g.targetMtbf = null;
-  if (g.totalTime === undefined) g.totalTime = null;
+  for (const phase of g.phases) {
+    if (!Array.isArray(phase.failures)) phase.failures = [];
+    if (phase.totalTime === undefined) phase.totalTime = null;
+    if (!phase.phaseNumber) phase.phaseNumber = 1;
+    if (!phase.name) phase.name = `第${phase.phaseNumber}轮`;
+  }
 }
 
 function save() {
@@ -47,16 +87,23 @@ function getGrowth() {
   return currentModel.modules.growth;
 }
 
-function getSortedFailures() {
+function getActivePhase() {
   const g = getGrowth();
-  return [...g.failures].sort((a, b) => a.time - b.time);
+  return g.phases.find((p) => p.id === g.activePhaseId) || g.phases[0] || null;
+}
+
+function getSortedFailures() {
+  const phase = getActivePhase();
+  if (!phase) return [];
+  return [...phase.failures].sort((a, b) => a.time - b.time);
 }
 
 function getTotalTime() {
-  const g = getGrowth();
+  const phase = getActivePhase();
+  if (!phase) return 0;
   const sorted = getSortedFailures();
-  if (g.totalTime && g.totalTime > 0) {
-    return g.totalTime;
+  if (phase.totalTime && phase.totalTime > 0) {
+    return phase.totalTime;
   }
   if (sorted.length > 0) {
     return sorted[sorted.length - 1].time;
@@ -64,12 +111,116 @@ function getTotalTime() {
   return 0;
 }
 
+function getPhaseSortedFailures(phase) {
+  return [...phase.failures].sort((a, b) => a.time - b.time);
+}
+
+function getPhaseTotalTime(phase) {
+  const sorted = getPhaseSortedFailures(phase);
+  if (phase.totalTime && phase.totalTime > 0) {
+    return phase.totalTime;
+  }
+  if (sorted.length > 0) {
+    return sorted[sorted.length - 1].time;
+  }
+  return 0;
+}
+
+function renderPhaseSelector() {
+  const g = getGrowth();
+  const select = document.getElementById("growth-phase-select");
+  if (!select) return;
+
+  let html = "";
+  g.phases.forEach((phase) => {
+    const selected = phase.id === g.activePhaseId ? "selected" : "";
+    html += `<option value="${phase.id}" ${selected}>第${phase.phaseNumber}轮 - ${escapeHtml(phase.name)}</option>`;
+  });
+  select.innerHTML = html;
+
+  const deleteBtn = document.getElementById("growth-delete-phase");
+  if (deleteBtn) {
+    deleteBtn.disabled = g.phases.length <= 1;
+    deleteBtn.style.opacity = g.phases.length <= 1 ? "0.5" : "1";
+  }
+}
+
+function renderPhaseInfo() {
+  const phase = getActivePhase();
+  if (!phase) return;
+
+  const nameInput = document.getElementById("growth-phase-name");
+  const totalTimeInput = document.getElementById("growth-phase-total-time");
+  const descInput = document.getElementById("growth-phase-desc");
+
+  if (nameInput) nameInput.value = phase.name || "";
+  if (totalTimeInput) totalTimeInput.value = phase.totalTime || "";
+  if (descInput) descInput.value = phase.description || "";
+}
+
+function addPhase() {
+  const g = getGrowth();
+  const lastPhase = g.phases[g.phases.length - 1];
+  const newNumber = lastPhase ? lastPhase.phaseNumber + 1 : 1;
+  const newId = genId();
+
+  g.phases.push({
+    id: newId,
+    name: `第${newNumber}轮试验`,
+    phaseNumber: newNumber,
+    description: "",
+    failures: [],
+    totalTime: null,
+    startDate: null,
+  });
+  g.activePhaseId = newId;
+  save();
+  renderPhaseSelector();
+  renderPhaseInfo();
+  renderFailureTable();
+  updateParamsAndChart();
+  renderComparisonTable();
+  drawComparisonChart();
+  renderGrowthSummary();
+}
+
+function deletePhase() {
+  const g = getGrowth();
+  if (g.phases.length <= 1) return;
+
+  if (!confirm("确定要删除当前轮次吗？此操作不可撤销。")) return;
+
+  const idx = g.phases.findIndex((p) => p.id === g.activePhaseId);
+  if (idx < 0) return;
+
+  g.phases.splice(idx, 1);
+
+  for (let i = idx; i < g.phases.length; i++) {
+    g.phases[i].phaseNumber = i + 1;
+  }
+
+  g.activePhaseId = g.phases[Math.max(0, idx - 1)].id;
+  save();
+  renderPhaseSelector();
+  renderPhaseInfo();
+  renderFailureTable();
+  updateParamsAndChart();
+  renderComparisonTable();
+  drawComparisonChart();
+  renderGrowthSummary();
+}
+
 function bindEvents() {
   const modelSelect = document.getElementById("growth-model-select");
   const targetInput = document.getElementById("growth-target-mtbf");
-  const totalTimeInput = document.getElementById("growth-total-time");
   const addBtn = document.getElementById("growth-add-failure");
   const emptyAddBtn = document.getElementById("growth-empty-add-btn");
+  const phaseSelect = document.getElementById("growth-phase-select");
+  const addPhaseBtn = document.getElementById("growth-add-phase");
+  const deletePhaseBtn = document.getElementById("growth-delete-phase");
+  const phaseNameInput = document.getElementById("growth-phase-name");
+  const phaseTotalTimeInput = document.getElementById("growth-phase-total-time");
+  const phaseDescInput = document.getElementById("growth-phase-desc");
 
   const g = getGrowth();
   if (modelSelect) {
@@ -79,6 +230,9 @@ function bindEvents() {
       save();
       updateModelParamsVisibility();
       updateParamsAndChart();
+      renderComparisonTable();
+      drawComparisonChart();
+      renderGrowthSummary();
     });
   }
 
@@ -89,16 +243,65 @@ function bindEvents() {
       g.targetMtbf = Number.isFinite(val) && val > 0 ? val : null;
       save();
       updateParamsAndChart();
+      renderComparisonTable();
+      drawComparisonChart();
+      renderGrowthSummary();
     });
   }
 
-  if (totalTimeInput) {
-    totalTimeInput.value = g.totalTime || "";
-    totalTimeInput.addEventListener("input", () => {
-      const val = parseFloat(totalTimeInput.value);
-      g.totalTime = Number.isFinite(val) && val > 0 ? val : null;
+  if (phaseSelect) {
+    phaseSelect.addEventListener("change", () => {
+      g.activePhaseId = phaseSelect.value;
       save();
+      renderPhaseInfo();
+      renderFailureTable();
       updateParamsAndChart();
+    });
+  }
+
+  if (addPhaseBtn) {
+    addPhaseBtn.addEventListener("click", () => addPhase());
+  }
+
+  if (deletePhaseBtn) {
+    deletePhaseBtn.addEventListener("click", () => deletePhase());
+  }
+
+  if (phaseNameInput) {
+    phaseNameInput.addEventListener("input", () => {
+      const phase = getActivePhase();
+      if (phase) {
+        phase.name = phaseNameInput.value;
+        save();
+        renderPhaseSelector();
+        renderComparisonTable();
+        drawComparisonChart();
+      }
+    });
+  }
+
+  if (phaseTotalTimeInput) {
+    phaseTotalTimeInput.addEventListener("input", () => {
+      const phase = getActivePhase();
+      if (phase) {
+        const val = parseFloat(phaseTotalTimeInput.value);
+        phase.totalTime = Number.isFinite(val) && val > 0 ? val : null;
+        save();
+        updateParamsAndChart();
+        renderComparisonTable();
+        drawComparisonChart();
+        renderGrowthSummary();
+      }
+    });
+  }
+
+  if (phaseDescInput) {
+    phaseDescInput.addEventListener("input", () => {
+      const phase = getActivePhase();
+      if (phase) {
+        phase.description = phaseDescInput.value;
+        save();
+      }
     });
   }
 
@@ -126,8 +329,9 @@ function bindEvents() {
       const field = e.target.dataset.field;
       if (!field) return;
 
-      const g = getGrowth();
-      const failure = g.failures.find((f) => f.id === id);
+      const phase = getActivePhase();
+      if (!phase) return;
+      const failure = phase.failures.find((f) => f.id === id);
       if (!failure) return;
 
       if (field === "time") {
@@ -139,17 +343,21 @@ function bindEvents() {
       save();
       renderFailureTable();
       updateParamsAndChart();
+      renderComparisonTable();
+      drawComparisonChart();
+      renderGrowthSummary();
     });
   }
 }
 
 function addFailure() {
-  const g = getGrowth();
+  const phase = getActivePhase();
+  if (!phase) return;
   const sorted = getSortedFailures();
   const lastTime = sorted.length > 0 ? sorted[sorted.length - 1].time : 0;
   const newTime = lastTime + (lastTime > 0 ? lastTime * 0.2 : 100);
 
-  g.failures.push({
+  phase.failures.push({
     id: genId(),
     time: Math.round(newTime * 10) / 10,
     failureMode: "",
@@ -157,14 +365,21 @@ function addFailure() {
   save();
   renderFailureTable();
   updateParamsAndChart();
+  renderComparisonTable();
+  drawComparisonChart();
+  renderGrowthSummary();
 }
 
 function deleteFailure(id) {
-  const g = getGrowth();
-  g.failures = g.failures.filter((f) => f.id !== id);
+  const phase = getActivePhase();
+  if (!phase) return;
+  phase.failures = phase.failures.filter((f) => f.id !== id);
   save();
   renderFailureTable();
   updateParamsAndChart();
+  renderComparisonTable();
+  drawComparisonChart();
+  renderGrowthSummary();
 }
 
 function renderFailureTable() {
@@ -306,6 +521,37 @@ function fitCrowAMSAA(sorted, totalTime) {
     currentMtbf: currentMtbf,
     trend: trend,
   };
+}
+
+function calcPhaseMetrics(phase) {
+  const sorted = getPhaseSortedFailures(phase);
+  const totalTime = getPhaseTotalTime(phase);
+  const g = getGrowth();
+
+  let mtbf = null;
+  let b10 = null;
+
+  if (g.model === "duane") {
+    const result = fitDuane(sorted, totalTime);
+    if (result && result.finalMtbf) {
+      mtbf = result.finalMtbf;
+    }
+  } else if (g.model === "crowAMSAA") {
+    const result = fitCrowAMSAA(sorted, totalTime);
+    if (result && result.currentMtbf) {
+      mtbf = result.currentMtbf;
+    }
+  }
+
+  if (mtbf === null && sorted.length > 0) {
+    mtbf = totalTime / sorted.length * 2;
+  }
+
+  if (mtbf !== null) {
+    b10 = mtbf * (-Math.log(0.9));
+  }
+
+  return { mtbf, b10, failureCount: sorted.length, totalTime };
 }
 
 function estimateTimeToTarget(targetMtbf, modelType, duaneResult, crowResult, totalTime) {
@@ -660,6 +906,385 @@ function drawGrowthChart(sorted, totalTime, modelType, duaneResult, crowResult, 
     ctx.lineWidth = 1.5;
     ctx.stroke();
   });
+}
+
+function renderComparisonTable() {
+  const g = getGrowth();
+  const tbody = document.getElementById("growth-comparison-body");
+  if (!tbody) return;
+
+  let html = "";
+  let prevMtbf = null;
+
+  g.phases.forEach((phase, idx) => {
+    const metrics = calcPhaseMetrics(phase);
+    const color = PHASE_COLORS[idx % PHASE_COLORS.length];
+
+    let improvement = "—";
+    let improvementColor = "";
+    if (prevMtbf !== null && metrics.mtbf !== null && prevMtbf > 0) {
+      const pct = ((metrics.mtbf - prevMtbf) / prevMtbf) * 100;
+      improvement = (pct >= 0 ? "+" : "") + fmt(pct, 1) + "%";
+      improvementColor = pct >= 0 ? "var(--success)" : "var(--danger)";
+    }
+
+    html += `
+      <tr>
+        <td style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="width: 10px; height: 10px; border-radius: 50%; background: ${color}; display: inline-block;"></span>
+          <span>${escapeHtml(phase.name)}</span>
+        </td>
+        <td>${metrics.failureCount}</td>
+        <td>${fmt(metrics.totalTime, 1)}</td>
+        <td>${metrics.mtbf ? fmt(metrics.mtbf, 1) : "—"}</td>
+        <td>${metrics.b10 ? fmt(metrics.b10, 1) : "—"}</td>
+        <td style="font-weight: 600; color: ${improvementColor || 'inherit'};">${improvement}</td>
+      </tr>
+    `;
+
+    if (metrics.mtbf !== null) {
+      prevMtbf = metrics.mtbf;
+    }
+  });
+
+  tbody.innerHTML = html;
+}
+
+function drawComparisonChart() {
+  const g = getGrowth();
+  const canvas = document.getElementById("growth-comparison-canvas");
+  const legendDiv = document.getElementById("growth-comparison-legend");
+  if (!canvas) return;
+
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  const width = rect.width;
+  const height = rect.height;
+  const padding = { top: 30, right: 30, bottom: 50, left: 60 };
+  const chartW = width - padding.left - padding.right;
+  const chartH = height - padding.top - padding.bottom;
+
+  ctx.clearRect(0, 0, width, height);
+
+  ctx.fillStyle = "#1a2332";
+  ctx.fillRect(0, 0, width, height);
+
+  const validPhases = g.phases.filter((p) => p.failures.length > 0 && getPhaseTotalTime(p) > 0);
+
+  if (validPhases.length === 0) {
+    ctx.fillStyle = "#8b9cb3";
+    ctx.font = "14px 'Segoe UI', sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("请添加失效数据以查看对比曲线", width / 2, height / 2);
+    if (legendDiv) legendDiv.innerHTML = "";
+    return;
+  }
+
+  let allMaxX = 0;
+  let allMaxY = 0;
+  let allMinX = Infinity;
+
+  validPhases.forEach((phase) => {
+    const sorted = getPhaseSortedFailures(phase);
+    const totalTime = getPhaseTotalTime(phase);
+    if (sorted.length > 0) {
+      if (sorted[0].time > 0 && sorted[0].time < allMinX) allMinX = sorted[0].time;
+      const maxT = totalTime > sorted[sorted.length - 1].time ? totalTime : sorted[sorted.length - 1].time;
+      if (maxT > allMaxX) allMaxX = maxT;
+      if (sorted.length > allMaxY) allMaxY = sorted.length;
+    }
+  });
+
+  if (allMinX === Infinity) allMinX = 1;
+  if (allMinX <= 0) allMinX = 1;
+
+  const targetMtbf = g.targetMtbf;
+  if (targetMtbf && targetMtbf > 0) {
+    validPhases.forEach((phase) => {
+      const sorted = getPhaseSortedFailures(phase);
+      const totalTime = getPhaseTotalTime(phase);
+      const duaneResult = fitDuane(sorted, totalTime);
+      const crowResult = fitCrowAMSAA(sorted, totalTime);
+      if (g.model === "duane" && duaneResult && duaneResult.m > 0 && duaneResult.m < 1) {
+        const tTarget = Math.pow(1 / (duaneResult.a * duaneResult.m * targetMtbf), 1 / (duaneResult.m - 1));
+        if (tTarget > allMaxX) allMaxX = tTarget * 1.1;
+      }
+      if (g.model === "crowAMSAA" && crowResult && crowResult.beta !== null && crowResult.beta > 0 && crowResult.beta < 1) {
+        const tTarget = Math.pow(1 / (crowResult.lambda * crowResult.beta * targetMtbf), 1 / (crowResult.beta - 1));
+        if (tTarget > allMaxX) allMaxX = tTarget * 1.1;
+      }
+    });
+  }
+
+  allMaxX *= 1.1;
+  allMaxY = Math.max(allMaxY * 1.5, 2);
+  const allMinY = 0.5;
+
+  const logMinX = Math.log10(allMinX);
+  const logMaxX = Math.log10(allMaxX);
+  const logMinY = Math.log10(allMinY);
+  const logMaxY = Math.log10(allMaxY);
+
+  function xToPx(x) {
+    const logX = Math.log10(x);
+    return padding.left + ((logX - logMinX) / (logMaxX - logMinX)) * chartW;
+  }
+
+  function yToPx(y) {
+    const logY = Math.log10(y);
+    return padding.top + chartH - ((logY - logMinY) / (logMaxY - logMinY)) * chartH;
+  }
+
+  ctx.strokeStyle = "#2d3a4f";
+  ctx.lineWidth = 1;
+
+  const xTicks = generateLogTicks(allMinX, allMaxX);
+  xTicks.forEach((tick) => {
+    const px = xToPx(tick);
+    if (px >= padding.left && px <= padding.left + chartW) {
+      ctx.beginPath();
+      ctx.moveTo(px, padding.top);
+      ctx.lineTo(px, padding.top + chartH);
+      ctx.stroke();
+    }
+  });
+
+  const yTicks = generateLogTicks(allMinY, allMaxY);
+  yTicks.forEach((tick) => {
+    const py = yToPx(tick);
+    if (py >= padding.top && py <= padding.top + chartH) {
+      ctx.beginPath();
+      ctx.moveTo(padding.left, py);
+      ctx.lineTo(padding.left + chartW, py);
+      ctx.stroke();
+    }
+  });
+
+  ctx.strokeStyle = "#8b9cb3";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(padding.left, padding.top);
+  ctx.lineTo(padding.left, padding.top + chartH);
+  ctx.lineTo(padding.left + chartW, padding.top + chartH);
+  ctx.stroke();
+
+  ctx.fillStyle = "#8b9cb3";
+  ctx.font = "11px 'Segoe UI', sans-serif";
+  ctx.textAlign = "center";
+  xTicks.forEach((tick) => {
+    const px = xToPx(tick);
+    if (px >= padding.left && px <= padding.left + chartW) {
+      ctx.fillText(formatTick(tick), px, padding.top + chartH + 18);
+    }
+  });
+
+  ctx.textAlign = "right";
+  yTicks.forEach((tick) => {
+    const py = yToPx(tick);
+    if (py >= padding.top && py <= padding.top + chartH) {
+      ctx.fillText(formatTick(tick), padding.left - 8, py + 4);
+    }
+  });
+
+  ctx.fillStyle = "#e8edf4";
+  ctx.font = "12px 'Segoe UI', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("累计时间 (h) - 对数坐标", padding.left + chartW / 2, height - 10);
+
+  ctx.save();
+  ctx.translate(18, padding.top + chartH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = "center";
+  ctx.fillText("累计失效数 - 对数坐标", 0, 0);
+  ctx.restore();
+
+  validPhases.forEach((phase, idx) => {
+    const color = PHASE_COLORS[idx % PHASE_COLORS.length];
+    const sorted = getPhaseSortedFailures(phase);
+    const totalTime = getPhaseTotalTime(phase);
+    const duaneResult = fitDuane(sorted, totalTime);
+    const crowResult = fitCrowAMSAA(sorted, totalTime);
+
+    if (g.model === "duane" && duaneResult && duaneResult.m > 0) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      let first = true;
+      for (let t = allMinX; t <= allMaxX; t *= 1.02) {
+        const nPred = duaneResult.a * Math.pow(t, duaneResult.m);
+        if (nPred > 0) {
+          const px = xToPx(t);
+          const py = yToPx(nPred);
+          if (first) {
+            ctx.moveTo(px, py);
+            first = false;
+          } else {
+            ctx.lineTo(px, py);
+          }
+        }
+      }
+      ctx.stroke();
+    }
+
+    if (g.model === "crowAMSAA" && crowResult && crowResult.beta !== null && crowResult.lambda !== null) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      let first = true;
+      for (let t = allMinX; t <= allMaxX; t *= 1.02) {
+        const nPred = crowResult.lambda * Math.pow(t, crowResult.beta);
+        if (nPred > 0) {
+          const px = xToPx(t);
+          const py = yToPx(nPred);
+          if (first) {
+            ctx.moveTo(px, py);
+            first = false;
+          } else {
+            ctx.lineTo(px, py);
+          }
+        }
+      }
+      ctx.stroke();
+    }
+
+    const dataPoints = [];
+    for (let i = 0; i < sorted.length; i++) {
+      if (sorted[i].time > 0) {
+        dataPoints.push({ x: sorted[i].time, y: i + 1 });
+      }
+    }
+
+    ctx.fillStyle = color;
+    dataPoints.forEach((pt) => {
+      const px = xToPx(pt.x);
+      const py = yToPx(pt.y);
+      ctx.beginPath();
+      ctx.arc(px, py, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#0f1419";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+  });
+
+  if (targetMtbf && targetMtbf > 0) {
+    const lastPhase = validPhases[validPhases.length - 1];
+    if (lastPhase) {
+      const sorted = getPhaseSortedFailures(lastPhase);
+      const totalTime = getPhaseTotalTime(lastPhase);
+      const duaneResult = fitDuane(sorted, totalTime);
+      const crowResult = fitCrowAMSAA(sorted, totalTime);
+
+      let targetT = null;
+      if (g.model === "duane" && duaneResult && duaneResult.m > 0 && duaneResult.m < 1 && duaneResult.a > 0) {
+        targetT = Math.pow(1 / (duaneResult.a * duaneResult.m * targetMtbf), 1 / (duaneResult.m - 1));
+      } else if (g.model === "crowAMSAA" && crowResult && crowResult.beta !== null && crowResult.lambda !== null && crowResult.beta > 0 && crowResult.beta < 1) {
+        targetT = Math.pow(1 / (crowResult.lambda * crowResult.beta * targetMtbf), 1 / (crowResult.beta - 1));
+      }
+
+      if (targetT && targetT > 0) {
+        ctx.strokeStyle = "#fbbf24";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        const px = xToPx(targetT);
+        ctx.moveTo(px, padding.top);
+        ctx.lineTo(px, padding.top + chartH);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = "#fbbf24";
+        ctx.font = "11px 'Segoe UI', sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(`目标: ${fmt(targetT, 0)}h`, px, padding.top - 8);
+      }
+    }
+  }
+
+  if (legendDiv) {
+    let legendHtml = "";
+    validPhases.forEach((phase, idx) => {
+      const color = PHASE_COLORS[idx % PHASE_COLORS.length];
+      legendHtml += `
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="width: 20px; height: 2px; background: ${color}; display: inline-block;"></span>
+          <span style="color: var(--text-muted);">${escapeHtml(phase.name)}</span>
+        </div>
+      `;
+    });
+    if (targetMtbf && targetMtbf > 0) {
+      legendHtml += `
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="width: 20px; height: 2px; background: var(--warning); border-style: dashed; display: inline-block;"></span>
+          <span style="color: var(--text-muted);">目标 MTBF</span>
+        </div>
+      `;
+    }
+    legendDiv.innerHTML = legendHtml;
+  }
+}
+
+function renderGrowthSummary() {
+  const g = getGrowth();
+  const summaryDiv = document.getElementById("growth-summary");
+  if (!summaryDiv) return;
+
+  const phases = g.phases;
+  if (phases.length === 0) {
+    summaryDiv.innerHTML = '<div style="color: var(--text-muted); text-align: center;">暂无数据</div>';
+    return;
+  }
+
+  const firstMetrics = calcPhaseMetrics(phases[0]);
+  const lastMetrics = calcPhaseMetrics(phases[phases.length - 1]);
+
+  let totalImprovement = "—";
+  let totalImprovementColor = "inherit";
+  if (firstMetrics.mtbf !== null && lastMetrics.mtbf !== null && firstMetrics.mtbf > 0) {
+    const pct = ((lastMetrics.mtbf - firstMetrics.mtbf) / firstMetrics.mtbf) * 100;
+    totalImprovement = (pct >= 0 ? "+" : "") + fmt(pct, 1) + "%";
+    totalImprovementColor = pct >= 0 ? "var(--success)" : "var(--danger)";
+  }
+
+  const targetMtbf = g.targetMtbf;
+  let targetStatus = "—";
+  let targetColor = "inherit";
+  if (targetMtbf && lastMetrics.mtbf !== null) {
+    const isMet = lastMetrics.mtbf >= targetMtbf;
+    targetStatus = isMet ? "已达标 ✓" : "未达标 ✗";
+    targetColor = isMet ? "var(--success)" : "var(--danger)";
+  }
+
+  summaryDiv.innerHTML = `
+    <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--accent);">📈 增长总结</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+      <div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">初始 MTBF (首轮)</div>
+        <div style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary);">${firstMetrics.mtbf ? fmt(firstMetrics.mtbf, 1) + " h" : "—"}</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">当前 MTBF (最新)</div>
+        <div style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary);">${lastMetrics.mtbf ? fmt(lastMetrics.mtbf, 1) + " h" : "—"}</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">总提升幅度</div>
+        <div style="font-size: 1.1rem; font-weight: 600; color: ${totalImprovementColor};">${totalImprovement}</div>
+      </div>
+      <div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">目标状态</div>
+        <div style="font-size: 1.1rem; font-weight: 600; color: ${targetColor};">${targetStatus}</div>
+      </div>
+    </div>
+    <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-muted);">
+      共 ${phases.length} 轮试验，累计 ${phases.reduce((sum, p) => sum + p.failures.length, 0)} 次失效记录
+    </div>
+  `;
 }
 
 function generateLogTicks(min, max) {

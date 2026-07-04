@@ -1779,6 +1779,58 @@ textarea.form-input {
   color: #fff;
 }
 
+.dvpr-status-passed {
+  color: var(--success, #10b981);
+  font-weight: 600;
+}
+
+.dvpr-status-failed {
+  color: var(--danger, #ef4444);
+  font-weight: 600;
+}
+
+.dvpr-status-progress {
+  color: var(--warning, #f59e0b);
+  font-weight: 600;
+}
+
+.dvpr-status-pending {
+  color: var(--text-muted, #6b7280);
+  font-weight: 500;
+}
+
+.dvpr-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.dvpr-stat-label {
+  color: var(--text-muted);
+}
+
+.dvpr-stat-value {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dvpr-pass {
+  color: var(--success, #10b981);
+}
+
+.dvpr-fail {
+  color: var(--danger, #ef4444);
+}
+
+.dvpr-progress {
+  color: var(--warning, #f59e0b);
+}
+
+.dvpr-pending {
+  color: var(--text-muted, #6b7280);
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -2353,6 +2405,196 @@ textarea.form-input {
 
   .pred-table {
     min-width: 1000px;
+  }
+}
+
+.prediction-tabs {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--surface-2);
+  padding: 0.25rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+
+.pred-tab {
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border-radius: 6px;
+  font-family: inherit;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.pred-tab:hover {
+  color: var(--text);
+}
+
+.pred-tab.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.pred-tab-content {
+  display: block;
+}
+
+.alloc-table-container {
+  background: var(--surface);
+  border-radius: 0;
+  border: none;
+}
+
+.alloc-table {
+  font-size: 0.8rem;
+  min-width: 1100px;
+}
+
+.alloc-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface-2);
+  white-space: nowrap;
+  font-weight: 600;
+  border-bottom: 2px solid var(--border);
+}
+
+.alloc-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.alloc-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.alloc-table tbody tr:hover {
+  background: rgba(59, 158, 255, 0.06);
+}
+
+.alloc-table td {
+  vertical-align: middle;
+  padding: 0.4rem 0.5rem;
+}
+
+.alloc-index {
+  text-align: center;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.alloc-num-input {
+  text-align: center;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.8rem;
+}
+
+.alloc-score-cell {
+  text-align: center;
+  font-weight: 600;
+  color: var(--warning);
+  font-size: 0.85rem;
+}
+
+.alloc-weight-cell {
+  text-align: center;
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+.alloc-b10-cell {
+  text-align: center;
+  font-weight: 600;
+  color: var(--success);
+  font-size: 0.85rem;
+}
+
+.alloc-action-cell {
+  text-align: center;
+}
+
+.alloc-delete-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.15s ease;
+}
+
+.alloc-delete-btn:hover {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+}
+
+.alloc-empty-state {
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.alloc-empty-state .empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.alloc-empty-state h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.alloc-empty-state p {
+  color: var(--text-muted);
+  margin: 0 0 1.5rem;
+  font-size: 0.9rem;
+}
+
+.alloc-chart-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border);
+}
+
+.alloc-chart-section h4 {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.alloc-chart-container {
+  background: var(--bg-deep);
+  border-radius: 8px;
+  padding: 1rem;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.alloc-chart-container canvas {
+  display: block;
+  width: 100% !important;
+  height: auto !important;
+  max-height: 350px;
+}
+
+.alloc-settings-card .form-row {
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .prediction-tabs {
+    overflow-x: auto;
+  }
+
+  .alloc-table {
+    min-width: 900px;
   }
 }
 

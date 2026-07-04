@@ -600,6 +600,37 @@
 
             <div class="card">
               <div class="card-header">
+                <h3>指定时长可靠度计算器</h3>
+              </div>
+              <div class="card-body">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>时间 t <span class="hint">(小时)</span></label>
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                      <input type="number" id="ld-reliability-time" class="form-input" min="0" step="1" value="40" style="max-width: 180px;" />
+                      <span class="hint" id="ld-reliability-warranty-label">质保期</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="metrics-grid" style="margin-top: 1rem;">
+                  <div class="metric-card">
+                    <div class="metric-label">可靠度 R(t)</div>
+                    <div class="metric-value" id="ld-reliability-value">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">失效率 F(t)</div>
+                    <div class="metric-value" id="ld-failure-rate-value">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">质保期失效率</div>
+                    <div class="metric-value" id="ld-warranty-failure-rate">—</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
                 <h3>概率图 (P-P 图)</h3>
               </div>
               <div class="card-body">
@@ -632,6 +663,7 @@
               <button type="button" class="test-plan-tab active" data-tab="test-items">试验项目</button>
               <button type="button" class="test-plan-tab" data-tab="alt">加速寿命</button>
               <button type="button" class="test-plan-tab" data-tab="halt">HALT 试验</button>
+              <button type="button" class="test-plan-tab" data-tab="dvpr">DVP&amp;R</button>
             </div>
           </div>
 
@@ -798,6 +830,66 @@
               </div>
             </div>
           </div>
+
+          <div class="test-plan-tab-content" id="tp-tab-dvpr" style="display: none;">
+            <div class="card">
+              <div class="card-header">
+                <h3>DVP&amp;R 设计验证计划与报告</h3>
+                <div class="card-actions">
+                  <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">
+                    共 <span id="dvpr-total">0</span> 项
+                  </span>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="table-wrap">
+                  <table class="data-table dvpr-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 50px;">序号</th>
+                        <th style="min-width: 200px;">试验项目名称</th>
+                        <th style="min-width: 150px;">试验对象</th>
+                        <th style="min-width: 200px;">试验工况</th>
+                        <th style="width: 80px;">样本量</th>
+                        <th style="width: 120px;">截尾方式</th>
+                        <th style="min-width: 220px;">验收标准</th>
+                        <th style="width: 100px;">试验结果</th>
+                        <th style="min-width: 150px;">备注</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dvpr-tbody"></tbody>
+                  </table>
+                </div>
+                <div class="empty-state" id="dvpr-empty" style="display: none;">
+                  <div class="empty-icon">📋</div>
+                  <h3>暂无 DVP&amp;R 数据</h3>
+                  <p>请先在「试验项目」Tab 中添加试验项目。</p>
+                </div>
+                <div class="dvpr-stats" style="margin-top: 1rem; display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                  <div class="dvpr-stat-item">
+                    <span class="dvpr-stat-label">总试验项数：</span>
+                    <span class="dvpr-stat-value" id="dvpr-stat-total">0</span>
+                  </div>
+                  <div class="dvpr-stat-item">
+                    <span class="dvpr-stat-label">通过：</span>
+                    <span class="dvpr-stat-value dvpr-pass" id="dvpr-stat-passed">0</span>
+                  </div>
+                  <div class="dvpr-stat-item">
+                    <span class="dvpr-stat-label">失败：</span>
+                    <span class="dvpr-stat-value dvpr-fail" id="dvpr-stat-failed">0</span>
+                  </div>
+                  <div class="dvpr-stat-item">
+                    <span class="dvpr-stat-label">进行中：</span>
+                    <span class="dvpr-stat-value dvpr-progress" id="dvpr-stat-progress">0</span>
+                  </div>
+                  <div class="dvpr-stat-item">
+                    <span class="dvpr-stat-label">未开始：</span>
+                    <span class="dvpr-stat-value dvpr-pending" id="dvpr-stat-pending">0</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -809,131 +901,251 @@
           <p>基于零部件失效率的系统可靠性预计与计算（简化版 MIL-HDBK-217）</p>
         </div>
         <div class="module-content">
-          <div class="prediction-toolbar">
-            <div class="prediction-structure-select">
-              <label class="selector-group">
-                <span class="selector-label">系统结构</span>
-                <select id="pred-structure-select" class="header-select">
-                  <option value="series">串联系统</option>
-                  <option value="parallel">并联系统</option>
-                  <option value="vote23">2/3 表决系统</option>
-                </select>
-              </label>
-              <div class="parallel-count-group" id="parallel-count-group" style="display: none;">
-                <label class="selector-group">
-                  <span class="selector-label">并联数量</span>
-                  <input type="number" id="pred-parallel-count" class="form-input" min="2" value="2" style="width: 80px;" />
-                </label>
-              </div>
-            </div>
-            <div class="prediction-toolbar-right">
-              <button type="button" class="btn-icon" id="pred-add-component">
-                <span>➕</span>
-                <span class="btn-text">添加元器件</span>
-              </button>
-              <button type="button" class="btn-icon btn-primary" id="pred-calculate">
-                <span>🔢</span>
-                <span class="btn-text">计算</span>
-              </button>
-            </div>
+          <div class="prediction-tabs">
+            <button type="button" class="pred-tab active" data-tab="prediction">可靠性预计</button>
+            <button type="button" class="pred-tab" data-tab="allocation">可靠性分配</button>
           </div>
 
-          <div class="pred-components-card card">
-            <div class="card-header">
-              <h3>元器件清单</h3>
-              <div class="card-actions">
-                <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">共 <span id="pred-component-count">0</span> 种元器件</span>
+          <div id="pred-tab-prediction" class="pred-tab-content">
+            <div class="prediction-toolbar">
+              <div class="prediction-structure-select">
+                <label class="selector-group">
+                  <span class="selector-label">系统结构</span>
+                  <select id="pred-structure-select" class="header-select">
+                    <option value="series">串联系统</option>
+                    <option value="parallel">并联系统</option>
+                    <option value="vote23">2/3 表决系统</option>
+                  </select>
+                </label>
+                <div class="parallel-count-group" id="parallel-count-group" style="display: none;">
+                  <label class="selector-group">
+                    <span class="selector-label">并联数量</span>
+                    <input type="number" id="pred-parallel-count" class="form-input" min="2" value="2" style="width: 80px;" />
+                  </label>
+                </div>
+              </div>
+              <div class="prediction-toolbar-right">
+                <button type="button" class="btn-icon" id="pred-add-component">
+                  <span>➕</span>
+                  <span class="btn-text">添加元器件</span>
+                </button>
+                <button type="button" class="btn-icon btn-primary" id="pred-calculate">
+                  <span>🔢</span>
+                  <span class="btn-text">计算</span>
+                </button>
               </div>
             </div>
-            <div class="card-body" style="padding: 0;">
-              <div class="pred-table-container table-wrap">
-                <table class="data-table pred-table">
-                  <thead>
-                    <tr>
-                      <th style="width: 50px;">序号</th>
-                      <th style="min-width: 150px;">元器件名称</th>
-                      <th style="width: 120px;">类型</th>
-                      <th style="width: 80px;">数量</th>
-                      <th style="width: 120px;">基础失效率λ(FIT)</th>
-                      <th style="width: 100px;">工作温度(°C)</th>
-                      <th style="width: 90px;">π_T</th>
-                      <th style="width: 90px;">π_S</th>
-                      <th style="width: 90px;">π_Q</th>
-                      <th style="width: 130px;">工作失效率(FIT)</th>
-                      <th style="width: 70px;">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody id="pred-table-body">
-                  </tbody>
-                </table>
-                <div class="pred-empty-state empty-state" id="pred-empty-state" style="display: none;">
-                  <div class="empty-icon">📋</div>
-                  <h3>暂无元器件数据</h3>
-                  <p>点击「添加元器件」按钮开始创建您的第一个元器件条目。</p>
-                  <button type="button" class="btn-primary" id="pred-empty-add-btn">添加第一个元器件</button>
+
+            <div class="pred-components-card card">
+              <div class="card-header">
+                <h3>元器件清单</h3>
+                <div class="card-actions">
+                  <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">共 <span id="pred-component-count">0</span> 种元器件</span>
+                </div>
+              </div>
+              <div class="card-body" style="padding: 0;">
+                <div class="pred-table-container table-wrap">
+                  <table class="data-table pred-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 50px;">序号</th>
+                        <th style="min-width: 150px;">元器件名称</th>
+                        <th style="width: 120px;">类型</th>
+                        <th style="width: 80px;">数量</th>
+                        <th style="width: 120px;">基础失效率λ(FIT)</th>
+                        <th style="width: 100px;">工作温度(°C)</th>
+                        <th style="width: 90px;">π_T</th>
+                        <th style="width: 90px;">π_S</th>
+                        <th style="width: 90px;">π_Q</th>
+                        <th style="width: 130px;">工作失效率(FIT)</th>
+                        <th style="width: 70px;">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="pred-table-body">
+                    </tbody>
+                  </table>
+                  <div class="pred-empty-state empty-state" id="pred-empty-state" style="display: none;">
+                    <div class="empty-icon">📋</div>
+                    <h3>暂无元器件数据</h3>
+                    <p>点击「添加元器件」按钮开始创建您的第一个元器件条目。</p>
+                    <button type="button" class="btn-primary" id="pred-empty-add-btn">添加第一个元器件</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pred-bottom-grid">
+              <div class="card pred-diagram-card">
+                <div class="card-header">
+                  <h3>系统结构示意图</h3>
+                </div>
+                <div class="card-body">
+                  <div class="pred-diagram-container" id="pred-diagram-container">
+                    <canvas id="pred-diagram-canvas" width="500" height="200"></canvas>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card pred-results-card">
+                <div class="card-header">
+                  <h3>计算结果</h3>
+                </div>
+                <div class="card-body">
+                  <div class="metrics-grid">
+                    <div class="metric-card">
+                      <div class="metric-label">元器件总失效率 (Σλ)</div>
+                      <div class="metric-value" id="pred-total-lambda">—</div>
+                      <div class="metric-unit">FIT</div>
+                    </div>
+                    <div class="metric-card">
+                      <div class="metric-label">系统失效率 λs</div>
+                      <div class="metric-value" id="pred-sys-lambda">—</div>
+                      <div class="metric-unit">FIT</div>
+                    </div>
+                    <div class="metric-card">
+                      <div class="metric-label">系统 MTBF</div>
+                      <div class="metric-value" id="pred-mtbf-hours">—</div>
+                      <div class="metric-unit">小时</div>
+                    </div>
+                    <div class="metric-card">
+                      <div class="metric-label">系统 MTBF</div>
+                      <div class="metric-value" id="pred-mtbf-years">—</div>
+                      <div class="metric-unit">年</div>
+                    </div>
+                  </div>
+
+                  <div class="pred-reliability-section">
+                    <h4 style="margin: 1rem 0 0.75rem; font-size: 0.9rem;">可靠度 R(t) = e^(-λt)</h4>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>任务时间 t (小时)</label>
+                        <input type="number" id="pred-mission-time" class="form-input" min="0" value="10000" step="100" />
+                      </div>
+                      <div class="form-group">
+                        <label>可靠度 R(t)</label>
+                        <div class="readonly-value" id="pred-reliability-value">—</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="pred-chart-section">
+                    <h4 style="margin: 1rem 0 0.75rem; font-size: 0.9rem;">元器件失效率占比</h4>
+                    <div class="pred-chart-container">
+                      <canvas id="pred-bar-canvas" width="400" height="200"></canvas>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="pred-bottom-grid">
-            <div class="card pred-diagram-card">
+          <div id="pred-tab-allocation" class="pred-tab-content" style="display: none;">
+            <div class="card alloc-settings-card">
               <div class="card-header">
-                <h3>系统结构示意图</h3>
+                <h3>分配设置</h3>
               </div>
               <div class="card-body">
-                <div class="pred-diagram-container" id="pred-diagram-container">
-                  <canvas id="pred-diagram-canvas" width="500" height="200"></canvas>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>整机目标 B10 (小时)</label>
+                    <input type="number" id="alloc-target-b10" class="form-input" min="1" value="150" step="1" />
+                  </div>
+                  <div class="form-group">
+                    <label>置信度</label>
+                    <select id="alloc-confidence" class="form-input">
+                      <option value="0.9">90%</option>
+                      <option value="0.95">95%</option>
+                      <option value="0.99">99%</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>系统结构</label>
+                    <select id="alloc-system-structure" class="form-input">
+                      <option value="series">串联</option>
+                      <option value="parallel">并联</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>β 形状参数</label>
+                    <input type="number" id="alloc-beta" class="form-input" min="0.1" value="2.2" step="0.1" />
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div class="card pred-results-card">
+            <div class="card alloc-subsystems-card">
               <div class="card-header">
-                <h3>计算结果</h3>
+                <h3>子系统评分表</h3>
+                <div class="card-actions">
+                  <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">共 <span id="alloc-subsystem-count">0</span> 个子系统</span>
+                  <button type="button" class="btn-icon btn-sm" id="alloc-add-subsystem">
+                    <span>➕</span>
+                    <span class="btn-text">添加子系统</span>
+                  </button>
+                </div>
+              </div>
+              <div class="card-body" style="padding: 0;">
+                <div class="alloc-table-container table-wrap">
+                  <table class="data-table alloc-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 50px;">序号</th>
+                        <th style="min-width: 160px;">子系统名称</th>
+                        <th style="width: 100px;">复杂度</th>
+                        <th style="width: 110px;">成熟度(反)</th>
+                        <th style="width: 110px;">环境严酷度</th>
+                        <th style="width: 100px;">任务占比</th>
+                        <th style="width: 90px;">总分</th>
+                        <th style="width: 100px;">权重占比</th>
+                        <th style="width: 120px;">分配 B10 (h)</th>
+                        <th style="width: 70px;">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="alloc-table-body">
+                    </tbody>
+                  </table>
+                  <div class="alloc-empty-state empty-state" id="alloc-empty-state" style="display: none;">
+                    <div class="empty-icon">📊</div>
+                    <h3>暂无子系统数据</h3>
+                    <p>点击「添加子系统」按钮开始创建您的第一个子系统条目。</p>
+                    <button type="button" class="btn-primary" id="alloc-empty-add-btn">添加第一个子系统</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card alloc-results-card">
+              <div class="card-header">
+                <h3>分配结果</h3>
               </div>
               <div class="card-body">
                 <div class="metrics-grid">
                   <div class="metric-card">
-                    <div class="metric-label">元器件总失效率 (Σλ)</div>
-                    <div class="metric-value" id="pred-total-lambda">—</div>
-                    <div class="metric-unit">FIT</div>
+                    <div class="metric-label">子系统数量</div>
+                    <div class="metric-value" id="alloc-subsys-count">0</div>
+                    <div class="metric-unit">个</div>
                   </div>
                   <div class="metric-card">
-                    <div class="metric-label">系统失效率 λs</div>
-                    <div class="metric-value" id="pred-sys-lambda">—</div>
-                    <div class="metric-unit">FIT</div>
+                    <div class="metric-label">权重总和</div>
+                    <div class="metric-value" id="alloc-weight-sum">0%</div>
+                    <div class="metric-unit">%</div>
                   </div>
                   <div class="metric-card">
-                    <div class="metric-label">系统 MTBF</div>
-                    <div class="metric-value" id="pred-mtbf-hours">—</div>
+                    <div class="metric-label">整机目标 B10</div>
+                    <div class="metric-value" id="alloc-target-b10-display">0</div>
                     <div class="metric-unit">小时</div>
                   </div>
                   <div class="metric-card">
-                    <div class="metric-label">系统 MTBF</div>
-                    <div class="metric-value" id="pred-mtbf-years">—</div>
-                    <div class="metric-unit">年</div>
+                    <div class="metric-label">计算整机 B10</div>
+                    <div class="metric-value" id="alloc-calc-b10">0</div>
+                    <div class="metric-unit">小时</div>
                   </div>
                 </div>
 
-                <div class="pred-reliability-section">
-                  <h4 style="margin: 1rem 0 0.75rem; font-size: 0.9rem;">可靠度 R(t) = e^(-λt)</h4>
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label>任务时间 t (小时)</label>
-                      <input type="number" id="pred-mission-time" class="form-input" min="0" value="10000" step="100" />
-                    </div>
-                    <div class="form-group">
-                      <label>可靠度 R(t)</label>
-                      <div class="readonly-value" id="pred-reliability-value">—</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="pred-chart-section">
-                  <h4 style="margin: 1rem 0 0.75rem; font-size: 0.9rem;">元器件失效率占比</h4>
-                  <div class="pred-chart-container">
-                    <canvas id="pred-bar-canvas" width="400" height="200"></canvas>
+                <div class="alloc-chart-section">
+                  <h4 style="margin: 1rem 0 0.75rem; font-size: 0.9rem;">子系统权重占比</h4>
+                  <div class="alloc-chart-container">
+                    <canvas id="alloc-pie-canvas" width="400" height="300"></canvas>
                   </div>
                 </div>
               </div>
@@ -1100,15 +1312,24 @@
                   <option value="crowAMSAA">Crow-AMSAA 模型</option>
                 </select>
               </label>
+              <label class="selector-group">
+                <span class="selector-label">试验轮次</span>
+                <select id="growth-phase-select" class="header-select">
+                </select>
+              </label>
+              <button type="button" class="btn-icon btn-sm" id="growth-add-phase" title="新增轮次">
+                <span>➕</span>
+                <span class="btn-text">新增轮次</span>
+              </button>
+              <button type="button" class="btn-icon btn-sm btn-danger" id="growth-delete-phase" title="删除轮次">
+                <span>🗑️</span>
+                <span class="btn-text">删除轮次</span>
+              </button>
             </div>
             <div class="growth-toolbar-right">
               <label class="selector-group">
                 <span class="selector-label">增长目标 MTBF (h)</span>
                 <input type="number" id="growth-target-mtbf" class="form-input" min="0" step="1" style="width: 120px;" placeholder="输入目标" />
-              </label>
-              <label class="selector-group">
-                <span class="selector-label">总试验时间 (h)</span>
-                <input type="number" id="growth-total-time" class="form-input" min="0" step="1" style="width: 120px;" placeholder="总时间" />
               </label>
               <button type="button" class="btn-icon btn-primary" id="growth-add-failure">
                 <span>➕</span>
@@ -1122,6 +1343,22 @@
               <h3>失效数据</h3>
               <div class="card-actions">
                 <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">共 <span id="growth-failure-count">0</span> 条失效记录</span>
+              </div>
+            </div>
+            <div class="card-body" style="padding-bottom: 0;">
+              <div class="phase-info-bar" id="growth-phase-info" style="display: flex; gap: 1.5rem; flex-wrap: wrap; padding: 0.75rem 1rem; background: var(--bg-secondary); border-radius: 6px; margin-bottom: 1rem;">
+                <div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">轮次名称</div>
+                  <div style="font-weight: 600; color: var(--text-primary);"><input type="text" id="growth-phase-name" class="form-input" style="width: 180px; padding: 0.25rem 0.5rem; font-size: 0.85rem;" /></div>
+                </div>
+                <div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">总试验时间 (h)</div>
+                  <div style="font-weight: 600; color: var(--text-primary);"><input type="number" id="growth-phase-total-time" class="form-input" style="width: 120px; padding: 0.25rem 0.5rem; font-size: 0.85rem;" min="0" step="1" /></div>
+                </div>
+                <div style="flex: 1; min-width: 200px;">
+                  <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">轮次描述</div>
+                  <div style="font-weight: 500; color: var(--text-primary);"><input type="text" id="growth-phase-desc" class="form-input" style="width: 100%; padding: 0.25rem 0.5rem; font-size: 0.85rem;" placeholder="输入轮次描述" /></div>
+                </div>
               </div>
             </div>
             <div class="card-body" style="padding: 0;">
@@ -1251,6 +1488,48 @@
                   <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <span style="width: 20px; height: 2px; background: var(--warning); border-style: dashed; display: inline-block;"></span>
                     <span style="color: var(--text-muted);">目标 MTBF</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>多轮增长对比</h3>
+              <div class="card-actions">
+                <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">各轮试验指标对比与增长趋势</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                <div>
+                  <h4 style="margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--accent);">轮次对比表</h4>
+                  <div class="table-wrap">
+                    <table class="data-table" id="growth-comparison-table">
+                      <thead>
+                        <tr>
+                          <th>轮次名称</th>
+                          <th>失效数</th>
+                          <th>总时间(h)</th>
+                          <th>MTBF(h)</th>
+                          <th>B10(h)</th>
+                          <th>提升幅度</th>
+                        </tr>
+                      </thead>
+                      <tbody id="growth-comparison-body">
+                      </tbody>
+                    </table>
+                  </div>
+                  <div id="growth-summary" style="margin-top: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 6px;">
+                  </div>
+                </div>
+                <div>
+                  <h4 style="margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--accent);">增长曲线叠加图</h4>
+                  <div class="growth-chart-container">
+                    <canvas id="growth-comparison-canvas" width="600" height="350"></canvas>
+                  </div>
+                  <div id="growth-comparison-legend" style="margin-top: 0.75rem; display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.8rem;">
                   </div>
                 </div>
               </div>
