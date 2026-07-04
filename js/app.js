@@ -41,7 +41,6 @@ function initApp() {
   initSidebar();
   initImportExport();
   initClearData();
-  initGlobalTooltip();
 
   initRouter({
     mainContent: mainContent,
