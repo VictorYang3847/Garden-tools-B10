@@ -48,6 +48,8 @@ function ensureTestPlan() {
         confidence: 0.9,
         allowedFailures: 0,
         defaultCensorType: "time",
+        defaultBeta: 2.2,
+        strategy: "standard",
       },
       testItems: [],
       altPlans: [],
@@ -56,8 +58,10 @@ function ensureTestPlan() {
   }
   const tp = currentModel.modules.testPlan;
   if (!tp.globalParams) {
-    tp.globalParams = { confidence: 0.9, allowedFailures: 0, defaultCensorType: "time" };
+    tp.globalParams = { confidence: 0.9, allowedFailures: 0, defaultCensorType: "time", defaultBeta: 2.2, strategy: "standard" };
   }
+  if (tp.globalParams.defaultBeta === undefined) tp.globalParams.defaultBeta = 2.2;
+  if (tp.globalParams.strategy === undefined) tp.globalParams.strategy = "standard";
   if (!tp.testItems) tp.testItems = [];
   if (!tp.altPlans) tp.altPlans = [];
   if (!tp.haltTests) tp.haltTests = [];
@@ -68,6 +72,8 @@ function ensureTestPlan() {
     if (item.acceptanceCriteria === undefined) item.acceptanceCriteria = "";
     if (item.resultStatus === undefined) item.resultStatus = "not_started";
     if (item.resultNote === undefined) item.resultNote = "";
+    if (item.testLevel === undefined) item.testLevel = "system";
+    if (item.beta === undefined) item.beta = tp.globalParams.defaultBeta || 2.2;
   }
 }
 
@@ -99,6 +105,7 @@ export function render(container, model) {
   renderAltPlans();
   renderHaltTests();
   renderDvprTable();
+  renderOptimizePanel();
   switchTab(activeTab);
 }
 
@@ -135,6 +142,8 @@ function bindGlobalParamsEvents() {
   const confidence = document.getElementById("tp-confidence");
   const allowedFailures = document.getElementById("tp-allowed-failures");
   const defaultCensor = document.getElementById("tp-default-censor");
+  const defaultBeta = document.getElementById("tp-default-beta");
+  const strategy = document.getElementById("tp-strategy");
 
   if (confidence) {
     confidence.addEventListener("change", () => {
@@ -154,6 +163,18 @@ function bindGlobalParamsEvents() {
       autoSave();
     });
   }
+  if (defaultBeta) {
+    defaultBeta.addEventListener("change", () => {
+      currentModel.modules.testPlan.globalParams.defaultBeta = Number(defaultBeta.value) || 2.2;
+      autoSave();
+    });
+  }
+  if (strategy) {
+    strategy.addEventListener("change", () => {
+      currentModel.modules.testPlan.globalParams.strategy = strategy.value;
+      calculateAllTestItems();
+    });
+  }
 }
 
 function renderGlobalParams() {
@@ -161,26 +182,22 @@ function renderGlobalParams() {
   const confidence = document.getElementById("tp-confidence");
   const allowedFailures = document.getElementById("tp-allowed-failures");
   const defaultCensor = document.getElementById("tp-default-censor");
+  const defaultBeta = document.getElementById("tp-default-beta");
+  const strategy = document.getElementById("tp-strategy");
 
   if (confidence) confidence.value = String(params.confidence ?? 0.9);
   if (allowedFailures) allowedFailures.value = params.allowedFailures ?? 0;
   if (defaultCensor) defaultCensor.value = params.defaultCensorType ?? "time";
+  if (defaultBeta) defaultBeta.value = params.defaultBeta ?? 2.2;
+  if (strategy) strategy.value = params.strategy ?? "standard";
 }
 
-function calculateSampleSize(reliability, confidence, allowedFailures) {
-  const R = Number(reliability) || 0.9;
-  const gamma = Number(confidence) || 0.9;
-  const r = Math.max(0, Math.floor(Number(allowedFailures) || 0));
+function binomialSampleSize(R, gamma, r) {
   const alpha = 1 - gamma;
-
   if (R <= 0 || R >= 1) return 0;
-
-  // 二项分布：找到最小的 n，使得 P(≤r失效 | 真实可靠度=R) ≤ α
-  // 即 Σ C(n,k) * (1-R)^k * R^(n-k) ≤ α, k=0..r
   if (r === 0) {
     return Math.ceil(Math.log(alpha) / Math.log(R));
   }
-
   let n = r;
   while (n < 10000) {
     if (binomialCdf(r, n, 1 - R) <= alpha) {
@@ -189,6 +206,26 @@ function calculateSampleSize(reliability, confidence, allowedFailures) {
     n++;
   }
   return n;
+}
+
+function calculateSampleSize(reliability, confidence, allowedFailures, targetB10, beta, testDuration) {
+  const R = Number(reliability) || 0.9;
+  const gamma = Number(confidence) || 0.9;
+  const r = Math.max(0, Math.floor(Number(allowedFailures) || 0));
+  const b10 = Number(targetB10) || 0;
+  const b = Number(beta) || 0;
+  const T = Number(testDuration) || 0;
+
+  // Weibull 优化：如果有 targetB10 + beta + testDuration 且 testDuration > targetB10
+  if (b10 > 0 && b > 0 && T > b10) {
+    const K10 = Math.log(10 / 9); // ≈ 0.10536
+    const R_test = Math.exp(-K10 * Math.pow(T / b10, b));
+    const n = binomialSampleSize(R_test, gamma, r);
+    return -n; // 负数标记 Weibull 优化
+  }
+
+  // 标准二项分布
+  return binomialSampleSize(R, gamma, r);
 }
 
 function binomialCdf(maxFailures, n, p) {
@@ -308,8 +345,16 @@ function lnGamma(z) {
   return Math.log(gammaFunc(z));
 }
 
-function calculateTestDuration(targetLife, censorType) {
+function calculateTestDuration(targetLife, censorType, beta, testLevel, strategy) {
   const life = Number(targetLife) || 0;
+  const strat = strategy || "standard";
+
+  if (strat === "optimized") {
+    const multiplier = testLevel === "component" ? 2.2 : 1.3;
+    return Math.ceil(life * multiplier);
+  }
+
+  // standard 策略：保持原有系数
   switch (censorType) {
     case "time":
       return Math.ceil(life * 1.2);
@@ -332,6 +377,8 @@ function createNewTestItem() {
     sampleSize: 0,
     testDuration: 0,
     censorType: params.defaultCensorType || "time",
+    testLevel: "system",
+    beta: params.defaultBeta || 2.2,
     benchCondition: "",
     testObject: "",
     testCondition: "",
@@ -368,20 +415,37 @@ function bindTestItemsEvents() {
       if (
         field === "targetLife" ||
         field === "targetReliability" ||
-        field === "censorType"
+        field === "censorType" ||
+        field === "testLevel" ||
+        field === "beta"
       ) {
         const params = currentModel.modules.testPlan.globalParams;
         item.sampleSize = calculateSampleSize(
           item.targetReliability,
           params.confidence,
-          params.allowedFailures
+          params.allowedFailures,
+          item.targetLife,
+          item.beta,
+          item.testDuration
         );
-        item.testDuration = calculateTestDuration(item.targetLife, item.censorType);
+        item.testDuration = calculateTestDuration(
+          item.targetLife, item.censorType, item.beta, item.testLevel, params.strategy
+        );
+        // 重新计算 sampleSize（testDuration 可能已变）
+        item.sampleSize = calculateSampleSize(
+          item.targetReliability,
+          params.confidence,
+          params.allowedFailures,
+          item.targetLife,
+          item.beta,
+          item.testDuration
+        );
       }
 
       autoSave();
       renderTestItems();
       renderDvprTable();
+      renderOptimizePanel();
     });
 
     tbody.addEventListener("click", (e) => {
@@ -415,6 +479,9 @@ function renderTestItems() {
 
   tbody.innerHTML = items
     .map((item, idx) => {
+      const sampleDisplay = item.sampleSize < 0
+        ? `\uD83D\uDCCD ${Math.abs(item.sampleSize)}`
+        : (item.sampleSize || "-");
       return `
       <tr data-id="${item.id}">
         <td>${idx + 1}</td>
@@ -428,7 +495,14 @@ function renderTestItems() {
             <option value="0.999" ${item.targetReliability === 0.999 ? "selected" : ""}>99.9%</option>
           </select>
         </td>
-        <td class="tp-sample-size">${item.sampleSize || "-"}</td>
+        <td>
+          <select data-field="testLevel" class="item-input">
+            <option value="system" ${item.testLevel === "system" ? "selected" : ""}>整机</option>
+            <option value="component" ${item.testLevel === "component" ? "selected" : ""}>部件</option>
+          </select>
+        </td>
+        <td><input type="number" data-field="beta" value="${item.beta}" min="0.1" step="0.1" class="item-input" /></td>
+        <td class="tp-sample-size">${sampleDisplay}</td>
         <td class="tp-test-duration">${item.testDuration || "-"}</td>
         <td>
           <select data-field="censorType" class="item-input">
@@ -447,16 +521,22 @@ function renderTestItems() {
 function addTestItem() {
   const item = createNewTestItem();
   const params = currentModel.modules.testPlan.globalParams;
+  item.testDuration = calculateTestDuration(
+    item.targetLife, item.censorType, item.beta, item.testLevel, params.strategy
+  );
   item.sampleSize = calculateSampleSize(
     item.targetReliability,
     params.confidence,
-    params.allowedFailures
+    params.allowedFailures,
+    item.targetLife,
+    item.beta,
+    item.testDuration
   );
-  item.testDuration = calculateTestDuration(item.targetLife, item.censorType);
   currentModel.modules.testPlan.testItems.push(item);
   autoSave();
   renderTestItems();
   renderDvprTable();
+  renderOptimizePanel();
 
   const tbody = document.getElementById("tp-items-tbody");
   const lastRow = tbody?.lastElementChild;
@@ -470,16 +550,22 @@ function calculateAllTestItems() {
   const params = currentModel.modules.testPlan.globalParams;
   const items = currentModel.modules.testPlan.testItems;
   for (const item of items) {
+    item.testDuration = calculateTestDuration(
+      item.targetLife, item.censorType, item.beta, item.testLevel, params.strategy
+    );
     item.sampleSize = calculateSampleSize(
       item.targetReliability,
       params.confidence,
-      params.allowedFailures
+      params.allowedFailures,
+      item.targetLife,
+      item.beta,
+      item.testDuration
     );
-    item.testDuration = calculateTestDuration(item.targetLife, item.censorType);
   }
   autoSave();
   renderTestItems();
   renderDvprTable();
+  renderOptimizePanel();
   const btn = document.getElementById("tp-calc-all");
   if (btn) toast(btn, "计算完成", 1500);
 }
@@ -504,12 +590,17 @@ function importFromFmea() {
     const item = createNewTestItem();
     item.name = name;
     item.benchCondition = fmeaItem.function || "";
+    item.testDuration = calculateTestDuration(
+      item.targetLife, item.censorType, item.beta, item.testLevel, params.strategy
+    );
     item.sampleSize = calculateSampleSize(
       item.targetReliability,
       params.confidence,
-      params.allowedFailures
+      params.allowedFailures,
+      item.targetLife,
+      item.beta,
+      item.testDuration
     );
-    item.testDuration = calculateTestDuration(item.targetLife, item.censorType);
     currentModel.modules.testPlan.testItems.push(item);
     existingNames.add(name);
     imported++;
@@ -1012,7 +1103,7 @@ function renderDvprTable() {
         <td><input type="text" data-field="name" value="${escapeHtml(item.name)}" class="item-input" placeholder="试验项目名称" /></td>
         <td><input type="text" data-field="testObject" value="${escapeHtml(item.testObject)}" class="item-input" placeholder="试验对象" /></td>
         <td><input type="text" data-field="testCondition" value="${escapeHtml(item.testCondition)}" class="item-input" placeholder="试验工况" /></td>
-        <td class="tp-sample-size">${item.sampleSize || "-"}</td>
+        <td class="tp-sample-size">${item.sampleSize ? Math.abs(item.sampleSize) : "-"}</td>
         <td>
           <select data-field="censorType" class="item-input">
             ${censorOptions}
@@ -1050,21 +1141,115 @@ function bindDvprEvents() {
     if (
       field === "targetLife" ||
       field === "targetReliability" ||
-      field === "censorType"
+      field === "censorType" ||
+      field === "testLevel" ||
+      field === "beta"
     ) {
       const params = currentModel.modules.testPlan.globalParams;
+      item.testDuration = calculateTestDuration(
+        item.targetLife, item.censorType, item.beta, item.testLevel, params.strategy
+      );
       item.sampleSize = calculateSampleSize(
         item.targetReliability,
         params.confidence,
-        params.allowedFailures
+        params.allowedFailures,
+        item.targetLife,
+        item.beta,
+        item.testDuration
       );
-      item.testDuration = calculateTestDuration(item.targetLife, item.censorType);
     }
 
     autoSave();
     renderDvprTable();
     renderTestItems();
   });
+}
+
+function renderOptimizePanel() {
+  const panel = document.getElementById("tp-optimize-panel");
+  if (!panel) return;
+
+  const items = currentModel.modules.testPlan.testItems;
+  const params = currentModel.modules.testPlan.globalParams;
+
+  if (!items || items.length === 0) {
+    panel.innerHTML = `<div class="tp-optimize-empty">暂无试验项目，请先添加试验项目。</div>`;
+    return;
+  }
+
+  let totalStandardN = 0;
+  let totalOptimizedN = 0;
+  let hasOptimization = false;
+
+  const rows = items.map((item, idx) => {
+    const R = Number(item.targetReliability) || 0.9;
+    const gamma = params.confidence;
+    const r = Math.max(0, Math.floor(Number(params.allowedFailures) || 0));
+    const b10 = Number(item.targetLife) || 0;
+    const b = Number(item.beta) || 2.2;
+
+    // 标准方案
+    const stdDuration = calculateTestDuration(b10, item.censorType, b, item.testLevel, "standard");
+    const stdN = binomialSampleSize(R, gamma, r);
+
+    // 优化方案
+    const optDuration = calculateTestDuration(b10, item.censorType, b, item.testLevel, "optimized");
+    const K10 = Math.log(10 / 9);
+    let optN;
+    if (b10 > 0 && b > 0 && optDuration > b10) {
+      const R_test = Math.exp(-K10 * Math.pow(optDuration / b10, b));
+      optN = binomialSampleSize(R_test, gamma, r);
+      hasOptimization = true;
+    } else {
+      optN = stdN;
+    }
+
+    totalStandardN += stdN;
+    totalOptimizedN += optN;
+
+    const saved = stdN - optN;
+    const pct = stdN > 0 ? ((saved / stdN) * 100).toFixed(1) : "0.0";
+    const isOptimized = saved > 0;
+
+    return `
+      <tr>
+        <td>${idx + 1}</td>
+        <td>${escapeHtml(item.name || "(未命名)")}</td>
+        <td class="tp-opt-value">${stdN}</td>
+        <td class="tp-opt-value">${stdDuration}h</td>
+        <td class="tp-opt-value ${isOptimized ? "tp-save-highlight" : ""}">${optN}</td>
+        <td class="tp-opt-value ${isOptimized ? "tp-save-highlight" : ""}">${optDuration}h</td>
+        <td class="tp-opt-value ${isOptimized ? "tp-save-highlight" : ""}">${isOptimized ? `-${saved} (${pct}%)` : "-"}</td>
+      </tr>`;
+  }).join("");
+
+  const totalSaved = totalStandardN - totalOptimizedN;
+  const totalPct = totalStandardN > 0 ? ((totalSaved / totalStandardN) * 100).toFixed(1) : "0.0";
+
+  panel.innerHTML = `
+    <div class="tp-optimize-hint">
+      Weibull 延长试验可降低等效可靠度要求，从而减少样本量。部件级默认 2.2×B10，整机级默认 1.3×B10。
+    </div>
+    <div class="table-wrap">
+      <table class="data-table tp-compare-table">
+        <thead>
+          <tr>
+            <th style="width: 50px;">序号</th>
+            <th style="min-width: 150px;">测试项目</th>
+            <th style="width: 90px;">标准样本量</th>
+            <th style="width: 110px;">标准试验时长</th>
+            <th style="width: 90px;">优化样本量</th>
+            <th style="width: 110px;">优化试验时长</th>
+            <th style="width: 120px;">节省</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="tp-optimize-summary">
+      <span>合计：标准 <strong>${totalStandardN}</strong> 件 → 优化 <strong>${totalOptimizedN}</strong> 件</span>
+      ${totalSaved > 0 ? `<span>节省 <strong class="tp-save-highlight">${totalSaved}</strong> 件 (${totalPct}%)</span>` : ""}
+    </div>`;
 }
 
 function escapeHtml(s) {

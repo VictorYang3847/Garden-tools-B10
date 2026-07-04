@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --bg-deep: #0f1419;
   --bg: #0f1419;
   --bg-card: #1a2332;
@@ -2336,7 +2336,7 @@ textarea.form-input {
 }
 
 .test-items-table {
-  min-width: 1100px;
+  min-width: 1300px;
 }
 
 .alt-table {
@@ -2369,6 +2369,60 @@ textarea.form-input {
   .halt-test-stats {
     justify-content: flex-start;
   }
+}
+
+/* ===== 智能优化面板样式 ===== */
+
+.tp-optimize-hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--surface-2);
+  border-radius: 6px;
+  border-left: 3px solid var(--accent);
+  line-height: 1.5;
+}
+
+.tp-compare-table {
+  min-width: 800px;
+}
+
+.tp-opt-value {
+  text-align: center;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.tp-save-highlight {
+  color: var(--success) !important;
+  font-weight: 700 !important;
+}
+
+.tp-optimize-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.tp-optimize-summary {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.tp-optimize-summary strong {
+  color: var(--text);
+}
+
+.tp-optimize-summary .tp-save-highlight {
+  font-size: 1.05rem;
 }
 
 /* ===== 可靠性预测模块样式 ===== */

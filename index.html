@@ -990,6 +990,18 @@
                       <option value="complete">完全失效</option>
                     </select>
                   </div>
+                  <div class="form-group">
+                    <label>形状参数 β<span class="help-icon" data-tooltip="Weibull 分布的形状参数，β>1 表示老化失效，β=1 为随机失效，β<1 为早期失效">?</span></label>
+                    <input type="number" id="tp-default-beta" class="form-input" min="0.1" step="0.1" value="2.2" />
+                  </div>
+                  <div class="form-group">
+                    <label>优化策略<span class="help-icon" data-tooltip="standard=传统截尾系数, optimized=Weibull延长试验(部件2.2×B10,整机1.3×B10), custom=自定义">?</span></label>
+                    <select id="tp-strategy" class="form-input">
+                      <option value="standard">标准</option>
+                      <option value="optimized">Weibull 优化</option>
+                      <option value="custom">自定义</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1021,6 +1033,8 @@
                         <th style="min-width: 200px;">测试项目名称</th>
                         <th style="width: 120px;">目标寿命 (h)</th>
                         <th style="width: 120px;">目标可靠度</th>
+                        <th style="width: 90px;">测试级别</th>
+                        <th style="width: 80px;">β</th>
                         <th style="width: 100px;">样本量</th>
                         <th style="width: 120px;">试验时长 (h)</th>
                         <th style="width: 120px;">截尾类型<span class="help-icon" data-tooltip="定时截尾(到时停) vs 定数截尾(失效数够了停)">?</span></th>
@@ -1036,6 +1050,15 @@
                   <h3>暂无试验项目</h3>
                   <p>点击「添加测试项」或「从 FMEA 导入」开始创建试验项目。</p>
                 </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3>智能优化方案对比</h3>
+              </div>
+              <div class="card-body">
+                <div id="tp-optimize-panel"></div>
               </div>
             </div>
           </div>
