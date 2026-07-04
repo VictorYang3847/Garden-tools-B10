@@ -125,6 +125,7 @@ function bindEvents() {
   bindAltEvents();
   bindHaltEvents();
   bindDvprEvents();
+  bindSampleAnalysisEvents();
 }
 
 function switchTab(tabName) {
@@ -1285,4 +1286,131 @@ function escapeHtml(s) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+let saActiveTab = "qualification";
+
+function switchSampleAnalysisTab(tabName) {
+  saActiveTab = tabName;
+  document.querySelectorAll(".sample-analysis-tab").forEach((t) => {
+    t.classList.toggle("active", t.dataset.tab === tabName);
+  });
+  document.querySelectorAll(".sample-analysis-tab-content").forEach((c) => {
+    c.style.display = "none";
+  });
+  const tabEl = document.getElementById(`tp-sa-tab-${tabName}`);
+  if (tabEl) tabEl.style.display = "";
+}
+
+function calculateQualificationAnalysis() {
+  const R = (Number(document.getElementById("tp-sa-reliability")?.value) || 90) / 100;
+  const CL = (Number(document.getElementById("tp-sa-confidence")?.value) || 90) / 100;
+  const r = Math.max(0, Math.floor(Number(document.getElementById("tp-sa-allowed")?.value) || 0));
+
+  if (R <= 0 || R >= 1) {
+    document.getElementById("tp-sa-qual-n").textContent = "-";
+    document.getElementById("tp-sa-qual-pass").textContent = "-";
+    return;
+  }
+
+  const n = binomialSampleSize(R, CL, r);
+  const zeroFailProb = Math.pow(R, n);
+
+  document.getElementById("tp-sa-qual-n").textContent = n;
+  document.getElementById("tp-sa-qual-pass").textContent = (zeroFailProb * 100).toFixed(2) + "%";
+}
+
+function calculateLifeTestAnalysis() {
+  const B10 = Number(document.getElementById("tp-sa-b10")?.value) || 150;
+  const beta = Number(document.getElementById("tp-sa-beta")?.value) || 2.2;
+  const CL = (Number(document.getElementById("tp-sa-life-confidence")?.value) || 90) / 100;
+  const r = Math.max(0, Math.floor(Number(document.getElementById("tp-sa-life-allowed")?.value) || 0));
+  const multiplier = Number(document.getElementById("tp-sa-multiplier")?.value) || 1.0;
+
+  if (B10 <= 0 || beta <= 0) {
+    document.getElementById("tp-sa-life-duration").textContent = "-";
+    document.getElementById("tp-sa-life-n").textContent = "-";
+    document.getElementById("tp-sa-life-rtest").textContent = "-";
+    document.getElementById("tp-sa-life-total").textContent = "-";
+    document.getElementById("tp-sa-life-comparison").innerHTML = "";
+    return;
+  }
+
+  const duration = Math.ceil(B10 * multiplier);
+  const K10 = Math.log(10 / 9);
+  const R_test = Math.exp(-K10 * Math.pow(duration / B10, beta));
+  const n = binomialSampleSize(R_test, CL, r);
+  const totalHours = n * duration;
+
+  document.getElementById("tp-sa-life-duration").textContent = duration + "h";
+  document.getElementById("tp-sa-life-n").textContent = n;
+  document.getElementById("tp-sa-life-rtest").textContent = (R_test * 100).toFixed(1) + "%";
+  document.getElementById("tp-sa-life-total").textContent = totalHours + " 台时";
+
+  const multipliers = [1.0, 1.2, 1.5, 1.7, 2.0, 2.5];
+  const baseN = binomialSampleSize(0.9, CL, r);
+  const baseHours = baseN * B10;
+
+  let rows = "";
+  multipliers.forEach(m => {
+    const dur = Math.ceil(B10 * m);
+    const rTest = Math.exp(-K10 * Math.pow(dur / B10, beta));
+    const num = binomialSampleSize(rTest, CL, r);
+    const hours = num * dur;
+    const save = baseHours > 0 ? ((1 - hours / baseHours) * 100).toFixed(0) : 0;
+    const isCurrent = Math.abs(m - multiplier) < 0.01;
+    rows += `<tr ${isCurrent ? 'style="background: var(--surface-2);"' : ""}>
+      <td>${m}×</td>
+      <td>${dur}h</td>
+      <td>${num}</td>
+      <td>${hours}</td>
+      <td>${save > 0 ? '<span class="tp-save-highlight">-' + save + '%</span>' : "-"}</td>
+    </tr>`;
+  });
+
+  document.getElementById("tp-sa-life-comparison").innerHTML = rows;
+}
+
+function bindSampleAnalysisEvents() {
+  const tabContainer = document.querySelector(".sample-analysis-tabs");
+  if (tabContainer) {
+    tabContainer.addEventListener("click", (e) => {
+      const tab = e.target.closest(".sample-analysis-tab");
+      if (!tab) return;
+      switchSampleAnalysisTab(tab.dataset.tab);
+    });
+  }
+
+  document.getElementById("tp-sa-reliability")?.addEventListener("input", calculateQualificationAnalysis);
+  document.getElementById("tp-sa-confidence")?.addEventListener("input", calculateQualificationAnalysis);
+  document.getElementById("tp-sa-allowed")?.addEventListener("input", calculateQualificationAnalysis);
+
+  document.getElementById("tp-sa-b10")?.addEventListener("input", calculateLifeTestAnalysis);
+  document.getElementById("tp-sa-beta")?.addEventListener("input", calculateLifeTestAnalysis);
+  document.getElementById("tp-sa-life-confidence")?.addEventListener("input", calculateLifeTestAnalysis);
+  document.getElementById("tp-sa-life-allowed")?.addEventListener("input", calculateLifeTestAnalysis);
+  document.getElementById("tp-sa-multiplier")?.addEventListener("input", calculateLifeTestAnalysis);
+
+  const qualToggle = document.getElementById("tp-sa-qual-formula-toggle");
+  const qualContent = document.getElementById("tp-sa-qual-formula-content");
+  if (qualToggle && qualContent) {
+    qualToggle.addEventListener("click", () => {
+      const isHidden = qualContent.style.display === "none";
+      qualContent.style.display = isHidden ? "" : "none";
+      qualToggle.textContent = isHidden ? "📐 收起公式" : "📐 查看计算公式";
+    });
+  }
+
+  const lifeToggle = document.getElementById("tp-sa-life-formula-toggle");
+  const lifeContent = document.getElementById("tp-sa-life-formula-content");
+  if (lifeToggle && lifeContent) {
+    lifeToggle.addEventListener("click", () => {
+      const isHidden = lifeContent.style.display === "none";
+      lifeContent.style.display = isHidden ? "" : "none";
+      lifeToggle.textContent = isHidden ? "📐 收起公式" : "📐 查看计算公式";
+    });
+  }
+
+  calculateQualificationAnalysis();
+  calculateLifeTestAnalysis();
 }

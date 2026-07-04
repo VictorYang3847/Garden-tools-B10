@@ -2353,6 +2353,77 @@ textarea.form-input {
     overflow-x: auto;
   }
 
+  .sample-analysis-tabs {
+    overflow-x: auto;
+  }
+}
+
+.sample-analysis-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sample-analysis-tab {
+  padding: 6px 16px;
+  background: var(--surface-2);
+  border: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sample-analysis-tab:hover {
+  background: var(--surface-3);
+}
+
+.sample-analysis-tab.active {
+  background: var(--primary);
+  color: white;
+}
+
+.result-card {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+}
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.result-row:last-child {
+  border-bottom: none;
+}
+
+.result-label {
+  color: var(--text-muted);
+}
+
+.result-value {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: var(--primary);
+}
+
+@media (max-width: 768px) {
+  .test-plan-tabs {
+    overflow-x: auto;
+  }
+
+  .sample-analysis-tabs {
+    overflow-x: auto;
+  }
+
   .card-header {
     flex-direction: column;
     align-items: stretch;

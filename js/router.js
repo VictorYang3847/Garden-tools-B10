@@ -24,11 +24,6 @@ const routes = {
     title: "测试计划",
     module: () => import("./pages/test-plan.js"),
   },
-  "sample-size": {
-    path: "sample-size",
-    title: "样本量计算",
-    module: () => import("./pages/sample-size.js"),
-  },
   fta: {
     path: "fta",
     title: "故障树分析",

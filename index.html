@@ -36,10 +36,6 @@
             <span class="nav-icon">📋</span>
             <span class="nav-label">测试计划</span>
           </a>
-          <a href="#/sample-size" class="nav-item" data-route="sample-size">
-            <span class="nav-icon">🧮</span>
-            <span class="nav-label">样本量计算</span>
-          </a>
           <a href="#/fta" class="nav-item" data-route="fta">
             <span class="nav-icon">🌳</span>
             <span class="nav-label">故障树分析</span>
@@ -144,11 +140,6 @@
               <div class="tool-card-icon">📋</div>
               <div class="tool-card-name">测试计划</div>
               <div class="tool-card-desc">试验方案设计与评估</div>
-            </a>
-            <a href="#/test-plan" class="tool-card">
-              <div class="tool-card-icon">🧮</div>
-              <div class="tool-card-name">样本量计算</div>
-              <div class="tool-card-desc">试验样本量估算</div>
             </a>
             <a href="#/fta" class="tool-card">
               <div class="tool-card-icon">🌳</div>
@@ -957,6 +948,7 @@
           <div class="test-plan-toolbar">
             <div class="test-plan-tabs">
               <button type="button" class="test-plan-tab active" data-tab="test-items">试验项目</button>
+              <button type="button" class="test-plan-tab" data-tab="sample-analysis">样本量分析</button>
               <button type="button" class="test-plan-tab" data-tab="alt">加速寿命</button>
               <button type="button" class="test-plan-tab" data-tab="halt">HALT 试验</button>
               <button type="button" class="test-plan-tab" data-tab="dvpr">DVP&amp;R</button>
@@ -1060,6 +1052,127 @@
               </div>
               <div class="card-body">
                 <div id="tp-optimize-panel"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="test-plan-tab-content" id="tp-tab-sample-analysis" style="display: none;">
+            <div class="card">
+              <div class="card-header">
+                <h3>样本量分析</h3>
+                <span class="tp-optimize-hint">制定测试计划前的前置分析工具</span>
+              </div>
+              <div class="card-body">
+                <div class="sample-analysis-tabs">
+                  <button type="button" class="sample-analysis-tab active" data-tab="qualification">合格性验证</button>
+                  <button type="button" class="sample-analysis-tab" data-tab="life-test">寿命测定</button>
+                </div>
+
+                <div class="sample-analysis-tab-content" id="tp-sa-tab-qualification">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>目标可靠度 R<span class="help-icon" data-tooltip="产品在目标寿命时刻的可靠度">?</span></label>
+                      <input type="number" id="tp-sa-reliability" class="form-input" min="50" max="99.9" step="0.1" value="90" />
+                    </div>
+                    <div class="form-group">
+                      <label>置信度 γ<span class="help-icon" data-tooltip="统计置信度，通常90%或95%">?</span></label>
+                      <input type="number" id="tp-sa-confidence" class="form-input" min="50" max="99.9" step="0.1" value="90" />
+                    </div>
+                    <div class="form-group">
+                      <label>允许失效数 r<span class="help-icon" data-tooltip="试验中允许的最大失效数">?</span></label>
+                      <input type="number" id="tp-sa-allowed" class="form-input" min="0" max="20" step="1" value="0" />
+                    </div>
+                  </div>
+                  <div class="result-card">
+                    <div class="result-row">
+                      <span class="result-label">所需样本量 n</span>
+                      <span class="result-value" id="tp-sa-qual-n">-</span>
+                    </div>
+                    <div class="result-row">
+                      <span class="result-label">通过概率（零失效）</span>
+                      <span class="result-value" id="tp-sa-qual-pass">-</span>
+                    </div>
+                  </div>
+                  <div class="formula-section">
+                    <button type="button" id="tp-sa-qual-formula-toggle" class="btn-link">📐 查看计算公式</button>
+                    <div id="tp-sa-qual-formula-content" style="display: none; margin-top: 8px; padding: 8px; background: var(--surface-2); border-radius: var(--radius); font-size: 0.85rem;">
+                      <p><strong>二项分布样本量公式：</strong></p>
+                      <p>P(≤r失效 | n,R) ≤ 1-γ</p>
+                      <p>当 r=0 时：n = ceil(ln(1-γ) / ln(R))</p>
+                      <p>当 r>0 时：搜索最小 n 满足 Σ(k=0 to r) C(n,k)p^k(1-p)^(n-k) ≤ 1-γ</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="sample-analysis-tab-content" id="tp-sa-tab-life-test" style="display: none;">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>目标 B10 寿命 (h)<span class="help-icon" data-tooltip="10%失效概率对应的寿命">?</span></label>
+                      <input type="number" id="tp-sa-b10" class="form-input" min="1" max="100000" step="1" value="150" />
+                    </div>
+                    <div class="form-group">
+                      <label>形状参数 β<span class="help-icon" data-tooltip="Weibull形状参数，β>1磨损失效">?</span></label>
+                      <input type="number" id="tp-sa-beta" class="form-input" min="0.5" max="5" step="0.1" value="2.2" />
+                    </div>
+                    <div class="form-group">
+                      <label>置信度 γ</label>
+                      <input type="number" id="tp-sa-life-confidence" class="form-input" min="50" max="99.9" step="0.1" value="90" />
+                    </div>
+                    <div class="form-group">
+                      <label>允许失效数 r</label>
+                      <input type="number" id="tp-sa-life-allowed" class="form-input" min="0" max="20" step="1" value="0" />
+                    </div>
+                    <div class="form-group">
+                      <label>试验时间倍率<span class="help-icon" data-tooltip="试验时间 / B10，越大样本量越少">?</span></label>
+                      <input type="number" id="tp-sa-multiplier" class="form-input" min="0.5" max="5" step="0.1" value="1.0" />
+                    </div>
+                  </div>
+                  <div class="result-card">
+                    <div class="result-row">
+                      <span class="result-label">试验时间</span>
+                      <span class="result-value" id="tp-sa-life-duration">-</span>
+                    </div>
+                    <div class="result-row">
+                      <span class="result-label">所需样本量 n</span>
+                      <span class="result-value" id="tp-sa-life-n">-</span>
+                    </div>
+                    <div class="result-row">
+                      <span class="result-label">等效可靠度 R_test</span>
+                      <span class="result-value" id="tp-sa-life-rtest">-</span>
+                    </div>
+                    <div class="result-row">
+                      <span class="result-label">总台时</span>
+                      <span class="result-value" id="tp-sa-life-total">-</span>
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                      <label>不同倍率优化对比</label>
+                      <table class="data-table tp-compare-table" style="margin-top: 8px;">
+                        <thead>
+                          <tr>
+                            <th>倍率</th>
+                            <th>试验时间</th>
+                            <th>样本量</th>
+                            <th>总台时</th>
+                            <th>节省</th>
+                          </tr>
+                        </thead>
+                        <tbody id="tp-sa-life-comparison">
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div class="formula-section">
+                    <button type="button" id="tp-sa-life-formula-toggle" class="btn-link">📐 查看计算公式</button>
+                    <div id="tp-sa-life-formula-content" style="display: none; margin-top: 8px; padding: 8px; background: var(--surface-2); border-radius: var(--radius); font-size: 0.85rem;">
+                      <p><strong>Weibull 折算样本量公式：</strong></p>
+                      <p>K10 = ln(10/9) ≈ 0.10536</p>
+                      <p>R_test = exp(-K10 × (T/B10)^β)</p>
+                      <p>n = binomialSampleSize(R_test, γ, r)</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
