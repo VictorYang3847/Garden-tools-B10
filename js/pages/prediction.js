@@ -1,3 +1,5 @@
+import { getCustomComponentLibrary, setCustomComponentLibrary } from "../store.js";
+
 let onSaveCallback = null;
 let currentModel = null;
 let predictionData = null;
@@ -830,12 +832,9 @@ function drawArrow(ctx, x, y, direction) {
 
 function loadCustomComponents() {
   try {
-    const saved = localStorage.getItem('COMPONENT_LIBRARY_CUSTOM');
-    if (saved) {
-      customComponentLibrary = JSON.parse(saved);
-    } else {
-      customComponentLibrary = [];
-    }
+    // 从 store.js 统一读取（参与导入导出和云同步）
+    const stored = getCustomComponentLibrary();
+    customComponentLibrary = Array.isArray(stored) ? stored : [];
   } catch (e) {
     customComponentLibrary = [];
   }
@@ -843,7 +842,7 @@ function loadCustomComponents() {
 
 function saveCustomComponents() {
   try {
-    localStorage.setItem('COMPONENT_LIBRARY_CUSTOM', JSON.stringify(customComponentLibrary));
+    setCustomComponentLibrary(customComponentLibrary);
   } catch (e) {
     console.error('保存自定义元器件失败:', e);
   }

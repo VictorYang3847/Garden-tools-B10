@@ -18,8 +18,13 @@ import {
   importData,
   createModuleData,
   persistState,
+  loadStateAsync,
+  initSync,
+  getState,
 } from "./store.js";
 import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js";
+import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.js";
+import { initSyncUI } from "./sync-ui.js";
 
 const projectSelect = document.getElementById("project-select");
 const productSelect = document.getElementById("product-select");
@@ -34,9 +39,59 @@ const clearDataBtn = document.getElementById("btn-clear-data");
 
 const navItems = document.querySelectorAll(".nav-item");
 
+// 异步启动：等待 IndexedDB 加载完成后再渲染页面
 initApp();
 
-function initApp() {
+async function initApp() {
+  // 1. 等待 IndexedDB 数据加载完成（含 localStorage 迁移）
+  await loadStateAsync();
+
+  // 检测是否配置了云端 API（未配置则纯本地模式）
+  const hasCloudApi = typeof window !== 'undefined' && !!window.__API_BASE_URL__;
+
+  // 2. 初始化认证 UI（仅在配置了云端 API 时启用）
+  if (hasCloudApi) {
+    initAuthUI();
+  }
+
+  // 3. 初始化同步（如已登录，触发登录后同步）
+  let syncManager = null;
+  if (hasCloudApi) {
+    try {
+      const syncResult = await initSync(getState());
+      syncManager = syncResult.syncManager;
+      if (syncResult.stateChanged) {
+        // 云端覆盖了本地，刷新选择器
+        refreshAllSelectors();
+        refreshCurrentRoute();
+      }
+    } catch (e) {
+      console.warn('同步初始化失败:', e);
+    }
+  }
+
+  // 4. 初始化同步状态 UI
+  initSyncUI(syncManager);
+
+  // 5. 注册登录状态变化回调（登录/登出后刷新 UI）
+  if (hasCloudApi) {
+    onAuthChange(async (loggedIn, user) => {
+      updateAuthDisplay(loggedIn, user);
+      if (loggedIn) {
+        // 登录成功，触发同步
+        try {
+          const syncResult = await initSync(getState());
+          if (syncResult.stateChanged) {
+            refreshAllSelectors();
+            refreshCurrentRoute();
+          }
+        } catch (e) {
+          console.warn('登录后同步失败:', e);
+        }
+      }
+    });
+  }
+
   initSelectors();
   initSidebar();
   initImportExport();
@@ -51,6 +106,7 @@ function initApp() {
       const current = getCurrentModel();
       if (current && modelData) {
         Object.assign(current, modelData);
+        persistState(); // 修复：保存后立即落盘
         refreshAllSelectors();
       }
     },
@@ -66,6 +122,58 @@ function initApp() {
   });
 
   initGlobalTooltip();
+}
+
+/**
+ * 更新顶栏登录/用户显示
+ */
+async function updateAuthDisplay(loggedIn, user) {
+  const authArea = document.getElementById("auth-area");
+  if (!authArea) return;
+  if (loggedIn && user) {
+    authArea.innerHTML = `
+      <div class="user-menu" id="user-menu">
+        <button type="button" class="user-btn" id="user-btn">${escapeHtml(user.email)}</button>
+        <div class="user-dropdown" id="user-dropdown" hidden>
+          <button type="button" id="manual-sync-btn">手动同步</button>
+          <button type="button" id="logout-btn">退出登录</button>
+        </div>
+      </div>
+    `;
+    const userBtn = document.getElementById("user-btn");
+    const dropdown = document.getElementById("user-dropdown");
+    userBtn?.addEventListener("click", () => {
+      if (dropdown) dropdown.hidden = !dropdown.hidden;
+    });
+    document.getElementById("logout-btn")?.addEventListener("click", async () => {
+      await handleLogout();
+      if (dropdown) dropdown.hidden = true;
+    });
+    document.getElementById("manual-sync-btn")?.addEventListener("click", async () => {
+      try {
+        const syncResult = await initSync(getState());
+        if (syncResult.stateChanged) {
+          refreshAllSelectors();
+          refreshCurrentRoute();
+        }
+      } catch (e) {
+        console.warn('手动同步失败:', e);
+      }
+      if (dropdown) dropdown.hidden = true;
+    });
+    // 点击外部关闭下拉
+    document.addEventListener("click", (e) => {
+      if (!authArea.contains(e.target) && dropdown) {
+        dropdown.hidden = true;
+      }
+    });
+  } else {
+    authArea.innerHTML = `<button type="button" id="login-btn" class="btn-secondary">登录同步</button>`;
+    document.getElementById("login-btn")?.addEventListener("click", () => {
+      const modal = document.getElementById("auth-modal");
+      if (modal) modal.hidden = false;
+    });
+  }
 }
 
 let globalTooltipEl = null;

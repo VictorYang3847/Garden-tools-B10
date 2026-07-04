@@ -1,4 +1,4 @@
-import { genId } from "../store.js";
+import { genId, getCustomImprovements, setCustomImprovements } from "../store.js";
 import { fmt } from "../utils.js";
 
 let currentModel = null;
@@ -1434,10 +1434,9 @@ let customImprovements = [];
 
 function loadCustomImprovements() {
   try {
-    const saved = localStorage.getItem("growth_custom_improvements");
-    if (saved) {
-      customImprovements = JSON.parse(saved);
-    }
+    // 从 store.js 统一读取（参与导入导出和云同步）
+    const stored = getCustomImprovements();
+    customImprovements = Array.isArray(stored) ? stored : [];
   } catch (e) {
     customImprovements = [];
   }
@@ -1445,7 +1444,7 @@ function loadCustomImprovements() {
 
 function saveCustomImprovements() {
   try {
-    localStorage.setItem("growth_custom_improvements", JSON.stringify(customImprovements));
+    setCustomImprovements(customImprovements);
   } catch (e) {}
 }
 

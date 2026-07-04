@@ -19,8 +19,43 @@ export function render(container, model) {
   const content = template.content.cloneNode(true);
   container.appendChild(content);
 
+  loadValuesFromModel();
   bindEvents();
   calculate();
+}
+
+function loadValuesFromModel() {
+  const hc = currentModel?.homeCalc;
+  if (!hc) return;
+  const fields = [
+    ["home-warranty-years", "warrantyYears"],
+    ["home-hours-per-year", "hoursPerYear"],
+    ["home-allow-fail-rate", "allowFailRate"],
+    ["home-beta", "beta"],
+    ["home-safety-margin", "safetyMargin"],
+    ["home-time", "time"],
+  ];
+  fields.forEach(([domId, field]) => {
+    const el = document.getElementById(domId);
+    if (el && hc[field] !== undefined && hc[field] !== null) {
+      el.value = hc[field];
+    }
+  });
+}
+
+function saveValuesToModel() {
+  if (!currentModel) return;
+  const hc = currentModel.homeCalc || {};
+  hc.warrantyYears = Number(document.getElementById("home-warranty-years")?.value) || 0;
+  hc.hoursPerYear = Number(document.getElementById("home-hours-per-year")?.value) || 0;
+  hc.allowFailRate = Number(document.getElementById("home-allow-fail-rate")?.value) || 0;
+  hc.beta = Number(document.getElementById("home-beta")?.value) || 0;
+  hc.safetyMargin = Number(document.getElementById("home-safety-margin")?.value) || 0;
+  hc.time = Number(document.getElementById("home-time")?.value) || 0;
+  currentModel.homeCalc = hc;
+  if (typeof onSaveCallback === "function") {
+    onSaveCallback({ homeCalc: hc });
+  }
 }
 
 function gammaApprox(x) {
@@ -68,7 +103,10 @@ function bindEvents() {
   ids.forEach((id) => {
     const el = document.getElementById(id);
     if (el) {
-      el.addEventListener("input", calculate);
+      el.addEventListener("input", () => {
+        saveValuesToModel();
+        calculate();
+      });
     }
   });
 

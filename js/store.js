@@ -1,8 +1,23 @@
 import { defaultModelDefinition, defaultModelRecord, defaultPlanningItem, defaultAnalysisBatch } from "./calculator.js";
+import {
+  getState as dbGetState,
+  setState as dbSetState,
+  migrateFromLocalStorage,
+} from "./db.js";
 
 const STORAGE_KEY = "reliability-tool-data";
 const LEGACY_V2_KEY = "b10-tool-v2";
 const LEGACY_V1_KEY = "b10-hedge-trimmer-v1";
+
+// 同步管理器单例（懒加载，避免循环依赖）
+let syncManagerInstance = null;
+async function getSyncManager() {
+  if (!syncManagerInstance) {
+    const { getSyncManager: getSM } = await import("./sync.js");
+    syncManagerInstance = getSM();
+  }
+  return syncManagerInstance;
+}
 
 export function genId() {
   return crypto.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -165,6 +180,17 @@ function defaultDataManagement() {
   return { versions: [], templates: [] };
 }
 
+function defaultHomeCalc() {
+  return {
+    warrantyYears: 2,
+    hoursPerYear: 25,
+    allowFailRate: 2,
+    beta: 2.2,
+    safetyMargin: 20,
+    time: 100,
+  };
+}
+
 export function createModuleData() {
   return {
     fmea: defaultFmea(),
@@ -186,6 +212,7 @@ export function createModel(name = "新型号") {
     name,
     record: defaultModelRecord(name),
     modules: createModuleData(),
+    homeCalc: defaultHomeCalc(),
     lastResult: null,
     createdAt: new Date().toISOString(),
   };
@@ -222,6 +249,9 @@ function defaultAppState() {
     currentProductId: product.id,
     currentModelId: model.id,
     projects: [project],
+    customComponentLibrary: [], // 预测模块自定义元器件库
+    customImprovements: [], // 增长模块自定义改进措施库
+    updatedAt: 0,
   };
 }
 
@@ -231,6 +261,42 @@ function ensureState() {
   if (!state) {
     state = loadState();
   }
+  return state;
+}
+
+/**
+ * 异步加载 state（从 IndexedDB 主存储，降级到 localStorage）
+ * 优先使用此方法，由 app.js 在初始化时 await 调用
+ */
+export async function loadStateAsync() {
+  // 1. 迁移旧 localStorage 数据到 IndexedDB
+  try {
+    await migrateFromLocalStorage();
+  } catch (e) {
+    console.warn('localStorage 迁移失败:', e);
+  }
+
+  // 2. 从 IndexedDB 读取
+  try {
+    const data = await dbGetState();
+    if (data && data.version === 3 && Array.isArray(data.projects)) {
+      state = normalizeStateV3(data);
+      return state;
+    }
+  } catch (e) {
+    console.warn('IndexedDB 读取失败，降级到 localStorage:', e);
+  }
+
+  // 3. 降级到同步 loadState（含 v1/v2 迁移逻辑）
+  state = loadState();
+
+  // 4. 若是从 localStorage 加载或新建，写入 IndexedDB 持久化
+  try {
+    await dbSetState(state);
+  } catch (e) {
+    console.warn('IndexedDB 写入失败:', e);
+  }
+
   return state;
 }
 
@@ -280,12 +346,17 @@ function loadState() {
 }
 
 function normalizeStateV3(s) {
+  // 初始化顶层的自定义库字段
+  if (!Array.isArray(s.customComponentLibrary)) s.customComponentLibrary = [];
+  if (!Array.isArray(s.customImprovements)) s.customImprovements = [];
+  if (typeof s.updatedAt !== 'number') s.updatedAt = 0;
   for (const project of s.projects) {
     if (!Array.isArray(project.products)) project.products = [];
     for (const product of project.products) {
       if (!Array.isArray(product.models)) product.models = [];
       for (const model of product.models) {
         if (!model.record) model.record = defaultModelRecord(model.name);
+        if (!model.homeCalc) model.homeCalc = defaultHomeCalc();
         if (!model.modules) model.modules = createModuleData();
         if (!model.modules.fmea) model.modules.fmea = defaultFmea();
         if (!model.modules.prediction) model.modules.prediction = defaultPrediction();
@@ -456,7 +527,8 @@ function migrateV2ToV3(v2) {
   };
 }
 
-function saveState(s) {
+function saveStateSync(s) {
+  // 兼容备份：同时写 localStorage（配额超限时静默失败）
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
   } catch {
@@ -464,12 +536,77 @@ function saveState(s) {
   }
 }
 
+/**
+ * 异步保存 state：写 IndexedDB + 触发云同步
+ */
+async function saveState(s) {
+  s.updatedAt = Date.now();
+  // 1. 写 IndexedDB（主存储）
+  try {
+    await dbSetState(s);
+  } catch (e) {
+    console.warn('IndexedDB 写入失败，降级到 localStorage:', e);
+    saveStateSync(s);
+  }
+  // 2. 触发云同步（防抖推送，不 await）
+  try {
+    const sm = await getSyncManager();
+    if (sm) sm.pushData(s);
+  } catch (e) {
+    // 同步失败不影响本地保存
+  }
+}
+
 function persist() {
   saveState(ensureState());
 }
 
+/**
+ * 同步包装器：fire-and-forget 触发异步 persist
+ * 保持与现有同步调用兼容（addProject/setModuleData 等）
+ */
 export function persistState() {
   persist();
+}
+
+/**
+ * 初始化同步管理器（由 app.js 调用）
+ * 登录后触发首次同步
+ * @param {object} localState 当前本地 state
+ * @returns {Promise<object>} 同步后的 state（可能是云端覆盖后的新 state）
+ */
+export async function initSync(localState) {
+  const sm = await getSyncManager();
+  // 触发登录后同步：比较本地与云端，Last-Write-Wins
+  const result = await sm.syncOnLogin(localState);
+  if (result.merged === 'cloud') {
+    // 云端较新，用云端覆盖本地内存 state
+    state = normalizeStateV3(result.newState);
+    // 同步写入 IndexedDB
+    try {
+      await dbSetState(state);
+    } catch (e) {
+      console.warn('IndexedDB 写入失败:', e);
+    }
+    return { syncManager: sm, stateChanged: true, newState: state };
+  }
+  return { syncManager: sm, stateChanged: false, newState: localState };
+}
+
+/**
+ * 获取同步管理器实例（供 sync-ui.js 注册状态回调）
+ * @returns {Promise<object>}
+ */
+export async function getSyncManagerInstance() {
+  return await getSyncManager();
+}
+
+/**
+ * 获取当前内存 state（供同步使用）
+ * @returns {object}
+ */
+export function getState() {
+  return ensureState();
 }
 
 export function getProjects() {
@@ -662,6 +799,46 @@ export function importData(json) {
   state = normalizeStateV3(parsed);
   persist();
   return state;
+}
+
+// ====== 自定义库（原独立 localStorage key）======
+
+/**
+ * 获取自定义元器件库（原 COMPONENT_LIBRARY_CUSTOM）
+ * @returns {Array}
+ */
+export function getCustomComponentLibrary() {
+  const s = ensureState();
+  return s.customComponentLibrary || [];
+}
+
+/**
+ * 保存自定义元器件库
+ * @param {Array} list
+ */
+export function setCustomComponentLibrary(list) {
+  const s = ensureState();
+  s.customComponentLibrary = Array.isArray(list) ? list : [];
+  persist();
+}
+
+/**
+ * 获取自定义改进措施库（原 growth_custom_improvements）
+ * @returns {Array}
+ */
+export function getCustomImprovements() {
+  const s = ensureState();
+  return s.customImprovements || [];
+}
+
+/**
+ * 保存自定义改进措施库
+ * @param {Array} list
+ */
+export function setCustomImprovements(list) {
+  const s = ensureState();
+  s.customImprovements = Array.isArray(list) ? list : [];
+  persist();
 }
 
 export function mergeInputs(record, definition) {

@@ -1,0 +1,7 @@
+name = "reliability-tool-api"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "RELIABILITY_KV"
+id = "ae2ca351c0a14c7b92093dcdf6fda980"

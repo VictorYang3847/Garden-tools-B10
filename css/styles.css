@@ -6610,3 +6610,278 @@ textarea.form-input {
   background: rgba(248, 113, 113, 0.2);
   color: #f87171;
 }
+
+/* ===== 同步状态指示器 ===== */
+
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.2s ease;
+  user-select: none;
+}
+
+.sync-status:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sync-indicator {
+  font-size: 14px;
+  line-height: 1;
+  display: inline-block;
+}
+
+.sync-indicator.sync-spinning {
+  animation: sync-spin 1s linear infinite;
+}
+
+.sync-text {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+@keyframes sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== 登录/用户菜单区域 ===== */
+
+.auth-area {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.user-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.user-btn {
+  background: rgba(59, 158, 255, 0.12);
+  color: var(--accent, #3b9eff);
+  border: 1px solid rgba(59, 158, 255, 0.3);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.user-btn:hover {
+  background: rgba(59, 158, 255, 0.2);
+}
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 140px;
+  background: var(--bg-card, #1e293b);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.user-dropdown button {
+  background: transparent;
+  color: var(--text, #e8edf4);
+  border: none;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.user-dropdown button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ===== 登录/注册弹窗 ===== */
+
+.auth-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5000;
+  animation: modalFadeIn 0.2s ease;
+}
+
+.auth-modal-overlay[hidden] {
+  display: none;
+}
+
+.auth-modal-panel {
+  position: relative;
+  background: var(--bg-card, #1e293b);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 380px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.auth-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 0;
+}
+
+.auth-tab {
+  background: transparent;
+  color: var(--text-muted, #8b9cb3);
+  border: none;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.auth-tab:hover {
+  color: var(--text, #e8edf4);
+}
+
+.auth-tab.active {
+  color: var(--accent, #3b9eff);
+  border-bottom-color: var(--accent, #3b9eff);
+}
+
+.auth-modal-close {
+  background: transparent;
+  color: var(--text-muted, #8b9cb3);
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.auth-modal-close:hover {
+  color: var(--text, #e8edf4);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.auth-form {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.auth-form input {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text, #e8edf4);
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.auth-form input:focus {
+  outline: none;
+  border-color: var(--accent, #3b9eff);
+}
+
+.auth-form input::placeholder {
+  color: var(--text-muted, #8b9cb3);
+}
+
+.auth-submit-btn {
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.auth-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-error {
+  background: rgba(248, 113, 113, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.auth-error[hidden] {
+  display: none;
+}
+
+.auth-modal-footer {
+  padding: 0.75rem 1.25rem 1rem;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.auth-hint {
+  font-size: 11px;
+  color: var(--text-muted, #8b9cb3);
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .sync-status {
+    padding: 2px 6px;
+  }
+  .sync-text {
+    display: none;
+  }
+  .user-btn {
+    max-width: 100px;
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+  .auth-modal-panel {
+    width: 95%;
+    max-width: none;
+  }
+}

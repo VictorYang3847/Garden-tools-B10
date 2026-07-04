@@ -93,6 +93,13 @@
               <button type="button" class="btn-secondary btn-clear-data" id="btn-clear-data" title="清空当前型号的所有模块数据">清空数据</button>
             </div>
             <div class="header-actions">
+              <div class="sync-status" id="sync-status" title="本地存储">
+                <span class="sync-indicator" id="sync-indicator">○</span>
+                <span class="sync-text" id="sync-text">本地</span>
+              </div>
+              <div class="auth-area" id="auth-area">
+                <button type="button" id="login-btn" class="btn-secondary">登录同步</button>
+              </div>
               <button type="button" id="import-btn" class="btn-icon" title="导入">
                 <span>📥</span>
                 <span class="btn-text">导入</span>
@@ -3379,6 +3386,29 @@
         </div>
       </div>
     </template>
+
+    <!-- 登录/注册弹窗 -->
+    <div class="auth-modal-overlay" id="auth-modal" hidden>
+      <div class="auth-modal-panel">
+        <div class="auth-modal-header">
+          <div class="auth-tabs">
+            <button type="button" class="auth-tab active" data-tab="login">登录</button>
+            <button type="button" class="auth-tab" data-tab="register">注册</button>
+          </div>
+          <button type="button" class="auth-modal-close" id="auth-close" aria-label="关闭">×</button>
+        </div>
+        <form id="auth-form" class="auth-form">
+          <input type="email" id="auth-email" placeholder="邮箱" required autocomplete="email" />
+          <input type="password" id="auth-password" placeholder="密码（至少 6 位）" required minlength="6" autocomplete="current-password" />
+          <input type="password" id="auth-password-confirm" placeholder="确认密码" hidden autocomplete="new-password" />
+          <button type="submit" id="auth-submit" class="btn-primary auth-submit-btn">登录</button>
+          <div class="auth-error" id="auth-error" hidden></div>
+        </form>
+        <div class="auth-modal-footer">
+          <span class="auth-hint">登录后可跨设备同步数据；未登录时仅本地存储</span>
+        </div>
+      </div>
+    </div>
 
     <script type="module" src="js/app.js"></script>
   </body>
