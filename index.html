@@ -1604,11 +1604,11 @@
                         <th style="min-width: 150px;">元器件名称</th>
                         <th style="width: 120px;">类型</th>
                         <th style="width: 80px;">数量</th>
-                        <th style="width: 120px;">基础失效率λ(FIT)</th>
+                        <th style="width: 120px;">基础失效率λ(FIT)<span class="help-icon" data-tooltip="基础失效率：元器件在标准条件（25°C、额定应力）下的失效率，单位FIT(10⁻⁹/h)。可从元器件手册或MIL-HDBK-217查得">?</span></th>
                         <th style="width: 100px;">工作温度(°C)</th>
-                        <th style="width: 90px;">π_T</th>
-                        <th style="width: 90px;">π_S</th>
-                        <th style="width: 90px;">π_Q</th>
+                        <th style="width: 90px;">π_T<span class="help-icon" data-tooltip="温度加速系数：基于Arrhenius模型计算，工作温度越高值越大。25°C时=1.0，每升高10°C约增大1.5~2倍">?</span></th>
+                        <th style="width: 90px;">π_S<span class="help-icon" data-tooltip="应力降额系数：实际工作应力与额定应力之比的相关因子。默认1.0，降额设计时<1.0，过载时>1.0">?</span></th>
+                        <th style="width: 90px;">π_Q<span class="help-icon" data-tooltip="质量等级系数：反映元器件质量水平。军用级0.3~0.5，工业级1.0，民用级1.5~2.0">?</span></th>
                         <th style="width: 130px;">工作失效率(FIT)</th>
                         <th style="width: 70px;">操作</th>
                       </tr>
@@ -1663,6 +1663,25 @@
                       <div class="metric-label">系统 MTBF</div>
                       <div class="metric-value" id="pred-mtbf-years">—</div>
                       <div class="metric-unit">年</div>
+                    </div>
+                    <div class="metric-card">
+                      <div class="metric-label">等效 B10 寿命</div>
+                      <div class="metric-value" id="pred-equiv-b10">—</div>
+                      <div class="metric-unit">小时</div>
+                    </div>
+                    <div class="metric-card">
+                      <div class="metric-label">等效失效率 λ</div>
+                      <div class="metric-value" id="pred-equiv-lambda">—</div>
+                      <div class="metric-unit">10⁻⁶/h</div>
+                    </div>
+                  </div>
+
+                  <div class="pred-beta-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label>Weibull 形状参数 β<span class="help-icon" data-tooltip="Weibull形状参数：β>1磨损失效(典型2.0~2.5)，β=1随机失效，β<1早期失效。用于从MTBF反算等效B10">?</span></label>
+                        <input type="number" id="pred-beta" class="form-input" min="0.1" step="0.1" value="2.2" style="width: 100px;" />
+                      </div>
                     </div>
                   </div>
 
@@ -1879,6 +1898,16 @@
                     <canvas id="alloc-pie-canvas" width="400" height="300"></canvas>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div class="card alloc-pred-compare-card">
+              <div class="card-header">
+                <h3>📊 与可靠性预计比对</h3>
+                <span class="tp-optimize-hint">预测模块的等效B10与分配目标B10对比验证</span>
+              </div>
+              <div class="card-body">
+                <div id="alloc-pred-compare-panel"></div>
               </div>
             </div>
 

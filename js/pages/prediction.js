@@ -3,6 +3,8 @@ let currentModel = null;
 let predictionData = null;
 let activePredTab = "prediction";
 let allocationData = null;
+// 同步标志，防止预测侧与分配侧双向同步时循环触发事件
+let isSyncing = false;
 
 const K_BOLTZMANN = 8.617e-5;
 const T_REF = 25 + 273.15;
@@ -187,6 +189,34 @@ function calcMtbfHours() {
   return 1 / sysLambdaPerHour;
 }
 
+// Gamma函数近似（Lanczos逼近），用于Weibull分布等效B10反算
+function gammaApprox(x) {
+  if (x <= 0) return Infinity;
+  if (x === 1) return 1;
+  if (x < 1) {
+    return gammaApprox(x + 1) / x;
+  }
+  const g = 7;
+  const c = [
+    0.99999999999980993,
+    676.5203681218851,
+    -1259.1392167224028,
+    771.32342877765313,
+    -176.61502916214059,
+    12.507343278686905,
+    -0.13857109526572012,
+    9.9843695780195716e-6,
+    1.5056327351493116e-7,
+  ];
+  x -= 1;
+  let a = c[0];
+  const t = x + g + 0.5;
+  for (let i = 1; i < g + 2; i++) {
+    a += c[i] / (x + i);
+  }
+  return Math.sqrt(2 * Math.PI) * Math.pow(t, x + 0.5) * Math.exp(-t) * a;
+}
+
 function renderComponentRow(item, index) {
   const typeOptions = Object.entries(COMPONENT_TYPE_LABELS)
     .map(([val, label]) => `<option value="${val}" ${item.type === val ? "selected" : ""}>${label}</option>`)
@@ -344,6 +374,22 @@ function handleStructureChange(container, e) {
   saveData();
   updateResults(container);
   drawSystemDiagram(container);
+
+  // 同步系统结构到分配侧（避免循环触发）
+  if (isSyncing) return;
+  // vote23 在分配侧不支持，映射为 series
+  const allocStructure = structure === "vote23" ? "series" : structure;
+  allocationData.systemStructure = allocStructure;
+  isSyncing = true;
+  const allocStructureSelect = container.querySelector("#alloc-system-structure");
+  if (allocStructureSelect) allocStructureSelect.value = allocStructure;
+  isSyncing = false;
+  // 如果当前在分配Tab，刷新分配结果
+  if (activePredTab === "allocation") {
+    calcAllocation();
+    renderAllocationTable(container);
+    renderAllocationResults(container);
+  }
 }
 
 function handleParallelCountChange(container, e) {
@@ -402,6 +448,29 @@ function updateResults(container) {
   }
   if (missionTimeInput && !missionTimeInput.matches(":focus")) {
     missionTimeInput.value = missionTime;
+  }
+
+  // 等效B10计算：基于Weibull分布从MTBF反算B10寿命和等效失效率
+  const predBeta = Number(container.querySelector("#pred-beta")?.value) || 0;
+  if (predBeta > 0 && mtbfHours > 0) {
+    const K10 = Math.log(10 / 9); // ≈ 0.10536
+    const eta = mtbfHours / gammaApprox(1 + 1 / predBeta);
+    const equivB10 = eta * Math.pow(K10, 1 / predBeta);
+    const equivLambda = equivB10 > 0 ? (0.10536 / equivB10) * 1000000 : 0;
+    const b10El = container.querySelector("#pred-equiv-b10");
+    const lambdaEl = container.querySelector("#pred-equiv-lambda");
+    if (b10El) b10El.textContent = equivB10.toFixed(1);
+    if (lambdaEl) lambdaEl.textContent = equivLambda.toFixed(2);
+  } else {
+    const b10El = container.querySelector("#pred-equiv-b10");
+    const lambdaEl = container.querySelector("#pred-equiv-lambda");
+    if (b10El) b10El.textContent = "—";
+    if (lambdaEl) lambdaEl.textContent = "—";
+  }
+
+  // 如果当前在分配Tab，刷新与可靠性预计比对的面板
+  if (activePredTab === "allocation") {
+    renderPredComparison(container);
   }
 }
 
@@ -1080,6 +1149,29 @@ function bindEvents(container) {
   const calculateBtn = container.querySelector("#pred-calculate");
   calculateBtn.addEventListener("click", () => handleCalculate(container));
 
+  // β参数变化时重新计算等效B10和λ
+  const predBetaInput = container.querySelector("#pred-beta");
+  if (predBetaInput) {
+    predBetaInput.addEventListener("input", () => {
+      // 触发重新计算等效B10
+      updateResults(container);
+      // 同步 β 到分配侧（避免循环触发）
+      if (isSyncing) return;
+      const betaVal = Number(predBetaInput.value) || 2.2;
+      allocationData.beta = Math.max(0.1, betaVal);
+      isSyncing = true;
+      const allocBetaInput = container.querySelector("#alloc-beta");
+      if (allocBetaInput) allocBetaInput.value = betaVal;
+      isSyncing = false;
+      // 如果当前在分配Tab，刷新分配结果
+      if (activePredTab === "allocation") {
+        calcAllocation();
+        renderAllocationTable(container);
+        renderAllocationResults(container);
+      }
+    });
+  }
+
   let resizeTimeout;
   window.addEventListener("resize", () => {
     clearTimeout(resizeTimeout);
@@ -1347,6 +1439,7 @@ function addAllocationSubsystem(container) {
   renderAllocationResults(container);
   drawPieChart(container);
   renderFmeaComparison(container);
+  renderPredComparison(container);
 }
 
 function deleteAllocationSubsystem(container, id) {
@@ -1358,6 +1451,7 @@ function deleteAllocationSubsystem(container, id) {
   renderAllocationResults(container);
   drawPieChart(container);
   renderFmeaComparison(container);
+  renderPredComparison(container);
 }
 
 function updateAllAllocationRows(container) {
@@ -1420,6 +1514,7 @@ function handleAllocationInputChange(container, e) {
   renderAllocationResults(container);
   drawPieChart(container);
   renderFmeaComparison(container);
+  renderPredComparison(container);
 }
 
 function handleAllocationDeleteClick(container, e) {
@@ -1444,6 +1539,7 @@ function handleTargetB10Change(container, e) {
   renderAllocationResults(container);
   drawPieChart(container);
   renderFmeaComparison(container);
+  renderPredComparison(container);
 }
 
 function handleConfidenceChange(container, e) {
@@ -1459,6 +1555,21 @@ function handleAllocStructureChange(container, e) {
   renderAllocationResults(container);
   drawPieChart(container);
   renderFmeaComparison(container);
+  renderPredComparison(container);
+
+  // 同步系统结构到预测侧（避免循环触发）
+  if (isSyncing) return;
+  isSyncing = true;
+  const predStructureSelect = container.querySelector("#pred-structure-select");
+  if (predStructureSelect) predStructureSelect.value = allocationData.systemStructure;
+  // 同步更新并联数量输入组的显示状态
+  const parallelGroup = container.querySelector("#parallel-count-group");
+  if (parallelGroup) {
+    parallelGroup.style.display = allocationData.systemStructure === "parallel" ? "block" : "none";
+  }
+  updateResults(container);
+  drawSystemDiagram(container);
+  isSyncing = false;
 }
 
 function handleBetaChange(container, e) {
@@ -1470,6 +1581,15 @@ function handleBetaChange(container, e) {
   renderAllocationResults(container);
   drawPieChart(container);
   renderFmeaComparison(container);
+  renderPredComparison(container);
+
+  // 同步 β 到预测侧（避免循环触发）
+  if (isSyncing) return;
+  isSyncing = true;
+  const predBetaInput = container.querySelector("#pred-beta");
+  if (predBetaInput) predBetaInput.value = val;
+  updateResults(container);
+  isSyncing = false;
 }
 
 function switchPredTab(container, tabName) {
@@ -1595,6 +1715,81 @@ function getFmeaSubsystemData(subsystemName) {
     lambda: getFmeaLambdaEstimate(Math.round(avgOccurrence)),
     itemCount: items.length,
   };
+}
+
+// 与可靠性预计比对：将预测模块的等效B10与分配目标B10进行交叉验证
+function renderPredComparison(container) {
+  const panel = container.querySelector("#alloc-pred-compare-panel");
+  if (!panel) return;
+
+  // 获取预测模块的等效B10
+  const predB10El = document.getElementById("pred-equiv-b10");
+  const predB10Text = predB10El?.textContent || "—";
+  const predB10 = parseFloat(predB10Text) || 0;
+
+  // 获取分配模块的目标B10
+  const allocB10 = allocationData?.targetB10 || 0;
+  const calcSysB10 = allocationData?.calcSysB10 || 0;
+
+  if (predB10 <= 0) {
+    panel.innerHTML = `
+      <div class="compare-empty" style="text-align: center; padding: 1.5rem; color: var(--text-muted);">
+        <p>请先在「可靠性预计」中添加元器件并点击计算</p>
+      </div>
+    `;
+    return;
+  }
+
+  if (allocB10 <= 0) {
+    panel.innerHTML = `
+      <div class="compare-empty" style="text-align: center; padding: 1.5rem; color: var(--text-muted);">
+        <p>请先在分配设置中设定整机目标 B10</p>
+      </div>
+    `;
+    return;
+  }
+
+  // 计算差异百分比
+  const diff = Math.abs(predB10 - allocB10);
+  const diffPct = allocB10 > 0 ? (diff / allocB10) * 100 : 0;
+
+  // 一致性评价
+  let consistency = "";
+  let consistencyClass = "";
+  if (diffPct <= 20) {
+    consistency = "一致";
+    consistencyClass = "consistency-good";
+  } else if (diffPct <= 50) {
+    consistency = "基本一致";
+    consistencyClass = "consistency-fair";
+  } else {
+    consistency = "差异较大";
+    consistencyClass = "consistency-poor";
+  }
+
+  panel.innerHTML = `
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>预计等效 B10 (h)</th>
+          <th>分配目标 B10 (h)</th>
+          <th>差异百分比</th>
+          <th>一致性评价</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>${predB10.toFixed(1)}</td>
+          <td>${allocB10.toFixed(1)}</td>
+          <td>${diffPct.toFixed(1)}%</td>
+          <td><span class="consistency-badge ${consistencyClass}">${consistency}</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="compare-note" style="margin-top: 0.75rem; font-size: 0.8rem; color: var(--text-muted);">
+      预测模块基于元器件失效率模型计算系统MTBF，再通过β转换为等效B10；分配模块基于评分法分配目标B10。两者差异≤20%为一致，20%~50%为基本一致，>50%建议重新评估元器件选型或分配权重。
+    </div>
+  `;
 }
 
 function renderFmeaComparison(container) {
@@ -1740,6 +1935,7 @@ function initAllocationUI(container) {
   renderAllocationResults(container);
   bindAllocationEvents(container);
   renderFmeaComparison(container);
+  renderPredComparison(container);
 }
 
 export function init(model, onSave) {

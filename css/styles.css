@@ -6590,3 +6590,23 @@ textarea.form-input {
   background: rgba(139, 156, 179, 0.15);
   color: #8b9cb3;
 }
+
+/* 与可靠性预计比对交叉验证面板样式 */
+.alloc-pred-compare-card {
+  margin-top: 1rem;
+}
+
+.consistency-good {
+  background: rgba(52, 211, 153, 0.2);
+  color: #34d399;
+}
+
+.consistency-fair {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+}
+
+.consistency-poor {
+  background: rgba(248, 113, 113, 0.2);
+  color: #f87171;
+}
