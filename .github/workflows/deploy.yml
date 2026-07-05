@@ -57,14 +57,36 @@ jobs:
             echo "⚠️ 未配置 JWT_SECRET GitHub Secret，请在 CloudBase 控制台手动设置"
           fi
 
+      - name: Deploy static hosting to CloudBase
+        env:
+          TCB_ENV_ID: ${{ secrets.TCB_ENV_ID }}
+        run: |
+          set -x
+          # 准备静态文件目录
+          mkdir -p deploy_tmp
+          cp index.html deploy_tmp/
+          cp -r css deploy_tmp/
+          cp -r js deploy_tmp/
+          
+          # 列出文件确认
+          echo "=== 静态文件列表 ==="
+          find deploy_tmp -type f | head -50
+          
+          # 部署静态托管
+          tcb hosting deploy deploy_tmp -e "$TCB_ENV_ID" --force
+          echo "静态托管部署退出码: $?"
+
       - name: Deployment summary
         run: |
-          echo "### CloudBase 云函数部署完成" >> $GITHUB_STEP_SUMMARY
+          echo "### CloudBase 部署完成" >> $GITHUB_STEP_SUMMARY
           echo "- 分支: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- 提交: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- 环境: \`${{ secrets.TCB_ENV_ID }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> 前端由 Cloudflare Pages 自动部署" >> $GITHUB_STEP_SUMMARY
+          echo "### 部署内容" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ 云函数 (API)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ 静态托管 (前端)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Cloudflare Pages (自动部署)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### ⚠️ 安全检查" >> $GITHUB_STEP_SUMMARY
           if [ -n "${{ secrets.JWT_SECRET }}" ]; then

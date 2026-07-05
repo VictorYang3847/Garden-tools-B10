@@ -7,7 +7,7 @@ const ALLOWED_ORIGINS = [
   'https://b10.gardeningtools.com',
   'https://garden-tools-b10.pages.dev',
   'https://reliability-tool-d8erocv8e9979b2-1327689319.ap-shanghai.app.tcloudbase.com',
-  'https://gardeningtools-4g37ygvdbeb3d854-1254128272.tcloudbaseapp.com',
+  'https://reliability-tool-d8erocv8e9979b2-1327689319.tcloudbaseapp.com',
   'http://localhost:3000',
   'http://localhost:8080',
   'http://localhost:8140',
