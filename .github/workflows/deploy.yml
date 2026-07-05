@@ -49,9 +49,13 @@ jobs:
           TCB_API_KEY: ${{ secrets.TCB_API_KEY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
+          set -x
           tcb login --apiKeyId "$TCB_API_KEY_ID" --apiKey "$TCB_API_KEY"
+
+          # 部署云函数
           echo "y" | tcb fn deploy api -e "$TCB_ENV_ID" --force
-          # 设置 JWT_SECRET 环境变量（如果已配置 GitHub Secret）
+
+          # 设置 JWT_SECRET 环境变量
           if [ -n "$JWT_SECRET" ]; then
             tcb fn config update api -e "$TCB_ENV_ID" --envVariables "{\"JWT_SECRET\":\"$JWT_SECRET\"}" 2>/dev/null \
               && echo "JWT_SECRET 已设置" \
@@ -59,7 +63,20 @@ jobs:
           else
             echo "⚠️ 未配置 JWT_SECRET GitHub Secret，请在 CloudBase 控制台手动设置"
           fi
-          tcb hosting deploy ./deploy -e "$TCB_ENV_ID"
+
+          # 验证 deploy 目录内容
+          echo "=== deploy 目录内容 ==="
+          ls -la deploy/
+          ls -la deploy/css/ | head -5
+          ls -la deploy/js/ | head -5
+          ls -la deploy/js/pages/ | head -5
+
+          # 部署静态托管（--yes 跳过 CI 环境中的交互确认）
+          tcb hosting deploy ./deploy -e "$TCB_ENV_ID" --yes --verbose
+
+          # 验证部署结果
+          echo "=== 验证静态托管文件列表 ==="
+          tcb hosting list -e "$TCB_ENV_ID" 2>&1 || echo "⚠️ hosting list 失败"
 
       - name: Deployment summary
         run: |
