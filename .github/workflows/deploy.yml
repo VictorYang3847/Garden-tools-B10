@@ -24,8 +24,11 @@ jobs:
           cache: npm
           cache-dependency-path: cloudbase/functions/api/package-lock.json
 
-      - name: Install CloudBase CLI
-        run: npm install -g @cloudbase/cli
+      - name: Install CloudBase CLI and SDK
+        run: |
+          npm install -g @cloudbase/cli
+          npm install @cloudbase/manager-node
+          tcb --version
 
       - name: Prepare deploy files
         run: |
@@ -33,6 +36,11 @@ jobs:
           cp index.html deploy/
           cp -r css deploy/
           cp -r js deploy/
+          echo "=== deploy 目录内容 ==="
+          find deploy -type f | head -30
+          echo "..."
+          find deploy -type f | wc -l
+          echo "files total"
 
       - name: Install function dependencies
         run: |
@@ -64,15 +72,17 @@ jobs:
             echo "⚠️ 未配置 JWT_SECRET GitHub Secret，请在 CloudBase 控制台手动设置"
           fi
 
-          # 验证 deploy 目录内容
-          echo "=== deploy 目录内容 ==="
-          ls -la deploy/
-          ls -la deploy/css/ | head -5
-          ls -la deploy/js/ | head -5
-          ls -la deploy/js/pages/ | head -5
+          # 方法1: 使用 manager-node SDK 直接上传（更可靠）
+          echo "=== 方法1: SDK 上传 ==="
+          DEPLOY_DIR=./deploy node scripts/deploy-hosting.mjs 2>&1 || echo "⚠️ SDK 上传失败"
 
-          # 部署静态托管（--yes 跳过 CI 环境中的交互确认）
-          tcb hosting deploy ./deploy -e "$TCB_ENV_ID" --yes --verbose
+          # 方法2: 使用 CLI 部署到根目录
+          echo "=== 方法2: CLI 部署到 / ==="
+          tcb hosting deploy ./deploy / -e "$TCB_ENV_ID" 2>&1 || echo "⚠️ CLI 部署到 / 失败"
+
+          # 方法3: 使用 CLI 部署到 /home
+          echo "=== 方法3: CLI 部署到 /home ==="
+          tcb hosting deploy ./deploy /home -e "$TCB_ENV_ID" 2>&1 || echo "⚠️ CLI 部署到 /home 失败"
 
           # 验证部署结果
           echo "=== 验证静态托管文件列表 ==="
