@@ -5,7 +5,7 @@ import {
   failureRate,
   gammaApprox,
   calcMtbf,
-} from "../calculator.js?v=1.0.4";
+} from "../calculator.js?v=1.0.5";
 
 let currentModel = null;
 let onSaveCallback = null;

@@ -1,6 +1,6 @@
-import { genId, getCustomImprovements, setCustomImprovements } from "../store.js?v=1.0.4";
-import { fmt } from "../utils.js?v=1.0.4";
-import { gammaApprox } from "../calculator.js?v=1.0.4";
+import { genId, getCustomImprovements, setCustomImprovements } from "../store.js?v=1.0.5";
+import { fmt } from "../utils.js?v=1.0.5";
+import { gammaApprox } from "../calculator.js?v=1.0.5";
 
 let currentModel = null;
 let onSaveCallback = null;
@@ -16,15 +16,32 @@ const IMPROVEMENT_LIBRARY = [
   { id: 'bearing-sealed', name: '换双面密封轴承', category: 'motor', improvement: '2~3倍寿命', desc: '双面密封轴承防止粉尘和润滑脂流失', applicable: '开式轴承磨损、进灰' },
   { id: 'bearing-alignment', name: '优化装配同轴度', category: 'motor', improvement: '1.2~1.5倍寿命', desc: '减少偏心受力，降低附加载荷', applicable: '轴承偏磨、异响' },
   { id: 'bearing-grease', name: '选用高速润滑脂', category: 'motor', improvement: '1.2倍寿命', desc: '高速高温下润滑性能更好', applicable: '高转速电机' },
+  { id: 'bearing-ceramic', name: '换陶瓷球轴承', category: 'motor', improvement: '2~4倍寿命', desc: '氮化硅陶瓷球，重量轻、耐高温、电绝缘', applicable: '吹风机高速电机、电腐蚀' },
   { id: 'switch-agni', name: '换银镍合金触点', category: 'switch', improvement: '5倍以上寿命', desc: '银镍合金抗电弧磨损能力远强于铜镀层', applicable: '开关触点磨损、接触不良' },
   { id: 'switch-dust', name: '增加硅胶防尘罩', category: 'switch', improvement: '1.5~2倍寿命', desc: '防止粉尘进入触点区域', applicable: '多尘环境开关失效' },
   { id: 'switch-derating', name: '电流降额使用', category: 'switch', improvement: '1.5倍寿命', desc: '降低触点电流，减少电弧侵蚀', applicable: '额定电流接近上限' },
   { id: 'battery-derating', name: '放电倍率降额', category: 'battery', improvement: '1.3~1.5倍寿命', desc: '放电倍率从1C降至0.8C，降低发热和衰减', applicable: '高倍率放电应用' },
   { id: 'battery-bms', name: 'BMS策略优化', category: 'battery', improvement: '1.2倍寿命', desc: '收窄充放电截止电压，避免过充过放', applicable: 'BMS策略激进' },
   { id: 'battery-cooling', name: '电芯间散热优化', category: 'battery', improvement: '1.1~1.3倍寿命', desc: '电芯间预留散热间隙，降低工作温度', applicable: '高温环境、密集排布' },
+  { id: 'battery-heatpad', name: '增加加热膜保温', category: 'battery', improvement: '1.2~1.5倍寿命', desc: '低温环境下保持电芯工作温度，减少析锂', applicable: '冬季/低温地区割草机器人' },
   { id: 'pcb-coating', name: 'PCB喷涂三防漆', category: 'pcb', improvement: '1.5~2倍寿命', desc: '防潮、防霉、防盐雾，保护电路板', applicable: '潮湿、腐蚀环境' },
   { id: 'pcb-derating', name: '功率器件降额50%', category: 'pcb', improvement: '2倍以上寿命', desc: '降低结温，大幅提升器件寿命', applicable: '功率器件发热严重' },
   { id: 'pcb-heatsink', name: '增加散热片', category: 'pcb', improvement: '1.5~2倍寿命', desc: '降低器件结温，每降10℃寿命翻倍', applicable: '高温环境、散热差' },
+  { id: 'pcb-potting', name: 'PCB灌封处理', category: 'pcb', improvement: '2~3倍寿命', desc: '环氧树脂灌封，防水防尘防震', applicable: '割草机器人户外恶劣环境' },
+  { id: 'fan-balance', name: '风轮动平衡校准', category: 'fan', improvement: '1.5~2倍寿命', desc: 'G2.5级以上动平衡，减少振动和轴承负载', applicable: '吹风机风轮振动大、异响' },
+  { id: 'fan-material', name: '换玻纤增强风轮', category: 'fan', improvement: '1.5~2.5倍寿命', desc: 'PA66+30%GF玻纤增强塑料，强度高耐温好', applicable: '普通塑料风轮变形、断裂' },
+  { id: 'fan-shape', name: '叶片型线优化', category: 'fan', improvement: '1.2~1.5倍寿命', desc: '优化叶片气动外形，降低气流脉动和应力', applicable: '风轮叶片根部疲劳断裂' },
+  { id: 'blade-material', name: '换合金工具钢刀片', category: 'blade', improvement: '2~3倍寿命', desc: 'SK5/65Mn合金钢，硬度HRC45~50，耐磨抗冲击', applicable: '普通碳钢刀片磨损快、卷刃' },
+  { id: 'blade-heat', name: '刀片热处理优化', category: 'blade', improvement: '1.5~2倍寿命', desc: '淬火+回火工艺优化，刃口硬度均匀', applicable: '刀片刃口硬度不均、早期崩刃' },
+  { id: 'blade-coating', name: '刀片镀钛/特氟龙涂层', category: 'blade', improvement: '1.3~1.8倍寿命', desc: 'TiN镀钛或特氟龙涂层，减磨防锈', applicable: '潮湿环境刀片锈蚀、粘草' },
+  { id: 'seal-silicone', name: '换硅橡胶密封圈', category: 'sealing', improvement: '1.5~2.5倍寿命', desc: '硅橡胶耐温-40~200℃，抗老化性能优异', applicable: '普通橡胶密封圈高温老化' },
+  { id: 'seal-double', name: '双道密封结构', category: 'sealing', improvement: '2~3倍寿命', desc: '两道密封圈串联，一道失效另一道仍起作用', applicable: '割草机器人户外防水要求高' },
+  { id: 'seal-breath', name: '增加防水透气阀', category: 'sealing', improvement: '1.5~2倍寿命', desc: '平衡内外压力，防止密封圈受压渗漏', applicable: '温度变化大、密封件鼓胀渗漏' },
+  { id: 'sensor-shield', name: '传感器增加防护罩', category: 'sensor', improvement: '1.5~2.5倍寿命', desc: '机械/光电保护罩，防碰撞防泥水', applicable: '割草机碰撞传感器、雨水传感器' },
+  { id: 'sensor-selfclean', name: '传感器自清洁设计', category: 'sensor', improvement: '1.3~1.8倍寿命', desc: '刮片/超声波/振动自清洁，减少积灰误判', applicable: '灰尘大环境下传感器失灵' },
+  { id: 'charging-gold', name: '充电触点镀金处理', category: 'charging', improvement: '3~5倍寿命', desc: '厚金镀层，抗氧化耐腐蚀，接触电阻稳定', applicable: '充电触点氧化、接触不良' },
+  { id: 'charging-align', name: '增加导向对准机构', category: 'charging', improvement: '1.5~2倍寿命', desc: '斜面导向+磁吸对准，减少触点侧向磨损', applicable: '回充对位不准、触点偏磨' },
+  { id: 'charging-silver', name: '充电触点镀银', category: 'charging', improvement: '2~3倍寿命', desc: '银镀层导电好、抗氧化能力优于铜', applicable: '大电流充电、触点发热氧化' },
 ];
 
 const CATEGORY_LABELS = {
@@ -33,6 +50,11 @@ const CATEGORY_LABELS = {
   switch: '开关触点',
   battery: '锂电池',
   pcb: 'PCB电子',
+  fan: '风机风轮',
+  blade: '刀片刀具',
+  sealing: '密封防护',
+  sensor: '传感器',
+  charging: '充电接口',
 };
 
 const PHASE_COLORS = [

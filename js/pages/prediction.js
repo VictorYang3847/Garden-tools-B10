@@ -1,5 +1,5 @@
-import { getCustomComponentLibrary, setCustomComponentLibrary, getHomeB10 } from "../store.js?v=1.0.4";
-import { gammaApprox, K10 } from "../calculator.js?v=1.0.4";
+import { getCustomComponentLibrary, setCustomComponentLibrary, getHomeB10 } from "../store.js?v=1.0.5";
+import { gammaApprox, K10 } from "../calculator.js?v=1.0.5";
 
 let onSaveCallback = null;
 let currentModel = null;
@@ -65,17 +65,38 @@ const COMPONENT_LIBRARY = [
   { id: 'c-electrolytic', name: '电解电容', category: 'electronic', type: 'capacitor', lambdaBase: 0.1, desc: '铝电解电容，温度敏感' },
   { id: 'ic-mcu', name: 'MCU芯片', category: 'electronic', type: 'ic_digital', lambdaBase: 0.3, desc: '通用微控制器，数字IC' },
   { id: 'ic-power', name: '电源管理IC', category: 'electronic', type: 'ic_analog', lambdaBase: 0.5, desc: '模拟电源管理芯片' },
+  { id: 'ic-motor-drv', name: '电机驱动IC', category: 'electronic', type: 'ic_analog', lambdaBase: 0.6, desc: 'BLDC电机驱动芯片，大电流发热' },
   { id: 'mosfet', name: 'MOS管', category: 'electronic', type: 'transistor', lambdaBase: 0.3, desc: '功率MOSFET，结温敏感' },
   { id: 'diode', name: '二极管', category: 'electronic', type: 'diode', lambdaBase: 0.1, desc: '普通硅二极管' },
   { id: 'inductor-common', name: '普通电感', category: 'electronic', type: 'inductor', lambdaBase: 0.03, desc: '通用功率电感' },
+  { id: 'hall-sensor', name: '霍尔传感器', category: 'electronic', type: 'sensor', lambdaBase: 0.2, desc: '电机位置检测霍尔元件' },
+  { id: 'imu-sensor', name: 'IMU姿态传感器', category: 'electronic', type: 'sensor', lambdaBase: 0.15, desc: '加速度+陀螺仪，割草机器人导航用' },
   { id: 'bearing-ball', name: '滚珠轴承 608', category: 'mechanical', type: 'other', lambdaBase: 0.5, desc: '深沟球轴承，转速负载相关' },
+  { id: 'bearing-highspeed', name: '高速滚珠轴承', category: 'mechanical', type: 'other', lambdaBase: 1.2, desc: '吹风机高转速电机轴承，dmn值高' },
   { id: 'gear-steel', name: '齿轮(渗碳淬火)', category: 'mechanical', type: 'other', lambdaBase: 0.8, desc: '渗碳淬火钢制齿轮，接触疲劳' },
+  { id: 'gear-plastic', name: '塑料齿轮(POM)', category: 'mechanical', type: 'other', lambdaBase: 1.5, desc: 'POM/尼龙塑料齿轮，磨损+热变形' },
   { id: 'spring', name: '弹簧', category: 'mechanical', type: 'other', lambdaBase: 0.2, desc: '疲劳失效为主' },
   { id: 'seal', name: '密封圈', category: 'mechanical', type: 'other', lambdaBase: 0.3, desc: '橡胶密封件，老化失效' },
+  { id: 'seal-ipx5', name: '防水密封圈(IPX5)', category: 'mechanical', type: 'other', lambdaBase: 0.5, desc: '割草机器人户外防水，硅胶密封圈' },
+  { id: 'fan-impeller', name: '离心风轮', category: 'mechanical', type: 'other', lambdaBase: 0.8, desc: '吹风机离心风叶，动平衡+疲劳' },
+  { id: 'mower-blade', name: '割草刀片', category: 'mechanical', type: 'other', lambdaBase: 1.0, desc: '合金钢割草刀片，磨损+冲击' },
+  { id: 'mower-wheel', name: '行走轮', category: 'mechanical', type: 'other', lambdaBase: 0.4, desc: '割草机驱动轮，磨损+承载' },
+  { id: 'heater-element', name: '发热丝/加热芯', category: 'electronic', type: 'other', lambdaBase: 1.5, desc: '吹风机加热丝，高温氧化+振动' },
+  { id: 'charging-contact', name: '充电对接触点', category: 'electromechanical', type: 'connector', lambdaBase: 1.0, desc: '割草机器人自动充电触点，氧化+脏污' },
+  { id: 'boundary-coil', name: '边界线感应线圈', category: 'electronic', type: 'sensor', lambdaBase: 0.1, desc: '割草机器人边界检测，电磁感应' },
+  { id: 'collision-sensor', name: '碰撞传感器', category: 'electromechanical', type: 'sensor', lambdaBase: 0.4, desc: '割草机碰撞检测，机械微动+缓冲' },
+  { id: 'rain-sensor', name: '雨水传感器', category: 'electronic', type: 'sensor', lambdaBase: 0.25, desc: '割草机雨水检测，电极式/电容式' },
+  { id: 'lift-sensor', name: '抬升/跌落传感器', category: 'electromechanical', type: 'sensor', lambdaBase: 0.3, desc: '割草机抬升检测，红外/机械开关' },
   { id: 'switch-micro', name: '微动开关', category: 'electromechanical', type: 'relay', lambdaBase: 0.5, desc: '机械开关，触点磨损' },
+  { id: 'switch-trigger', name: '扳机开关/调速开关', category: 'electromechanical', type: 'relay', lambdaBase: 0.8, desc: '吹风机扳机调速开关，大电流电弧' },
   { id: 'relay', name: '继电器', category: 'electromechanical', type: 'relay', lambdaBase: 0.8, desc: '电磁继电器，触点寿命' },
   { id: 'connector', name: '连接器', category: 'electromechanical', type: 'connector', lambdaBase: 0.1, desc: '接插件，插拔磨损' },
   { id: 'motor', name: '无刷电机', category: 'electromechanical', type: 'other', lambdaBase: 2.0, desc: '无刷直流电机，轴承+绕组' },
+  { id: 'motor-blower', name: '吹风机高速无刷电机', category: 'electromechanical', type: 'other', lambdaBase: 3.5, desc: '10万转以上高速电机，轴承+风磨' },
+  { id: 'motor-wheel', name: '行走轮电机', category: 'electromechanical', type: 'other', lambdaBase: 1.8, desc: '割草机行走驱动电机，负载+粉尘' },
+  { id: 'motor-mower', name: '割草刀盘电机', category: 'electromechanical', type: 'other', lambdaBase: 2.5, desc: '割草机刀盘驱动电机，冲击负载' },
+  { id: 'battery-pack', name: '锂电池包', category: 'electromechanical', type: 'other', lambdaBase: 1.2, desc: '18650/21700电芯组，循环衰减' },
+  { id: 'air-filter', name: '进风滤网/滤芯', category: 'mechanical', type: 'other', lambdaBase: 0.6, desc: '吹风机进风过滤，堵塞导致过热' },
 ];
 
 let customComponentLibrary = [];
@@ -1573,7 +1594,7 @@ async function ensureDeratingRendered(container) {
   const deratingContainer = container.querySelector("#pred-tab-derating");
   if (!deratingContainer) return;
   if (!deratingModule) {
-    deratingModule = await import("./derating.js?v=1.0.4");
+    deratingModule = await import("./derating.js?v=1.0.5");
   }
   if (!deratingInitialized) {
     deratingModule.init(currentModel, onSaveCallback);
