@@ -1215,15 +1215,19 @@ function getWeaknessBatchData() {
     if (item.time <= 0) continue;
     totalSamples++;
     const failed = isItemFailed(item);
-    if (failed && item.failureMode && item.failureMode.trim()) {
-      const mode = item.failureMode.trim();
-      if (!failureModeGroups[mode]) {
-        failureModeGroups[mode] = { failures: [], censored: [], failureCount: 0 };
-      }
-      failureModeGroups[mode].failures.push(item.time);
-      failureModeGroups[mode].failureCount++;
-      totalFailures++;
+    if (!failed) continue;
+
+    // 优先使用失效模式；若未填写，按测试对象（part）兜底分组
+    const mode = (item.failureMode && item.failureMode.trim())
+      ? item.failureMode.trim()
+      : (PART_LABELS[item.part] || item.part || "未分类");
+
+    if (!failureModeGroups[mode]) {
+      failureModeGroups[mode] = { failures: [], failureCount: 0 };
     }
+    failureModeGroups[mode].failures.push(item.time);
+    failureModeGroups[mode].failureCount++;
+    totalFailures++;
   }
 
   const results = [];
@@ -1238,6 +1242,7 @@ function getWeaknessBatchData() {
         eta: null,
         mtbf: null,
         sufficient: false,
+        note: "样本不足",
       });
       continue;
     }
@@ -1269,6 +1274,7 @@ function getWeaknessBatchData() {
       rSquared: fit?.rSquared ?? null,
       sufficient: true,
       fit,
+      note: "已拟合",
     });
   }
 
@@ -1317,7 +1323,16 @@ function updateWeaknessAnalysis() {
   const chartsCard = document.getElementById("ld-weakness-charts-card");
   const emptyCard = document.getElementById("ld-weakness-empty-card");
 
-  if (!data || data.results.length === 0 || data.results.filter((r) => r.sufficient).length < 1) {
+  // 调试日志，方便排查数据问题
+  console.log("[weakness] updateWeaknessAnalysis", {
+    activeBatchId,
+    batchName: data?.batch?.name,
+    totalItems: data?.batch?.items?.length,
+    resultsCount: data?.results?.length,
+    sufficientCount: data?.results?.filter((r) => r.sufficient).length,
+  });
+
+  if (!data || data.results.length === 0) {
     if (coreCard) coreCard.style.display = "none";
     if (tableCard) tableCard.style.display = "none";
     if (chartsCard) chartsCard.style.display = "none";
@@ -1326,17 +1341,19 @@ function updateWeaknessAnalysis() {
   }
 
   const validResults = data.results.filter((r) => r.sufficient);
+
+  // 有失效数据就显示表格，哪怕不足以做 Weibull 拟合
+  if (emptyCard) emptyCard.style.display = "none";
+  if (tableCard) tableCard.style.display = "";
+  renderWeaknessTable(data.results);
+
   if (validResults.length === 0) {
     if (coreCard) coreCard.style.display = "none";
-    if (tableCard) tableCard.style.display = "none";
     if (chartsCard) chartsCard.style.display = "none";
-    if (emptyCard) emptyCard.style.display = "";
     return;
   }
 
-  if (emptyCard) emptyCard.style.display = "none";
   if (coreCard) coreCard.style.display = "";
-  if (tableCard) tableCard.style.display = "";
   if (chartsCard) chartsCard.style.display = "";
 
   const coreWeakness = validResults[0];
@@ -1351,7 +1368,6 @@ function updateWeaknessAnalysis() {
   const coreCountEl = document.getElementById("ld-weakness-core-count");
   if (coreCountEl) coreCountEl.textContent = coreWeakness.failureCount;
 
-  renderWeaknessTable(data.results);
   drawWeaknessBarChart(validResults);
   drawWeaknessPieChart(data.results, data.totalFailures);
 }
