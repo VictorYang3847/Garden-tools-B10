@@ -1,5 +1,5 @@
-import { genId } from "../store.js?v=1.0.2";
-import { fmt, pct } from "../utils.js?v=1.0.2";
+import { genId } from "../store.js?v=1.0.3";
+import { fmt, pct } from "../utils.js?v=1.0.3";
 
 let currentModel = null;
 let onSaveCallback = null;
