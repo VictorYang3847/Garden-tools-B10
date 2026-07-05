@@ -5,6 +5,7 @@
 
 const ALLOWED_ORIGINS = [
   'https://b10.gardeningtools.com',
+  'https://garden-tools-b10.pages.dev',
   'https://reliability-tool-d8erocv8e9979b2-1327689319.ap-shanghai.app.tcloudbase.com',
   'https://gardeningtools-4g37ygvdbeb3d854-1254128272.tcloudbaseapp.com',
   'http://localhost:3000',
@@ -13,9 +14,19 @@ const ALLOWED_ORIGINS = [
   'http://127.0.0.1:3000',
 ];
 
+// Cloudflare Pages 预览域名模式
+const ALLOWED_ORIGIN_PATTERNS = [
+  /^https:\/\/[a-f0-9]+\.(garden-tools-b10\.pages\.dev)$/,
+];
+
+function isOriginAllowed(origin) {
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  return ALLOWED_ORIGIN_PATTERNS.some((p) => p.test(origin));
+}
+
 function getCorsHeaders(request) {
   const origin = (request.headers.get('Origin') || '').toLowerCase();
-  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allowOrigin = isOriginAllowed(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
