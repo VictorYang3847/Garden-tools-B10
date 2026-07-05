@@ -240,8 +240,8 @@ async function handleSubmit() {
     showError('请填写邮箱和密码');
     return;
   }
-  if (password.length < 6) {
-    showError('密码至少 6 位');
+  if (password.length < 8) {
+    showError('密码至少 8 位');
     return;
   }
 
