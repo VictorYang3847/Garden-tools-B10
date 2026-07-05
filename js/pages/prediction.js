@@ -1,4 +1,4 @@
-import { getCustomComponentLibrary, setCustomComponentLibrary } from "../store.js";
+import { getCustomComponentLibrary, setCustomComponentLibrary, getHomeB10 } from "../store.js";
 
 let onSaveCallback = null;
 let currentModel = null;
@@ -80,6 +80,8 @@ const COMPONENT_LIBRARY = [
 let customComponentLibrary = [];
 let currentLibCategory = 'all';
 let currentLibKeyword = '';
+let deratingModule = null;
+let deratingInitialized = false;
 
 const CHART_COLORS = [
   "#3b9eff",
@@ -1184,12 +1186,16 @@ function bindEvents(container) {
 function ensureAllocationData() {
   if (!predictionData.allocation) {
     predictionData.allocation = {
-      targetB10: 150,
+      targetB10: getHomeB10(currentModel),
       confidence: 0.9,
       systemStructure: "series",
       beta: 2.2,
       subsystems: [],
     };
+  } else {
+    if (!predictionData.allocation.targetB10 || predictionData.allocation.targetB10 === 150) {
+      predictionData.allocation.targetB10 = getHomeB10(currentModel);
+    }
   }
   if (!predictionData.allocation.subsystems || predictionData.allocation.subsystems.length === 0) {
     predictionData.allocation.subsystems = [
@@ -1218,7 +1224,7 @@ function calcAllocation() {
   });
 
   // 2. 计算权重
-  const targetB10 = allocationData.targetB10 || 150;
+  const targetB10 = allocationData.targetB10 || getHomeB10(currentModel);
   allocationData.subsystems.forEach((s) => {
     s.weight = totalScore > 0 ? s.totalScore / totalScore : 0;
   });
@@ -1591,6 +1597,20 @@ function handleBetaChange(container, e) {
   isSyncing = false;
 }
 
+async function ensureDeratingRendered(container) {
+  const deratingContainer = container.querySelector("#pred-tab-derating");
+  if (!deratingContainer) return;
+  if (!deratingModule) {
+    deratingModule = await import("./derating.js");
+  }
+  if (!deratingInitialized) {
+    deratingModule.init(currentModel, onSaveCallback);
+    deratingInitialized = true;
+  }
+  deratingContainer.innerHTML = "";
+  deratingModule.render(deratingContainer, currentModel);
+}
+
 function switchPredTab(container, tabName) {
   activePredTab = tabName;
 
@@ -1605,17 +1625,25 @@ function switchPredTab(container, tabName) {
 
   const tabPrediction = container.querySelector("#pred-tab-prediction");
   const tabAllocation = container.querySelector("#pred-tab-allocation");
+  const tabDerating = container.querySelector("#pred-tab-derating");
 
-  if (tabName === "prediction") {
-    tabPrediction.style.display = "block";
-    tabAllocation.style.display = "none";
+  if (tabName === "derating") {
+    if (tabDerating) tabDerating.style.display = "block";
+    if (tabPrediction) tabPrediction.style.display = "none";
+    if (tabAllocation) tabAllocation.style.display = "none";
+    ensureDeratingRendered(container);
+  } else if (tabName === "prediction") {
+    if (tabDerating) tabDerating.style.display = "none";
+    if (tabPrediction) tabPrediction.style.display = "block";
+    if (tabAllocation) tabAllocation.style.display = "none";
     requestAnimationFrame(() => {
       drawBarChart(container);
       drawSystemDiagram(container);
     });
   } else {
-    tabPrediction.style.display = "none";
-    tabAllocation.style.display = "block";
+    if (tabDerating) tabDerating.style.display = "none";
+    if (tabPrediction) tabPrediction.style.display = "none";
+    if (tabAllocation) tabAllocation.style.display = "block";
     requestAnimationFrame(() => {
       drawPieChart(container);
     });
@@ -1954,6 +1982,7 @@ export function render(container, model) {
   const clone = template.content.cloneNode(true);
   container.innerHTML = "";
   container.appendChild(clone);
+  deratingInitialized = false;
 
   predictionData = model?.modules?.prediction || {
     components: [],

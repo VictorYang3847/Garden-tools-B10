@@ -5,7 +5,7 @@ import {
   lognormalCdf,
   fitDistribution,
 } from "../calculator.js";
-import { genId } from "../store.js";
+import { genId, getHomeB10 } from "../store.js";
 import { fmt, pct, toast } from "../utils.js";
 
 let currentModel = null;
@@ -13,7 +13,6 @@ let onSaveCallback = null;
 let activeTab = "data-entry";
 let activeBatchId = null;
 let analysisMode = "merged"; // "merged" | "batch"
-let selectedBatchIdForAnalysis = null;
 
 const PART_LABELS = {
   product: "整机",
@@ -34,6 +33,7 @@ export function render(container, model) {
   const template = document.getElementById("life-data-template");
   const content = template.content.cloneNode(true);
   container.appendChild(content);
+  weaknessInitialized = false;
 
   ensureLifeData();
   bindEvents();
@@ -59,7 +59,6 @@ function ensureLifeData() {
   activeBatchId = ld.activeBatchId || ld.batches[0]?.id || null;
   // 同步analysisMode状态
   analysisMode = ld.analysisConfig.analysisMode || "merged";
-  selectedBatchIdForAnalysis = ld.analysisConfig.selectedBatchId || ld.batches[0]?.id || null;
 }
 
 function save() {
@@ -85,6 +84,24 @@ function bindEvents() {
   bindAnalysisEvents();
 }
 
+let weaknessModule = null;
+let weaknessInitialized = false;
+
+async function ensureWeaknessRendered() {
+  const weaknessContainer = document.getElementById("life-tab-weakness");
+  if (!weaknessContainer) return;
+  if (!weaknessModule) {
+    weaknessModule = await import("./weakness.js");
+  }
+  if (!weaknessInitialized) {
+    weaknessModule.init(currentModel, onSaveCallback);
+    weaknessInitialized = true;
+  }
+  weaknessContainer.innerHTML = "";
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  weaknessModule.render(weaknessContainer, currentModel);
+}
+
 function switchTab(tabName) {
   activeTab = tabName;
   document.querySelectorAll(".life-data-tab").forEach((t) => {
@@ -98,6 +115,8 @@ function switchTab(tabName) {
 
   if (tabName === "analysis") {
     updateAnalysisResults();
+  } else if (tabName === "weakness") {
+    ensureWeaknessRendered();
   }
 }
 
@@ -376,41 +395,21 @@ function bindAnalysisEvents() {
   const reliabilityTimeInput = document.getElementById("ld-reliability-time");
   const formulaToggle = document.getElementById("ld-formula-toggle");
   const formulaContent = document.getElementById("ld-formula-content");
-  const modeMergedRadio = document.getElementById("ld-mode-merged");
-  const modeBatchRadio = document.getElementById("ld-mode-batch");
-  const batchSelector = document.getElementById("ld-batch-selector");
-  const batchSelectorContainer = document.getElementById("ld-batch-selector-container");
+  const modeSegmented = document.getElementById("ld-mode-segmented");
 
-  // 模式切换事件
-  if (modeMergedRadio) {
-    modeMergedRadio.addEventListener("change", () => {
-      if (modeMergedRadio.checked) {
-        analysisMode = "merged";
-        currentModel.modules.lifeData.analysisConfig.analysisMode = "merged";
-        if (batchSelectorContainer) batchSelectorContainer.style.display = "none";
-        autoSave();
-        updateAnalysisResults();
-      }
-    });
-  }
-  if (modeBatchRadio) {
-    modeBatchRadio.addEventListener("change", () => {
-      if (modeBatchRadio.checked) {
-        analysisMode = "batch";
-        currentModel.modules.lifeData.analysisConfig.analysisMode = "batch";
-        renderBatchSelectorOptions();
-        if (batchSelectorContainer) batchSelectorContainer.style.display = "";
-        autoSave();
-        updateAnalysisResults();
-      }
-    });
-  }
-
-  // 轮次选择事件
-  if (batchSelector) {
-    batchSelector.addEventListener("change", () => {
-      selectedBatchIdForAnalysis = batchSelector.value;
-      currentModel.modules.lifeData.analysisConfig.selectedBatchId = selectedBatchIdForAnalysis;
+  // 模式切换事件（segmented control）
+  if (modeSegmented) {
+    modeSegmented.addEventListener("click", (e) => {
+      const btn = e.target.closest(".segmented-btn");
+      if (!btn) return;
+      const mode = btn.dataset.mode;
+      if (!mode || mode === analysisMode) return;
+      analysisMode = mode;
+      currentModel.modules.lifeData.analysisConfig.analysisMode = mode;
+      // 更新激活状态
+      modeSegmented.querySelectorAll(".segmented-btn").forEach((b) => {
+        b.classList.toggle("active", b === btn);
+      });
       autoSave();
       updateAnalysisResults();
     });
@@ -453,26 +452,17 @@ function renderAnalysisTab() {
   const methodSelect = document.getElementById("ld-method");
   const reliabilityTimeInput = document.getElementById("ld-reliability-time");
   const warrantyLabel = document.getElementById("ld-reliability-warranty-label");
-  const modeMergedRadio = document.getElementById("ld-mode-merged");
-  const modeBatchRadio = document.getElementById("ld-mode-batch");
-  const batchSelectorContainer = document.getElementById("ld-batch-selector-container");
+  const modeSegmented = document.getElementById("ld-mode-segmented");
 
   if (distSelect) distSelect.value = config.distribution || "weibull";
   if (methodSelect) methodSelect.value = config.method || "rrx";
 
-  // 设置模式切换状态
+  // 设置模式切换状态（segmented control）
   analysisMode = config.analysisMode || "merged";
-  if (modeMergedRadio) modeMergedRadio.checked = analysisMode === "merged";
-  if (modeBatchRadio) modeBatchRadio.checked = analysisMode === "batch";
-
-  // 设置轮次选择器显示状态
-  if (batchSelectorContainer) {
-    batchSelectorContainer.style.display = analysisMode === "batch" ? "" : "none";
-  }
-
-  // 渲染轮次选择器选项
-  if (analysisMode === "batch") {
-    renderBatchSelectorOptions();
+  if (modeSegmented) {
+    modeSegmented.querySelectorAll(".segmented-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.mode === analysisMode);
+    });
   }
 
   // 从 model.homeCalc 获取质保期参数（首页共享数据）
@@ -489,72 +479,47 @@ function renderAnalysisTab() {
   }
 }
 
-function renderBatchSelectorOptions() {
-  const batchSelector = document.getElementById("ld-batch-selector");
-  if (!batchSelector) return;
-  const batches = currentModel.modules.lifeData.batches;
-
-  if (batches.length === 0) {
-    batchSelector.innerHTML = '<option value="">暂无批次数据</option>';
-    return;
-  }
-
-  batchSelector.innerHTML = batches.map((b) =>
-    `<option value="${b.id}" ${b.id === selectedBatchIdForAnalysis ? "selected" : ""}>${escapeHtml(b.name)} (${b.items?.length || 0} 条)</option>`
-  ).join("");
-
-  // 如果当前选中的批次不存在，自动选择第一个
-  if (!selectedBatchIdForAnalysis || !batches.find((b) => b.id === selectedBatchIdForAnalysis)) {
-    selectedBatchIdForAnalysis = batches[0]?.id;
-    batchSelector.value = selectedBatchIdForAnalysis;
-    currentModel.modules.lifeData.analysisConfig.selectedBatchId = selectedBatchIdForAnalysis;
-  }
-}
-
 function getTargetB10() {
-  // 从 model.homeCalc 获取质保期参数（首页共享数据）
-  const homeCalc = currentModel?.homeCalc || {};
-  const warrantyYears = homeCalc.warrantyYears || 0;
-  const hoursPerYear = homeCalc.hoursPerYear || 0;
-
-  if (warrantyYears <= 0 || hoursPerYear <= 0) return null;
-
-  // 计算质保期等效小时数
-  return warrantyYears * hoursPerYear;
+  const b10 = getHomeB10(currentModel);
+  return b10 > 0 ? b10 : null;
 }
 
 function getFailureAndCensoredTimes() {
+  // 合并模式：汇总全部批次数据
   const batches = currentModel.modules.lifeData.batches;
   const failures = [];
   const censored = [];
 
-  // 根据模式决定数据处理方式
-  if (analysisMode === "batch" && selectedBatchIdForAnalysis) {
-    // 分轮模式：只处理选中批次的数据
-    const targetBatch = batches.find((b) => b.id === selectedBatchIdForAnalysis);
-    if (targetBatch && targetBatch.items) {
-      for (const item of targetBatch.items) {
-        if (item.time <= 0) continue;
-        const failed = isItemFailed(item);
-        if (failed) {
-          failures.push(item.time);
-        } else {
-          censored.push(item.time);
-        }
+  for (const batch of batches) {
+    for (const item of batch.items || []) {
+      if (item.time <= 0) continue;
+      const failed = isItemFailed(item);
+      if (failed) {
+        failures.push(item.time);
+      } else {
+        censored.push(item.time);
       }
     }
-  } else {
-    // 合并模式：汇总全部批次数据
-    for (const batch of batches) {
-      for (const item of batch.items || []) {
-        if (item.time <= 0) continue;
-        const failed = isItemFailed(item);
-        if (failed) {
-          failures.push(item.time);
-        } else {
-          censored.push(item.time);
-        }
-      }
+  }
+  return { failures, censored };
+}
+
+function getBatchFailureAndCensoredTimes(batchId) {
+  // 分轮模式：返回单个批次的失效和截尾数据
+  const batches = currentModel.modules.lifeData.batches;
+  const batch = batches.find((b) => b.id === batchId);
+  const failures = [];
+  const censored = [];
+
+  if (!batch) return { failures, censored };
+
+  for (const item of batch.items || []) {
+    if (item.time <= 0) continue;
+    const failed = isItemFailed(item);
+    if (failed) {
+      failures.push(item.time);
+    } else {
+      censored.push(item.time);
     }
   }
   return { failures, censored };
@@ -562,15 +527,227 @@ function getFailureAndCensoredTimes() {
 
 function updateAnalysisResults() {
   const config = currentModel.modules.lifeData.analysisConfig;
-  const { failures, censored } = getFailureAndCensoredTimes();
   const targetB10 = getTargetB10();
+  const mergedContainer = document.getElementById("ld-merged-results");
+  const batchContainer = document.getElementById("ld-batch-results");
 
-  const fit = fitDistribution(config.distribution, config.method, failures, censored);
+  if (analysisMode === "batch") {
+    if (mergedContainer) mergedContainer.style.display = "none";
+    if (batchContainer) batchContainer.style.display = "";
+    renderBatchResults(config, targetB10);
+  } else {
+    if (mergedContainer) mergedContainer.style.display = "";
+    if (batchContainer) batchContainer.style.display = "none";
+    const { failures, censored } = getFailureAndCensoredTimes();
+    const fit = fitDistribution(config.distribution, config.method, failures, censored);
+    updateFitMetrics(fit, config.distribution, targetB10);
+    updateReliabilityCalculator(fit, config.distribution);
+    drawPPPlot(fit, config.distribution, "ld-pp-canvas");
+    drawCdfPlot(fit, config.distribution, targetB10, "ld-cdf-canvas");
+  }
+}
 
-  updateFitMetrics(fit, config.distribution, targetB10);
-  updateReliabilityCalculator(fit, config.distribution);
-  drawPPPlot(fit, config.distribution);
-  drawCdfPlot(fit, config.distribution, targetB10);
+function renderBatchResults(config, targetB10) {
+  const container = document.getElementById("ld-batch-results");
+  if (!container) return;
+
+  const batches = currentModel.modules.lifeData.batches;
+  if (batches.length === 0) {
+    container.innerHTML =
+      '<div class="card"><div class="card-body"><p class="hint" style="margin: 0;">暂无批次数据，请先在「数据录入」中添加批次。</p></div></div>';
+    return;
+  }
+
+  container.innerHTML = batches.map((batch) => buildBatchResultHtml(batch)).join("");
+
+  for (const batch of batches) {
+    const { failures, censored } = getBatchFailureAndCensoredTimes(batch.id);
+    const fit = fitDistribution(config.distribution, config.method, failures, censored);
+    updateBatchFitMetrics(batch.id, fit, config.distribution, targetB10);
+
+    const hasData = fit && fit.b10 != null;
+    const plotsEl = document.getElementById(`ld-batch-plots-${batch.id}`);
+    const emptyEl = document.getElementById(`ld-batch-empty-${batch.id}`);
+    if (hasData) {
+      if (plotsEl) plotsEl.style.display = "";
+      if (emptyEl) emptyEl.style.display = "none";
+      drawPPPlot(fit, config.distribution, `ld-pp-canvas-${batch.id}`);
+      drawCdfPlot(fit, config.distribution, targetB10, `ld-cdf-canvas-${batch.id}`);
+    } else {
+      if (plotsEl) plotsEl.style.display = "none";
+      if (emptyEl) emptyEl.style.display = "";
+    }
+  }
+}
+
+function buildBatchResultHtml(batch) {
+  const id = batch.id;
+  const name = escapeHtml(batch.name);
+  const itemCount = (batch.items || []).length;
+  return `
+    <div class="card ld-batch-result-card" data-batch-id="${id}">
+      <div class="card-header">
+        <h3>${name}</h3>
+        <span class="hint">${itemCount} 条数据</span>
+      </div>
+      <div class="card-body">
+        <div class="metrics-grid" id="ld-batch-metrics-${id}">
+          <div class="metric-card">
+            <div class="metric-label">样本总数</div>
+            <div class="metric-value" id="ld-batch-total-${id}">—</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">失效数</div>
+            <div class="metric-value" id="ld-batch-failures-${id}">—</div>
+          </div>
+          <div class="metric-card" id="ld-batch-metric-censored-${id}" style="display: none;">
+            <div class="metric-label">右删失数<span class="help-icon" data-tooltip="试验结束时仍未失效的样品，只知道寿命大于某个值">?</span></div>
+            <div class="metric-value" id="ld-batch-censored-${id}">—</div>
+          </div>
+          <div class="metric-card" id="ld-batch-metric-beta-${id}">
+            <div class="metric-label">形状参数 β<span class="help-icon" data-tooltip="β<1早期失效，β≈1偶然失效，β>1磨损失效。电动工具典型值2.0~2.5">?</span></div>
+            <div class="metric-value" id="ld-batch-beta-${id}">—</div>
+          </div>
+          <div class="metric-card" id="ld-batch-metric-eta-${id}">
+            <div class="metric-label">特征寿命 η<span class="help-icon" data-tooltip="可靠度为36.8%时的寿命时间，代表整体寿命量级">?</span></div>
+            <div class="metric-value" id="ld-batch-eta-${id}">—</div>
+            <div class="metric-unit">h</div>
+          </div>
+          <div class="metric-card" id="ld-batch-metric-lambda-${id}" style="display: none;">
+            <div class="metric-label">失效率 λ</div>
+            <div class="metric-value" id="ld-batch-lambda-${id}">—</div>
+            <div class="metric-unit">/h</div>
+          </div>
+          <div class="metric-card" id="ld-batch-metric-mu-${id}" style="display: none;">
+            <div class="metric-label">对数均值 μ</div>
+            <div class="metric-value" id="ld-batch-mu-${id}">—</div>
+          </div>
+          <div class="metric-card" id="ld-batch-metric-sigma-${id}" style="display: none;">
+            <div class="metric-label">对数标准差 σ</div>
+            <div class="metric-value" id="ld-batch-sigma-${id}">—</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">B10 寿命</div>
+            <div class="metric-value" id="ld-batch-b10-${id}">—</div>
+            <div class="metric-unit">h</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">B50 寿命</div>
+            <div class="metric-value" id="ld-batch-b50-${id}">—</div>
+            <div class="metric-unit">h</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">拟合优度 R²</div>
+            <div class="metric-value" id="ld-batch-r2-${id}">—</div>
+          </div>
+        </div>
+        <div class="metrics-grid" style="margin-top: 1rem;">
+          <div class="metric-card">
+            <div class="metric-label">目标 B10</div>
+            <div class="metric-value" id="ld-batch-target-${id}">—</div>
+            <div class="metric-unit">h</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">验证结果</div>
+            <div class="metric-value" id="ld-batch-pass-${id}">—</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">差距</div>
+            <div class="metric-value" id="ld-batch-gap-${id}">—</div>
+            <div class="metric-unit">h</div>
+          </div>
+        </div>
+        <div class="empty-state" id="ld-batch-empty-${id}" style="display: none;">
+          <div class="empty-icon">⚠️</div>
+          <h3>数据不足</h3>
+          <p>该批次失效数据不足（至少需要 2 个失效数据和 3 个总样本），无法拟合分布。</p>
+        </div>
+        <div class="ld-batch-plots" id="ld-batch-plots-${id}">
+          <div class="ld-plot-block">
+            <h4>概率图 (P-P 图)</h4>
+            <canvas id="ld-pp-canvas-${id}" width="700" height="400"></canvas>
+          </div>
+          <div class="ld-plot-block">
+            <h4>累积分布函数 (CDF)</h4>
+            <canvas id="ld-cdf-canvas-${id}" width="700" height="400"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function updateBatchFitMetrics(batchId, fit, distribution, targetB10) {
+  const hasData = fit && fit.b10 != null;
+  const get = (id) => document.getElementById(id);
+
+  const totalEl = get(`ld-batch-total-${batchId}`);
+  if (!totalEl) return;
+
+  totalEl.textContent = hasData ? fit.totalCount : "—";
+  get(`ld-batch-failures-${batchId}`).textContent = hasData ? fit.failureCount : "—";
+
+  const censoredMetric = get(`ld-batch-metric-censored-${batchId}`);
+  const censoredCount = hasData ? fit.totalCount - fit.failureCount : 0;
+  if (censoredCount > 0) {
+    censoredMetric.style.display = "";
+    get(`ld-batch-censored-${batchId}`).textContent = censoredCount;
+  } else {
+    censoredMetric.style.display = "none";
+  }
+
+  get(`ld-batch-b10-${batchId}`).textContent = hasData ? fmt(fit.b10, 1) + " h" : "—";
+  get(`ld-batch-b50-${batchId}`).textContent = hasData && fit.b50 != null ? fmt(fit.b50, 1) + " h" : "—";
+  get(`ld-batch-r2-${batchId}`).textContent = hasData && fit.rSquared != null ? fmt(fit.rSquared, 3) : "—";
+
+  const betaMetric = get(`ld-batch-metric-beta-${batchId}`);
+  const etaMetric = get(`ld-batch-metric-eta-${batchId}`);
+  const lambdaMetric = get(`ld-batch-metric-lambda-${batchId}`);
+  const muMetric = get(`ld-batch-metric-mu-${batchId}`);
+  const sigmaMetric = get(`ld-batch-metric-sigma-${batchId}`);
+
+  if (distribution === "weibull") {
+    betaMetric.style.display = "";
+    etaMetric.style.display = "";
+    lambdaMetric.style.display = "none";
+    muMetric.style.display = "none";
+    sigmaMetric.style.display = "none";
+    get(`ld-batch-beta-${batchId}`).textContent = hasData ? fmt(fit.beta, 2) : "—";
+    get(`ld-batch-eta-${batchId}`).textContent = hasData ? fmt(fit.eta, 0) + " h" : "—";
+  } else if (distribution === "exponential") {
+    betaMetric.style.display = "none";
+    etaMetric.style.display = "none";
+    lambdaMetric.style.display = "";
+    muMetric.style.display = "none";
+    sigmaMetric.style.display = "none";
+    get(`ld-batch-lambda-${batchId}`).textContent = hasData ? fmt(fit.lambda * 1000, 4) + " ×10⁻³/h" : "—";
+  } else if (distribution === "lognormal") {
+    betaMetric.style.display = "none";
+    etaMetric.style.display = "none";
+    lambdaMetric.style.display = "none";
+    muMetric.style.display = "";
+    sigmaMetric.style.display = "";
+    get(`ld-batch-mu-${batchId}`).textContent = hasData ? fmt(fit.mu, 2) : "—";
+    get(`ld-batch-sigma-${batchId}`).textContent = hasData ? fmt(fit.sigma, 2) : "—";
+  }
+
+  get(`ld-batch-target-${batchId}`).textContent = targetB10 ? fmt(targetB10, 0) + " h" : "—";
+
+  const passEl = get(`ld-batch-pass-${batchId}`);
+  const gapEl = get(`ld-batch-gap-${batchId}`);
+  if (hasData && targetB10) {
+    const pass = fit.b10 >= targetB10;
+    const gap = fit.b10 - targetB10;
+    passEl.textContent = pass ? "通过 ✓" : "未通过 ✗";
+    passEl.style.color = pass ? "var(--success)" : "var(--danger)";
+    gapEl.textContent = fmt(gap, 1) + " h";
+    gapEl.className = "metric-value " + (gap >= 0 ? "pass" : "fail");
+  } else {
+    passEl.textContent = "—";
+    passEl.style.color = "";
+    gapEl.textContent = "—";
+    gapEl.className = "metric-value";
+  }
 }
 
 function updateFitMetrics(fit, distribution, targetB10) {
@@ -713,8 +890,8 @@ function updateReliabilityCalculator(fitParam, distributionParam) {
   }
 }
 
-function drawPPPlot(fit, distribution) {
-  const canvas = document.getElementById("ld-pp-canvas");
+function drawPPPlot(fit, distribution, canvasOrId) {
+  const canvas = typeof canvasOrId === "string" ? document.getElementById(canvasOrId) : canvasOrId;
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
   const w = canvas.width;
@@ -847,8 +1024,8 @@ function drawPPPlot(fit, distribution) {
   ctx.restore();
 }
 
-function drawCdfPlot(fit, distribution, targetB10) {
-  const canvas = document.getElementById("ld-cdf-canvas");
+function drawCdfPlot(fit, distribution, targetB10, canvasOrId) {
+  const canvas = typeof canvasOrId === "string" ? document.getElementById(canvasOrId) : canvasOrId;
   if (!canvas) return;
   const ctx = canvas.getContext("2d");
   const w = canvas.width;

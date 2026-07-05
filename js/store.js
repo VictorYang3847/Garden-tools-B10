@@ -119,6 +119,13 @@ function defaultDerating() {
   return { components: [], standard: "mil-hdbk-217" };
 }
 
+function defaultWeakness() {
+  return {
+    weights: { fmea: 0.4, prediction: 0.3, derating: 0.3 },
+    items: [],
+  };
+}
+
 function defaultEnvironment() {
   return {
     thermalCycle: {
@@ -201,6 +208,7 @@ export function createModuleData() {
     growth: defaultGrowth(),
     maintenance: defaultMaintenance(),
     derating: defaultDerating(),
+    weakness: defaultWeakness(),
     environment: defaultEnvironment(),
     dataManagement: defaultDataManagement(),
   };
@@ -422,6 +430,7 @@ function normalizeStateV3(s) {
         if (!Array.isArray(model.modules.maintenance.spares)) model.modules.maintenance.spares = [];
         if (!model.modules.maintenance.strategy) model.modules.maintenance.strategy = defaultMaintenance().strategy;
         if (!model.modules.derating) model.modules.derating = defaultDerating();
+        if (!model.modules.weakness) model.modules.weakness = defaultWeakness();
         if (!model.modules.environment) model.modules.environment = defaultEnvironment();
         if (!model.modules.dataManagement) model.modules.dataManagement = defaultDataManagement();
         // 不再初始化 lifeData.definition，产品参数已迁移到 homeCalc
@@ -531,6 +540,7 @@ function migrateV2ToV3(v2) {
           growth: defaultGrowth(),
           maintenance: defaultMaintenance(),
           derating: defaultDerating(),
+          weakness: defaultWeakness(),
           environment: defaultEnvironment(),
           dataManagement: defaultDataManagement(),
         },
@@ -642,6 +652,33 @@ export async function getSyncManagerInstance() {
  */
 export function getState() {
   return ensureState();
+}
+
+/**
+ * 获取首页 B10 计算器得出的目标 B10 值
+ * 如果首页未计算（参数不完整），返回默认值 150
+ * @param {object} model 当前 model 对象（可选，不传则用当前选中型号）
+ * @returns {number} 目标 B10 值（小时）
+ */
+export function getHomeB10(model) {
+  const m = model || getCurrentModel();
+  if (!m || !m.homeCalc) return 150;
+  const hc = m.homeCalc;
+  const warrantyYears = Number(hc.warrantyYears) || 0;
+  const hoursPerYear = Number(hc.hoursPerYear) || 0;
+  const allowFailRate = Number(hc.allowFailRate) || 0;
+  const beta = Number(hc.beta) || 0;
+  const safetyMargin = Number(hc.safetyMargin) || 0;
+  if (warrantyYears <= 0 || hoursPerYear <= 0 || allowFailRate <= 0 || beta <= 0) {
+    return 150;
+  }
+  const tw = warrantyYears * hoursPerYear;
+  const fw = allowFailRate / 100;
+  const margin = safetyMargin / 100;
+  const K10 = Math.log(10 / 9);
+  const b10Calc = tw * Math.pow(K10 / -Math.log(1 - fw), 1 / beta);
+  const b10 = b10Calc * (1 + margin);
+  return isFinite(b10) && b10 > 0 ? b10 : 150;
 }
 
 export function getProjects() {
@@ -1353,6 +1390,11 @@ export function createDefaultProject() {
       },
     ],
     standard: "mil-hdbk-217",
+  };
+
+  model.modules.weakness = {
+    weights: { fmea: 0.4, prediction: 0.3, derating: 0.3 },
+    items: [],
   };
 
   model.modules.environment = {

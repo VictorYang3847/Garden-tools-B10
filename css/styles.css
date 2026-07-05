@@ -996,60 +996,43 @@ button:hover {
   height: auto;
 }
 
-/* ===== 模式切换 ===== */
-.mode-switch-container {
-  display: flex;
+/* ===== Segmented Control（紧凑模式切换） ===== */
+.segmented-control {
+  display: inline-flex;
   align-items: center;
-  gap: 1rem;
-}
-
-.mode-switch-label {
-  font-size: 0.88rem;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.mode-switch-buttons {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.mode-switch-option {
-  cursor: pointer;
-}
-
-.mode-switch-option input[type="radio"] {
-  display: none;
-}
-
-.mode-switch-btn {
-  display: inline-block;
-  padding: 0.5rem 1rem;
+  padding: 2px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 8px;
-  color: var(--text-muted);
-  font-size: 0.88rem;
-  transition: all 0.2s;
+  height: 30px;
+  box-sizing: border-box;
 }
 
-.mode-switch-btn:hover {
-  border-color: var(--accent-dim);
+.segmented-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-family: inherit;
+  padding: 0 0.85rem;
+  height: 26px;
+  line-height: 1;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.segmented-btn:hover:not(.active) {
   color: var(--text);
 }
 
-.mode-switch-option input[type="radio"]:checked + .mode-switch-btn {
-  background: var(--accent-dim);
-  border-color: var(--accent);
+.segmented-btn.active {
+  background: var(--accent);
   color: #fff;
   font-weight: 500;
-}
-
-.batch-selector-container {
-  padding: 0.75rem;
-  background: var(--surface-2);
-  border-radius: 8px;
-  border: 1px solid var(--border);
 }
 
 /* ===== 响应式 ===== */
@@ -1591,6 +1574,45 @@ button:hover {
 .life-data-tab.active {
   background: var(--accent);
   color: #fff;
+}
+
+/* 分轮模式结果卡片 */
+.ld-batch-results-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ld-batch-result-card {
+  margin-bottom: 0;
+}
+
+.ld-batch-plots {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.ld-plot-block {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+
+.ld-plot-block h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.ld-plot-block canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 700px;
 }
 
 .card-grid {
@@ -5189,6 +5211,47 @@ textarea.form-input {
 /* 产品信息卡片样式 */
 .product-info-card {
   margin-bottom: 0;
+}
+
+/* 可折叠产品信息卡片 */
+.product-info-card.collapsible .collapsible-header {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.product-info-card.collapsible .collapsible-header:hover {
+  background: var(--border);
+}
+
+.product-info-card.collapsible .collapsible-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.product-info-card.collapsible .collapse-indicator {
+  display: inline-block;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  width: 0.9rem;
+  text-align: center;
+  transition: transform 0.2s ease;
+}
+
+.product-info-card.collapsible .product-info-summary {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 折叠状态下隐藏 body */
+.product-info-card.collapsible[data-collapsed="true"] .collapsible-body {
+  display: none;
 }
 
 .product-info-grid {

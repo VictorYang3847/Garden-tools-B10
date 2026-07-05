@@ -44,6 +44,11 @@ const routes = {
     title: "降额裕度",
     module: () => import("./pages/derating.js"),
   },
+  weakness: {
+    path: "weakness",
+    title: "短板分析",
+    module: () => import("./pages/weakness.js"),
+  },
   environment: {
     path: "environment",
     title: "环境适应",

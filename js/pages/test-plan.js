@@ -1,9 +1,9 @@
-import { genId } from "../store.js";
+import { genId, getHomeB10 } from "../store.js";
 import { fmt, toast } from "../utils.js";
 
 let currentModel = null;
 let onSaveCallback = null;
-let activeTab = "test-items";
+let activeTab = "sample-analysis";
 
 const STRESS_TYPES = {
   temperature: "温度",
@@ -107,6 +107,12 @@ export function render(container, model) {
   renderHaltTests();
   renderDvprTable();
   renderOptimizePanel();
+
+  const b10Input = document.getElementById("tp-sa-b10");
+  if (b10Input) {
+    b10Input.value = getHomeB10(currentModel);
+  }
+
   switchTab(activeTab);
 }
 

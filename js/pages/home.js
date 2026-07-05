@@ -4,7 +4,6 @@ import {
   weibullEta,
   failureRate,
 } from "../calculator.js";
-import { toast } from "../utils.js";
 
 let currentModel = null;
 let onSaveCallback = null;
@@ -35,6 +34,7 @@ export function render(container, model) {
 
   loadValuesFromModel();
   loadProductInfoFromModel();
+  updateProductInfoSummary();
   bindEvents();
   bindProductInfoEvents();
   calculate();
@@ -186,11 +186,17 @@ function loadProductInfoFromModel() {
   const productInfo = currentModel?.productInfo || {};
   PRODUCT_INFO_FIELDS.forEach(({ id, key, type }) => {
     const el = document.getElementById(id);
-    if (el && productInfo[key] !== undefined && productInfo[key] !== null) {
+    if (!el) return;
+    // 型号名称字段：优先使用 productInfo.modelName，为空时回退到 model.name，保持与顶部型号选择器对齐
+    let value = productInfo[key];
+    if (key === "modelName" && (value === undefined || value === null || value === "")) {
+      value = currentModel?.name ?? "";
+    }
+    if (value !== undefined && value !== null) {
       if (type === "number") {
-        el.value = productInfo[key];
+        el.value = value;
       } else {
-        el.value = productInfo[key];
+        el.value = value;
       }
     }
   });
@@ -214,28 +220,63 @@ function saveProductInfoToModel() {
   productInfo.updatedAt = new Date().toISOString();
   currentModel.productInfo = productInfo;
 
+  // 同步型号名称到 model.name（与顶部型号选择器对齐）
+  const newName = productInfo.modelName || "";
+  const nameChanged = newName && newName !== currentModel.name;
+  if (nameChanged) {
+    currentModel.name = newName;
+  }
+
   if (typeof onSaveCallback === "function") {
-    onSaveCallback({ productInfo });
+    // 传入 name 字段，app.js 的 saveModel 回调会调用 refreshAllSelectors 刷新顶部型号选择器
+    const payload = { productInfo };
+    if (nameChanged) payload.name = newName;
+    onSaveCallback(payload);
+  }
+}
+
+function updateProductInfoSummary() {
+  const summaryEl = document.getElementById("product-info-summary");
+  if (!summaryEl) return;
+
+  const nameEl = document.getElementById("product-model-name");
+  const codeEl = document.getElementById("product-project-code");
+  const modelName = (nameEl?.value || "").trim() || currentModel?.name || "未命名型号";
+  const projectCode = (codeEl?.value || "").trim();
+
+  summaryEl.textContent = projectCode
+    ? `${modelName} | ${projectCode}`
+    : modelName;
+}
+
+function toggleProductInfoCollapse() {
+  const card = document.querySelector(".product-info-card.collapsible");
+  if (!card) return;
+  const isCollapsed = card.dataset.collapsed === "true";
+  card.dataset.collapsed = isCollapsed ? "false" : "true";
+  const indicator = card.querySelector(".collapse-indicator");
+  if (indicator) {
+    indicator.textContent = isCollapsed ? "▼" : "▶";
   }
 }
 
 function bindProductInfoEvents() {
-  // 为每个产品信息输入字段绑定事件
-  PRODUCT_INFO_FIELDS.forEach(({ id, type }) => {
+  // 折叠/展开：点击卡片标题切换
+  const header = document.getElementById("product-info-header");
+  if (header) {
+    header.addEventListener("click", toggleProductInfoCollapse);
+  }
+
+  // 自动保存：编辑任意字段后立即保存并更新摘要
+  PRODUCT_INFO_FIELDS.forEach(({ id }) => {
     const el = document.getElementById(id);
     if (el) {
       el.addEventListener("input", () => {
-        // 输入时不立即保存，用户需要点击保存按钮
+        saveProductInfoToModel();
+        updateProductInfoSummary();
+        // 型号名称变化时，同步更新顶部型号选择器（由 onSaveCallback 触发 refreshAllSelectors）
+        // 注意：不在此处刷新页面，避免输入框失焦
       });
     }
   });
-
-  // 保存按钮
-  const saveBtn = document.getElementById("product-info-save");
-  if (saveBtn) {
-    saveBtn.addEventListener("click", () => {
-      saveProductInfoToModel();
-      toast(saveBtn, "产品信息已保存", 1500);
-    });
-  }
 }

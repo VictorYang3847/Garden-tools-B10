@@ -31,17 +31,21 @@
             <span class="nav-icon">📊</span>
             <span class="nav-label">可靠性预测</span>
           </a>
-          <a href="#/life-data" class="nav-item" data-route="life-data">
-            <span class="nav-icon">📈</span>
-            <span class="nav-label">寿命数据分析</span>
-          </a>
           <a href="#/test-plan" class="nav-item" data-route="test-plan">
             <span class="nav-icon">📋</span>
             <span class="nav-label">测试计划</span>
           </a>
+          <a href="#/life-data" class="nav-item" data-route="life-data">
+            <span class="nav-icon">📈</span>
+            <span class="nav-label">寿命数据分析</span>
+          </a>
           <a href="#/fta" class="nav-item" data-route="fta">
             <span class="nav-icon">🌳</span>
             <span class="nav-label">故障树分析</span>
+          </a>
+          <a href="#/environment" class="nav-item" data-route="environment">
+            <span class="nav-icon">🌡️</span>
+            <span class="nav-label">环境适应</span>
           </a>
           <a href="#/growth" class="nav-item" data-route="growth">
             <span class="nav-icon">📈</span>
@@ -50,14 +54,6 @@
           <a href="#/maintenance" class="nav-item" data-route="maintenance">
             <span class="nav-icon">🔧</span>
             <span class="nav-label">维护可用性</span>
-          </a>
-          <a href="#/derating" class="nav-item" data-route="derating">
-            <span class="nav-icon">📉</span>
-            <span class="nav-label">降额裕度</span>
-          </a>
-          <a href="#/environment" class="nav-item" data-route="environment">
-            <span class="nav-icon">🌡️</span>
-            <span class="nav-label">环境适应</span>
           </a>
           <a href="#/data" class="nav-item" data-route="data">
             <span class="nav-icon">💾</span>
@@ -170,11 +166,15 @@
         </div>
 
         <div class="home-section">
-          <div class="card product-info-card">
-            <div class="card-header">
-              <h3>产品信息</h3>
+          <div class="card product-info-card collapsible" data-collapsed="true">
+            <div class="card-header collapsible-header" id="product-info-header">
+              <div class="collapsible-title">
+                <span class="collapse-indicator" aria-hidden="true">▶</span>
+                <h3>产品信息</h3>
+              </div>
+              <div class="product-info-summary" id="product-info-summary">—</div>
             </div>
-            <div class="card-body">
+            <div class="card-body collapsible-body">
               <div class="product-info-grid">
                 <div class="form-group">
                   <label>型号名称</label>
@@ -212,9 +212,6 @@
                   <label>备注</label>
                   <textarea id="product-note" class="form-input" rows="2" placeholder="请输入备注信息"></textarea>
                 </div>
-              </div>
-              <div class="product-info-actions">
-                <button type="button" id="product-info-save" class="btn btn-primary">保存产品信息</button>
               </div>
             </div>
           </div>
@@ -437,6 +434,7 @@
             <div class="life-data-tabs">
               <button type="button" class="life-data-tab active" data-tab="data-entry">数据录入</button>
               <button type="button" class="life-data-tab" data-tab="analysis">结果分析</button>
+              <button type="button" class="life-data-tab" data-tab="weakness">短板分析</button>
             </div>
           </div>
 
@@ -542,31 +540,15 @@
                 <h3>分析配置</h3>
               </div>
               <div class="card-body">
-                <!-- 模式切换 -->
-                <div class="mode-switch-container" style="margin-bottom: 1rem;">
-                  <div class="mode-switch-label">数据查看模式：</div>
-                  <div class="mode-switch-buttons">
-                    <label class="mode-switch-option">
-                      <input type="radio" name="ld-analysis-mode" value="merged" id="ld-mode-merged" checked />
-                      <span class="mode-switch-btn">合并模式</span>
-                    </label>
-                    <label class="mode-switch-option">
-                      <input type="radio" name="ld-analysis-mode" value="batch" id="ld-mode-batch" />
-                      <span class="mode-switch-btn">分轮模式</span>
-                    </label>
-                  </div>
-                </div>
-                <!-- 轮次选择器（分轮模式时显示） -->
-                <div class="batch-selector-container" id="ld-batch-selector-container" style="display: none; margin-bottom: 1rem;">
-                  <div class="form-group">
-                    <label>选择批次</label>
-                    <select id="ld-batch-selector" class="form-input">
-                      <!-- 动态填充批次选项 -->
-                    </select>
-                  </div>
-                </div>
-                <!-- 分布类型和方法选择 -->
+                <!-- 模式切换 + 分布类型 + 方法选择（紧凑同一行） -->
                 <div class="form-row">
+                  <div class="form-group">
+                    <label>查看模式</label>
+                    <div class="segmented-control" id="ld-mode-segmented">
+                      <button type="button" class="segmented-btn active" data-mode="merged">合并</button>
+                      <button type="button" class="segmented-btn" data-mode="batch">分轮</button>
+                    </div>
+                  </div>
                   <div class="form-group">
                     <label>分布类型</label>
                     <select id="ld-distribution" class="form-input">
@@ -587,6 +569,7 @@
               </div>
             </div>
 
+            <div id="ld-merged-results">
             <div class="card">
               <div class="card-header">
                 <h3>拟合结果</h3>
@@ -738,6 +721,9 @@
                 <canvas id="ld-cdf-canvas" width="700" height="400"></canvas>
               </div>
             </div>
+            </div>
+
+            <div id="ld-batch-results" class="ld-batch-results-container"></div>
           </div>
         </div>
       </div>
@@ -752,116 +738,15 @@
         <div class="module-content">
           <div class="test-plan-toolbar">
             <div class="test-plan-tabs">
-              <button type="button" class="test-plan-tab active" data-tab="test-items">试验项目</button>
-              <button type="button" class="test-plan-tab" data-tab="sample-analysis">样本量分析</button>
+              <button type="button" class="test-plan-tab active" data-tab="sample-analysis">样本量分析</button>
+              <button type="button" class="test-plan-tab" data-tab="test-items">试验项目</button>
               <button type="button" class="test-plan-tab" data-tab="alt">加速寿命</button>
               <button type="button" class="test-plan-tab" data-tab="halt">HALT 试验</button>
               <button type="button" class="test-plan-tab" data-tab="dvpr">DVP&amp;R</button>
             </div>
           </div>
 
-          <div class="test-plan-tab-content" id="tp-tab-test-items">
-            <div class="card">
-              <div class="card-header">
-                <h3>全局参数设置</h3>
-              </div>
-              <div class="card-body">
-                <div class="form-row">
-                  <div class="form-group">
-                    <label>置信度</label>
-                    <select id="tp-confidence" class="form-input">
-                      <option value="0.9">90%</option>
-                      <option value="0.95">95%</option>
-                      <option value="0.99">99%</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label>允许失效数</label>
-                    <input type="number" id="tp-allowed-failures" class="form-input" min="0" step="1" value="0" />
-                  </div>
-                  <div class="form-group">
-                    <label>默认截尾类型<span class="help-icon" data-tooltip="定时截尾(到时停) vs 定数截尾(失效数够了停)">?</span></label>
-                    <select id="tp-default-censor" class="form-input">
-                      <option value="time">定时截尾</option>
-                      <option value="failure">定数截尾</option>
-                      <option value="complete">完全失效</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label>形状参数 β<span class="help-icon" data-tooltip="Weibull 分布的形状参数，β>1 表示老化失效，β=1 为随机失效，β<1 为早期失效">?</span></label>
-                    <input type="number" id="tp-default-beta" class="form-input" min="0.1" step="0.1" value="2.2" />
-                  </div>
-                  <div class="form-group">
-                    <label>优化策略<span class="help-icon" data-tooltip="standard=传统截尾系数, optimized=Weibull延长试验(部件2.2×B10,整机1.3×B10), custom=自定义">?</span></label>
-                    <select id="tp-strategy" class="form-input">
-                      <option value="standard">标准</option>
-                      <option value="optimized">Weibull 优化</option>
-                      <option value="custom">自定义</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-header">
-                <h3>试验项目明细</h3>
-                <div class="card-actions">
-                  <button type="button" class="btn-icon" id="tp-import-fmea">
-                    <span>📥</span>
-                    <span class="btn-text">从 FMEA 导入</span>
-                  </button>
-                  <button type="button" class="btn-icon" id="tp-calc-all">
-                    <span>🔢</span>
-                    <span class="btn-text">计算全部</span>
-                  </button>
-                  <button type="button" class="btn-icon btn-primary" id="tp-add-item">
-                    <span>➕</span>
-                    <span class="btn-text">添加测试项</span>
-                  </button>
-                </div>
-              </div>
-              <div class="card-body">
-                <div class="table-wrap">
-                  <table class="data-table test-items-table">
-                    <thead>
-                      <tr>
-                        <th style="width: 40px;">#</th>
-                        <th style="width: 18%;">测试项目名称</th>
-                        <th style="width: 80px;">目标寿命</th>
-                        <th style="width: 75px;">可靠度</th>
-                        <th style="width: 70px;">级别</th>
-                        <th style="width: 55px;">β</th>
-                        <th style="width: 70px;">倍率</th>
-                        <th style="width: 65px;">样本量</th>
-                        <th style="width: 80px;">试验时长</th>
-                        <th style="width: 80px;">截尾类型</th>
-                        <th style="width: 15%;">台架条件</th>
-                        <th style="width: 50px;">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody id="tp-items-tbody"></tbody>
-                  </table>
-                </div>
-                <div class="empty-state" id="tp-items-empty" style="display: none;">
-                  <div class="empty-icon">📋</div>
-                  <h3>暂无试验项目</h3>
-                  <p>点击「添加测试项」或「从 FMEA 导入」开始创建试验项目。</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-header">
-                <h3>智能优化方案对比</h3>
-              </div>
-              <div class="card-body">
-                <div id="tp-optimize-panel"></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="test-plan-tab-content" id="tp-tab-sample-analysis" style="display: none;">
+          <div class="test-plan-tab-content" id="tp-tab-sample-analysis">
             <div class="card">
               <div class="card-header">
                 <h3>样本量分析</h3>
@@ -978,6 +863,107 @@
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="test-plan-tab-content" id="tp-tab-test-items" style="display: none;">
+            <div class="card">
+              <div class="card-header">
+                <h3>全局参数设置</h3>
+              </div>
+              <div class="card-body">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>置信度</label>
+                    <select id="tp-confidence" class="form-input">
+                      <option value="0.9">90%</option>
+                      <option value="0.95">95%</option>
+                      <option value="0.99">99%</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>允许失效数</label>
+                    <input type="number" id="tp-allowed-failures" class="form-input" min="0" step="1" value="0" />
+                  </div>
+                  <div class="form-group">
+                    <label>默认截尾类型<span class="help-icon" data-tooltip="定时截尾(到时停) vs 定数截尾(失效数够了停)">?</span></label>
+                    <select id="tp-default-censor" class="form-input">
+                      <option value="time">定时截尾</option>
+                      <option value="failure">定数截尾</option>
+                      <option value="complete">完全失效</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>形状参数 β<span class="help-icon" data-tooltip="Weibull 分布的形状参数，β>1 表示老化失效，β=1 为随机失效，β<1 为早期失效">?</span></label>
+                    <input type="number" id="tp-default-beta" class="form-input" min="0.1" step="0.1" value="2.2" />
+                  </div>
+                  <div class="form-group">
+                    <label>优化策略<span class="help-icon" data-tooltip="standard=传统截尾系数, optimized=Weibull延长试验(部件2.2×B10,整机1.3×B10), custom=自定义">?</span></label>
+                    <select id="tp-strategy" class="form-input">
+                      <option value="standard">标准</option>
+                      <option value="optimized">Weibull 优化</option>
+                      <option value="custom">自定义</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3>试验项目明细</h3>
+                <div class="card-actions">
+                  <button type="button" class="btn-icon" id="tp-import-fmea">
+                    <span>📥</span>
+                    <span class="btn-text">从 FMEA 导入</span>
+                  </button>
+                  <button type="button" class="btn-icon" id="tp-calc-all">
+                    <span>🔢</span>
+                    <span class="btn-text">计算全部</span>
+                  </button>
+                  <button type="button" class="btn-icon btn-primary" id="tp-add-item">
+                    <span>➕</span>
+                    <span class="btn-text">添加测试项</span>
+                  </button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="table-wrap">
+                  <table class="data-table test-items-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 40px;">#</th>
+                        <th style="width: 18%;">测试项目名称</th>
+                        <th style="width: 80px;">目标寿命</th>
+                        <th style="width: 75px;">可靠度</th>
+                        <th style="width: 70px;">级别</th>
+                        <th style="width: 55px;">β</th>
+                        <th style="width: 70px;">倍率</th>
+                        <th style="width: 65px;">样本量</th>
+                        <th style="width: 80px;">试验时长</th>
+                        <th style="width: 80px;">截尾类型</th>
+                        <th style="width: 15%;">台架条件</th>
+                        <th style="width: 50px;">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tp-items-tbody"></tbody>
+                  </table>
+                </div>
+                <div class="empty-state" id="tp-items-empty" style="display: none;">
+                  <div class="empty-icon">📋</div>
+                  <h3>暂无试验项目</h3>
+                  <p>点击「添加测试项」或「从 FMEA 导入」开始创建试验项目。</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3>智能优化方案对比</h3>
+              </div>
+              <div class="card-body">
+                <div id="tp-optimize-panel"></div>
               </div>
             </div>
           </div>
@@ -1312,6 +1298,9 @@
               </div>
             </div>
           </div>
+          <div class="life-data-tab-content" id="life-tab-weakness" style="display: none;">
+            <!-- 短板分析模块容器，由 JS 动态渲染 -->
+          </div>
         </div>
       </div>
     </template>
@@ -1324,8 +1313,13 @@
         </div>
         <div class="module-content">
           <div class="prediction-tabs">
+            <button type="button" class="pred-tab" data-tab="derating">降额裕度</button>
             <button type="button" class="pred-tab active" data-tab="prediction">可靠性预计</button>
             <button type="button" class="pred-tab" data-tab="allocation">可靠性分配</button>
+          </div>
+
+          <div id="pred-tab-derating" class="pred-tab-content" style="display: none;">
+            <!-- 降额裕度模块容器，由 JS 动态渲染 -->
           </div>
 
           <div id="pred-tab-prediction" class="pred-tab-content">
