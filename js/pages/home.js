@@ -4,9 +4,23 @@ import {
   weibullEta,
   failureRate,
 } from "../calculator.js";
+import { toast } from "../utils.js";
 
 let currentModel = null;
 let onSaveCallback = null;
+
+// 产品信息字段定义
+const PRODUCT_INFO_FIELDS = [
+  { id: "product-model-name", key: "modelName", label: "型号名称", type: "text" },
+  { id: "product-project-code", key: "projectCode", label: "项目编号", type: "text" },
+  { id: "product-voltage", key: "voltage", label: "电压(V)", type: "number", unit: "V" },
+  { id: "product-power", key: "power", label: "功率(W)", type: "number", unit: "W" },
+  { id: "product-blade-type", key: "bladeType", label: "刀片类型", type: "text" },
+  { id: "product-blade-length", key: "bladeLength", label: "刀片长度(mm)", type: "number", unit: "mm" },
+  { id: "product-stroke-rate", key: "strokeRate", label: "往复次数", type: "number" },
+  { id: "product-analyst", key: "analyst", label: "分析师", type: "text" },
+  { id: "product-note", key: "note", label: "备注", type: "textarea" },
+];
 
 export function init(model, onSave) {
   currentModel = model;
@@ -20,7 +34,9 @@ export function render(container, model) {
   container.appendChild(content);
 
   loadValuesFromModel();
+  loadProductInfoFromModel();
   bindEvents();
+  bindProductInfoEvents();
   calculate();
 }
 
@@ -162,4 +178,64 @@ function calculate() {
   if (mtbfEl) mtbfEl.textContent = mtbf.toFixed(1);
   if (reliabilityTEl) reliabilityTEl.textContent = (rt * 100).toFixed(2);
   if (failureTEl) failureTEl.textContent = (ft * 100).toFixed(2);
+}
+
+// ========== 产品信息相关函数 ==========
+
+function loadProductInfoFromModel() {
+  const productInfo = currentModel?.productInfo || {};
+  PRODUCT_INFO_FIELDS.forEach(({ id, key, type }) => {
+    const el = document.getElementById(id);
+    if (el && productInfo[key] !== undefined && productInfo[key] !== null) {
+      if (type === "number") {
+        el.value = productInfo[key];
+      } else {
+        el.value = productInfo[key];
+      }
+    }
+  });
+}
+
+function saveProductInfoToModel() {
+  if (!currentModel) return;
+
+  const productInfo = {};
+  PRODUCT_INFO_FIELDS.forEach(({ id, key, type }) => {
+    const el = document.getElementById(id);
+    if (el) {
+      if (type === "number") {
+        productInfo[key] = Number(el.value) || 0;
+      } else {
+        productInfo[key] = el.value || "";
+      }
+    }
+  });
+
+  productInfo.updatedAt = new Date().toISOString();
+  currentModel.productInfo = productInfo;
+
+  if (typeof onSaveCallback === "function") {
+    onSaveCallback({ productInfo });
+  }
+}
+
+function bindProductInfoEvents() {
+  // 为每个产品信息输入字段绑定事件
+  PRODUCT_INFO_FIELDS.forEach(({ id, type }) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener("input", () => {
+        // 输入时不立即保存，用户需要点击保存按钮
+      });
+    }
+  });
+
+  // 保存按钮
+  const saveBtn = document.getElementById("product-info-save");
+  if (saveBtn) {
+    saveBtn.addEventListener("click", () => {
+      saveProductInfoToModel();
+      toast(saveBtn, "产品信息已保存", 1500);
+    });
+  }
 }

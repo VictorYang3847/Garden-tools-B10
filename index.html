@@ -170,6 +170,57 @@
         </div>
 
         <div class="home-section">
+          <div class="card product-info-card">
+            <div class="card-header">
+              <h3>产品信息</h3>
+            </div>
+            <div class="card-body">
+              <div class="product-info-grid">
+                <div class="form-group">
+                  <label>型号名称</label>
+                  <input type="text" id="product-model-name" class="form-input" placeholder="请输入型号名称" />
+                </div>
+                <div class="form-group">
+                  <label>项目编号</label>
+                  <input type="text" id="product-project-code" class="form-input" placeholder="请输入项目编号" />
+                </div>
+                <div class="form-group">
+                  <label>电压(V)</label>
+                  <input type="number" id="product-voltage" class="form-input" min="0" step="0.1" placeholder="请输入电压" />
+                </div>
+                <div class="form-group">
+                  <label>功率(W)</label>
+                  <input type="number" id="product-power" class="form-input" min="0" step="1" placeholder="请输入功率" />
+                </div>
+                <div class="form-group">
+                  <label>刀片类型</label>
+                  <input type="text" id="product-blade-type" class="form-input" placeholder="请输入刀片类型" />
+                </div>
+                <div class="form-group">
+                  <label>刀片长度(mm)</label>
+                  <input type="number" id="product-blade-length" class="form-input" min="0" step="1" placeholder="请输入刀片长度" />
+                </div>
+                <div class="form-group">
+                  <label>往复次数</label>
+                  <input type="number" id="product-stroke-rate" class="form-input" min="0" step="1" placeholder="请输入往复次数" />
+                </div>
+                <div class="form-group">
+                  <label>分析师</label>
+                  <input type="text" id="product-analyst" class="form-input" placeholder="请输入分析师姓名" />
+                </div>
+                <div class="form-group full-width">
+                  <label>备注</label>
+                  <textarea id="product-note" class="form-input" rows="2" placeholder="请输入备注信息"></textarea>
+                </div>
+              </div>
+              <div class="product-info-actions">
+                <button type="button" id="product-info-save" class="btn btn-primary">保存产品信息</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="home-section">
           <div class="card b10-quick-card">
             <div class="card-header">
               <h3>B10 目标定义计算器</h3>
@@ -384,227 +435,14 @@
         <div class="module-content">
           <div class="life-data-toolbar">
             <div class="life-data-tabs">
-              <button type="button" class="life-data-tab active" data-tab="definition">产品定义</button>
-              <button type="button" class="life-data-tab" data-tab="data-entry">数据录入</button>
-              <button type="button" class="life-data-tab" data-tab="analysis">分析结果</button>
-              <button type="button" class="life-data-tab" data-tab="weakness">短板分析</button>
+              <button type="button" class="life-data-tab active" data-tab="data-entry">数据录入</button>
+              <button type="button" class="life-data-tab" data-tab="analysis">结果分析</button>
             </div>
           </div>
 
-          <div class="life-data-tab-content" id="life-tab-definition">
-            <div class="card-grid">
-              <div class="card">
-                <div class="card-header">
-                  <h3>产品信息</h3>
-                </div>
-                <div class="card-body">
-                  <form id="ld-definition-form">
-                    <div class="form-row">
-                      <div class="form-group">
-                        <label>型号名称</label>
-                        <input type="text" name="modelName" class="form-input" />
-                      </div>
-                      <div class="form-group">
-                        <label>项目编号</label>
-                        <input type="text" name="projectCode" class="form-input" />
-                      </div>
-                    </div>
-                    <div class="form-row">
-                      <div class="form-group">
-                        <label>电压 (V)</label>
-                        <input type="number" name="voltage" class="form-input" min="0" step="0.1" />
-                      </div>
-                      <div class="form-group">
-                        <label>功率 (W)</label>
-                        <input type="number" name="power" class="form-input" min="0" step="1" />
-                      </div>
-                    </div>
-                    <div class="form-row">
-                      <div class="form-group">
-                        <label>刀片类型</label>
-                        <select name="bladeType" class="form-input">
-                          <option value="double">双刃</option>
-                          <option value="single">单刃</option>
-                          <option value="reciprocating">往复式</option>
-                        </select>
-                      </div>
-                      <div class="form-group">
-                        <label>刀片长度 (mm)</label>
-                        <input type="number" name="bladeLength" class="form-input" min="0" step="1" />
-                      </div>
-                    </div>
-                    <div class="form-row">
-                      <div class="form-group">
-                        <label>每分钟行程次数</label>
-                        <input type="number" name="strokeRate" class="form-input" min="0" step="1" />
-                      </div>
-                      <div class="form-group">
-                        <label>分析人员</label>
-                        <input type="text" name="analyst" class="form-input" />
-                      </div>
-                    </div>
-                    <div class="form-row">
-                      <div class="form-group full-width">
-                        <label>备注</label>
-                        <textarea name="note" class="form-input" rows="2"></textarea>
-                      </div>
-                    </div>
-                  </form>
-                </div>
-              </div>
+          <!-- Definition tab removed - product definition now handled elsewhere -->
 
-              <div class="card">
-                <div class="card-header">
-                  <h3>使用场景</h3>
-                </div>
-                <div class="card-body">
-                  <form id="ld-scenario-form">
-                    <div class="form-row">
-                      <div class="form-group">
-                        <label>场景名称</label>
-                        <input type="text" name="scenarioName" class="form-input" />
-                      </div>
-                      <div class="form-group">
-                        <label>年使用小时数</label>
-                        <input type="number" name="hoursPerYear" class="form-input" min="0" step="1" />
-                      </div>
-                    </div>
-                    <div class="form-row">
-                      <div class="form-group">
-                        <label>占空比 (%)</label>
-                        <input type="number" name="dutyCycle" class="form-input" min="0" max="100" step="1" />
-                      </div>
-                      <div class="form-group">
-                        <label>连续运行时间 (分钟)</label>
-                        <input type="number" name="continuousRunMin" class="form-input" min="0" step="1" />
-                      </div>
-                    </div>
-                    <div class="form-row">
-                      <div class="form-group">
-                        <label>保修年限</label>
-                        <input type="number" name="warrantyYears" class="form-input" min="0" step="0.5" />
-                      </div>
-                      <div class="form-group">
-                        <label>可接受失效率 (%)</label>
-                        <input type="number" name="acceptableFailureRate" class="form-input" min="0" max="100" step="0.1" />
-                      </div>
-                    </div>
-                    <div class="form-row">
-                      <div class="form-group">
-                        <label>置信度 (%)<span class="help-icon" data-tooltip="统计结果的可信程度，行业常用90%或95%">?</span></label>
-                        <select name="confidence" class="form-input">
-                          <option value="90">90%</option>
-                          <option value="95">95%</option>
-                          <option value="99">99%</option>
-                        </select>
-                      </div>
-                      <div class="form-group">
-                        <label>安全余量 (%)</label>
-                        <input type="number" name="safetyMargin" class="form-input" min="0" max="100" step="1" />
-                      </div>
-                    </div>
-                    <div class="form-row">
-                      <div class="form-group">
-                        <label>失效定义</label>
-                        <select name="failureDefinition" class="form-input">
-                          <option value="performance">性能衰减</option>
-                          <option value="functional">功能失效</option>
-                          <option value="safety">安全失效</option>
-                        </select>
-                      </div>
-                      <div class="form-group">
-                        <label>性能阈值 (%)</label>
-                        <input type="number" name="performanceThreshold" class="form-input" min="0" max="100" step="1" />
-                      </div>
-                    </div>
-                    <div class="form-row">
-                      <div class="form-group full-width">
-                        <label>Weibull 形状参数 β</label>
-                        <input type="number" name="beta" class="form-input" min="0.1" step="0.1" />
-                      </div>
-                    </div>
-                    <div class="form-row">
-                      <div class="form-group full-width">
-                        <label>场景备注</label>
-                        <textarea name="scenarioNote" class="form-input" rows="2"></textarea>
-                      </div>
-                    </div>
-                    <div class="hint">保修累计小时数：<span id="ld-warranty-hours">0</span> h</div>
-                  </form>
-                </div>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-header">
-                <h3>零件 B10 寿命</h3>
-              </div>
-              <div class="card-body">
-                <div class="parts-table-container">
-                  <table class="data-table parts-table">
-                    <thead>
-                      <tr>
-                        <th style="width: 40px;">包含</th>
-                        <th>零件</th>
-                        <th style="width: 150px;">B10 寿命</th>
-                        <th style="width: 150px;">单位</th>
-                        <th style="min-width: 180px;">参数</th>
-                      </tr>
-                    </thead>
-                    <tbody id="ld-parts-tbody">
-                    </tbody>
-                  </table>
-                </div>
-                <div class="hint" id="ld-battery-equiv" style="margin-top: 0.5rem;">电池等效寿命：— h</div>
-              </div>
-            </div>
-
-            <div class="card" id="ld-def-results-card" style="display: none;">
-              <div class="card-header">
-                <h3>计算结果</h3>
-              </div>
-              <div class="card-body">
-                <div class="metrics-grid">
-                  <div class="metric-card">
-                    <div class="metric-label">目标 B10（含余量）</div>
-                    <div class="metric-value" id="ld-result-target-b10">—</div>
-                    <div class="metric-unit">h</div>
-                  </div>
-                  <div class="metric-card">
-                    <div class="metric-label">零件合成 B10</div>
-                    <div class="metric-value" id="ld-result-parts-b10">—</div>
-                    <div class="metric-unit">h</div>
-                  </div>
-                  <div class="metric-card">
-                    <div class="metric-label">瓶颈零件</div>
-                    <div class="metric-value" id="ld-result-bottleneck">—</div>
-                  </div>
-                  <div class="metric-card">
-                    <div class="metric-label">差距</div>
-                    <div class="metric-value" id="ld-result-gap">—</div>
-                    <div class="metric-unit">h</div>
-                  </div>
-                </div>
-                <div class="status-banner" id="ld-status-banner"></div>
-                <div class="chart-section">
-                  <h4>B10 寿命对比</h4>
-                  <div class="chart-container" id="ld-chart-bars"></div>
-                </div>
-                <div class="action-row">
-                  <button type="button" class="btn-primary" id="ld-def-calculate">计算</button>
-                  <button type="button" class="btn-secondary" id="ld-def-save">保存</button>
-                  <button type="button" class="btn-ghost" id="ld-def-reset">重置</button>
-                  <button type="button" class="btn-ghost" id="ld-copy-summary">复制摘要</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="action-row" id="ld-def-no-results">
-              <button type="button" class="btn-primary" id="ld-def-calculate-first">开始计算</button>
-            </div>
-          </div>
-
-          <div class="life-data-tab-content" id="life-tab-data-entry" style="display: none;">
+          <div class="life-data-tab-content" id="life-tab-data-entry">
             <div class="card">
               <div class="card-header">
                 <h3>试验批次管理</h3>
@@ -704,6 +542,30 @@
                 <h3>分析配置</h3>
               </div>
               <div class="card-body">
+                <!-- 模式切换 -->
+                <div class="mode-switch-container" style="margin-bottom: 1rem;">
+                  <div class="mode-switch-label">数据查看模式：</div>
+                  <div class="mode-switch-buttons">
+                    <label class="mode-switch-option">
+                      <input type="radio" name="ld-analysis-mode" value="merged" id="ld-mode-merged" checked />
+                      <span class="mode-switch-btn">合并模式</span>
+                    </label>
+                    <label class="mode-switch-option">
+                      <input type="radio" name="ld-analysis-mode" value="batch" id="ld-mode-batch" />
+                      <span class="mode-switch-btn">分轮模式</span>
+                    </label>
+                  </div>
+                </div>
+                <!-- 轮次选择器（分轮模式时显示） -->
+                <div class="batch-selector-container" id="ld-batch-selector-container" style="display: none; margin-bottom: 1rem;">
+                  <div class="form-group">
+                    <label>选择批次</label>
+                    <select id="ld-batch-selector" class="form-input">
+                      <!-- 动态填充批次选项 -->
+                    </select>
+                  </div>
+                </div>
+                <!-- 分布类型和方法选择 -->
                 <div class="form-row">
                   <div class="form-group">
                     <label>分布类型</label>
@@ -874,104 +736,6 @@
               </div>
               <div class="card-body">
                 <canvas id="ld-cdf-canvas" width="700" height="400"></canvas>
-              </div>
-            </div>
-          </div>
-
-          <div class="life-data-tab-content" id="life-tab-weakness" style="display: none;">
-            <div class="card">
-              <div class="card-header">
-                <h3>批次选择</h3>
-              </div>
-              <div class="card-body">
-                <div class="batch-tabs" id="ld-weakness-batch-tabs"></div>
-              </div>
-            </div>
-
-            <div class="card weakness-core-card" id="ld-weakness-core-card" style="display: none;">
-              <div class="card-header">
-                <h3>🔴 核心短板识别</h3>
-              </div>
-              <div class="card-body">
-                <div class="weakness-core-content">
-                  <div class="weakness-core-mode" id="ld-weakness-core-mode">—</div>
-                  <div class="weakness-core-metrics">
-                    <div class="metric-card weakness-highlight">
-                      <div class="metric-label">B10 寿命</div>
-                      <div class="metric-value" id="ld-weakness-core-b10">—</div>
-                      <div class="metric-unit">h</div>
-                    </div>
-                    <div class="metric-card">
-                      <div class="metric-label">失效占比</div>
-                      <div class="metric-value" id="ld-weakness-core-pct">—</div>
-                      <div class="metric-unit">%</div>
-                    </div>
-                    <div class="metric-card">
-                      <div class="metric-label">失效数</div>
-                      <div class="metric-value" id="ld-weakness-core-count">—</div>
-                    </div>
-                  </div>
-                  <div class="weakness-suggestion">
-                    <span class="suggestion-icon">💡</span>
-                    <span id="ld-weakness-suggestion">建议针对该失效模式优先优化，可显著提升整机寿命</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="card" id="ld-weakness-table-card" style="display: none;">
-              <div class="card-header">
-                <h3>拟合参数对比</h3>
-              </div>
-              <div class="card-body">
-                <div class="table-wrap">
-                  <table class="data-table weakness-table">
-                    <thead>
-                      <tr>
-                        <th style="min-width: 200px;">失效模式</th>
-                        <th style="width: 90px;">样本数</th>
-                        <th style="width: 90px;">失效数</th>
-                        <th style="width: 90px;">β</th>
-                        <th style="width: 110px;">η (h)</th>
-                        <th style="width: 110px;">B10 (h)</th>
-                        <th style="width: 110px;">MTBF (h)</th>
-                      </tr>
-                    </thead>
-                    <tbody id="ld-weakness-tbody"></tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div class="card" id="ld-weakness-charts-card" style="display: none;">
-              <div class="card-header">
-                <h3>图表分析</h3>
-              </div>
-              <div class="card-body">
-                <div class="weakness-charts-row">
-                  <div class="weakness-chart-col">
-                    <h4 class="chart-title">B10 寿命对比</h4>
-                    <div class="chart-container">
-                      <canvas id="ld-weakness-bar-canvas" width="500" height="350"></canvas>
-                    </div>
-                  </div>
-                  <div class="weakness-chart-col">
-                    <h4 class="chart-title">失效模式占比</h4>
-                    <div class="chart-container">
-                      <canvas id="ld-weakness-pie-canvas" width="500" height="350"></canvas>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="card" id="ld-weakness-empty-card">
-              <div class="card-body">
-                <div class="empty-state">
-                  <div class="empty-icon">📊</div>
-                  <h3>数据不足，无法进行短板分析</h3>
-                  <p>请确保当前批次有至少2种失效模式，且每种失效模式至少有2个失效样本。</p>
-                </div>
               </div>
             </div>
           </div>

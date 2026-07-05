@@ -47,7 +47,7 @@ function defaultLifeData() {
   return {
     batches: [],
     activeBatchId: null,
-    definition: defaultModelDefinition(),
+    // definition 已移除，产品参数现在从 model.homeCalc 获取
     analysisConfig: { distribution: "weibull", method: "rrx" },
   };
 }
@@ -211,6 +211,7 @@ export function createModel(name = "新型号") {
     id: genId(),
     name,
     record: defaultModelRecord(name),
+    productInfo: {},
     modules: createModuleData(),
     homeCalc: defaultHomeCalc(),
     lastResult: null,
@@ -356,7 +357,27 @@ function normalizeStateV3(s) {
       if (!Array.isArray(product.models)) product.models = [];
       for (const model of product.models) {
         if (!model.record) model.record = defaultModelRecord(model.name);
+        if (!model.productInfo) model.productInfo = {};
         if (!model.homeCalc) model.homeCalc = defaultHomeCalc();
+
+        // 数据迁移：如果 homeCalc 缺少质保期参数但 lifeData.definition 有数据，自动迁移
+        if (model.modules.lifeData && model.modules.lifeData.definition) {
+          const def = model.modules.lifeData.definition;
+          if (def.warrantyYears && (!model.homeCalc.warrantyYears || model.homeCalc.warrantyYears === 0)) {
+            model.homeCalc.warrantyYears = def.warrantyYears;
+          }
+          if (def.hoursPerYear && (!model.homeCalc.hoursPerYear || model.homeCalc.hoursPerYear === 0)) {
+            model.homeCalc.hoursPerYear = def.hoursPerYear;
+          }
+          // beta 参数也迁移（首页计算器需要）
+          if (def.beta && (!model.homeCalc.beta || model.homeCalc.beta === 0)) {
+            model.homeCalc.beta = def.beta;
+          }
+          // safetyMargin 参数也迁移
+          if (def.safetyMargin && (!model.homeCalc.safetyMargin || model.homeCalc.safetyMargin === 0)) {
+            model.homeCalc.safetyMargin = def.safetyMargin;
+          }
+        }
         if (!model.modules) model.modules = createModuleData();
         if (!model.modules.fmea) model.modules.fmea = defaultFmea();
         if (!model.modules.prediction) model.modules.prediction = defaultPrediction();
@@ -403,7 +424,8 @@ function normalizeStateV3(s) {
         if (!model.modules.derating) model.modules.derating = defaultDerating();
         if (!model.modules.environment) model.modules.environment = defaultEnvironment();
         if (!model.modules.dataManagement) model.modules.dataManagement = defaultDataManagement();
-        if (!model.modules.lifeData.definition) model.modules.lifeData.definition = defaultModelDefinition();
+        // 不再初始化 lifeData.definition，产品参数已迁移到 homeCalc
+        // 保留已有 definition 数据供向后兼容（如果存在）
         if (!model.modules.lifeData.batches) model.modules.lifeData.batches = [];
         if (!model.modules.lifeData.analysisConfig) model.modules.lifeData.analysisConfig = { distribution: "weibull", method: "rrx" };
       }
@@ -483,13 +505,26 @@ function migrateV2ToV3(v2) {
         id: v2Model.id || genId(),
         name: v2Model.name || "新型号",
         record: v2Model.record || defaultModelRecord(v2Model.name),
+        // 从 definition 迁移数据到 homeCalc（V2→V3 迁移）
+        homeCalc: (() => {
+          const def = v2Model.definition || {};
+          return {
+            warrantyYears: def.warrantyYears || 2,
+            hoursPerYear: def.hoursPerYear || 25,
+            allowFailRate: def.acceptableFailureRate || 2,
+            beta: def.beta || 2.2,
+            safetyMargin: def.safetyMargin || 20,
+            time: 100,
+          };
+        })(),
         modules: {
           fmea: defaultFmea(),
           prediction: defaultPrediction(),
           lifeData: {
             batches: v2Model.analysis?.batches || [],
             activeBatchId: null,
-            definition: v2Model.definition || defaultModelDefinition(),
+            // 保留原有 definition 数据供向后兼容
+            definition: v2Model.definition,
           },
           testPlan: defaultTestPlan(),
           fta: defaultFta(),
@@ -1120,7 +1155,7 @@ export function createDefaultProject() {
       },
     ],
     activeBatchId: null,
-    definition: defaultModelDefinition(),
+    // definition 已移除，产品参数现在从 model.homeCalc 获取
     analysisConfig: { distribution: "weibull", method: "rrx" },
   };
 
