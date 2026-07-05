@@ -1,0 +1,47 @@
+name: Deploy to CloudBase
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install CloudBase CLI
+        run: npm install -g @cloudbase/cli
+
+      - name: Prepare deploy files
+        run: |
+          mkdir -p deploy
+          cp index.html deploy/
+          cp -r css deploy/
+          cp -r js deploy/
+
+      - name: Install function dependencies
+        run: |
+          if [ -f "cloudbase/functions/api/package.json" ]; then
+            cd cloudbase/functions/api
+            npm install
+            cd ../../..
+          fi
+
+      - name: Deploy to CloudBase
+        env:
+          TCB_ENV_ID: ${{ secrets.TCB_ENV_ID }}
+          TCB_API_KEY_ID: ${{ secrets.TCB_API_KEY_ID }}
+          TCB_API_KEY: ${{ secrets.TCB_API_KEY }}
+        run: |
+          tcb login --apiKeyId "$TCB_API_KEY_ID" --apiKey "$TCB_API_KEY"
+          tcb fn deploy api -e "$TCB_ENV_ID" --force
+          tcb hosting deploy ./deploy -e "$TCB_ENV_ID"

@@ -1,0 +1,9 @@
+{
+  "name": "reliability-tool-api",
+  "version": "1.0.0",
+  "description": "可靠性工具平台 - CloudBase 云函数后端 API",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^2.9.0"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "envId": "reliability-tool-d8erocv8e9979b2",
+  "functionRoot": "cloudbase/functions",
+  "functionDefaultConfig": {
+    "timeout": 5,
+    "envVariables": {},
+    "runtime": "Nodejs16.13",
+    "memorySize": 256
+  },
+  "hosting": {
+    "ignore": [
+      "node_modules/**",
+      ".git/**",
+      ".github/**",
+      ".trae/**",
+      "cloudbase/**",
+      "worker/**",
+      "docs/**",
+      "README.md",
+      ".gitignore"
+    ]
+  },
+  "app": {
+    "serviceName": "reliability-tool-web",
+    "buildCommand": "",
+    "outputDir": "./"
+  }
+}
