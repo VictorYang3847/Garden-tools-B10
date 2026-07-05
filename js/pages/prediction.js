@@ -1,4 +1,4 @@
-import { getCustomComponentLibrary, setCustomComponentLibrary, getHomeB10 } from "../store.js";
+import { getCustomComponentLibrary, setCustomComponentLibrary, getHomeB10 } from "../store.js?v=1.0.2";
 
 let onSaveCallback = null;
 let currentModel = null;
@@ -1601,7 +1601,7 @@ async function ensureDeratingRendered(container) {
   const deratingContainer = container.querySelector("#pred-tab-derating");
   if (!deratingContainer) return;
   if (!deratingModule) {
-    deratingModule = await import("./derating.js");
+    deratingModule = await import("./derating.js?v=1.0.2");
   }
   if (!deratingInitialized) {
     deratingModule.init(currentModel, onSaveCallback);

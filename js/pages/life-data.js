@@ -4,9 +4,9 @@ import {
   exponentialCdf,
   lognormalCdf,
   fitDistribution,
-} from "../calculator.js";
-import { genId, getHomeB10 } from "../store.js";
-import { fmt, pct, toast } from "../utils.js";
+} from "../calculator.js?v=1.0.2";
+import { genId, getHomeB10 } from "../store.js?v=1.0.2";
+import { fmt, pct, toast } from "../utils.js?v=1.0.2";
 
 let currentModel = null;
 let onSaveCallback = null;

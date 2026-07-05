@@ -1,9 +1,9 @@
-import { defaultModelDefinition, defaultModelRecord, defaultPlanningItem, defaultAnalysisBatch } from "./calculator.js";
+import { defaultModelDefinition, defaultModelRecord, defaultPlanningItem, defaultAnalysisBatch } from "./calculator.js?v=1.0.2";
 import {
   getState as dbGetState,
   setState as dbSetState,
   migrateFromLocalStorage,
-} from "./db.js";
+} from "./db.js?v=1.0.2";
 
 const STORAGE_KEY = "reliability-tool-data";
 const LEGACY_V2_KEY = "b10-tool-v2";
@@ -13,7 +13,7 @@ const LEGACY_V1_KEY = "b10-hedge-trimmer-v1";
 let syncManagerInstance = null;
 async function getSyncManager() {
   if (!syncManagerInstance) {
-    const { getSyncManager: getSM } = await import("./sync.js");
+    const { getSyncManager: getSM } = await import("./sync.js?v=1.0.2");
     syncManagerInstance = getSM();
   }
   return syncManagerInstance;

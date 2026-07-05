@@ -3,7 +3,7 @@ import {
   targetB10WithoutMargin,
   weibullEta,
   failureRate,
-} from "../calculator.js";
+} from "../calculator.js?v=1.0.2";
 
 let currentModel = null;
 let onSaveCallback = null;
