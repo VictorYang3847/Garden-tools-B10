@@ -3,7 +3,6 @@ import { fmt } from "../utils.js";
 
 let currentModel = null;
 let onSaveCallback = null;
-let currentContainer = null;
 
 export function init(model, onSave) {
   currentModel = model;
@@ -12,7 +11,6 @@ export function init(model, onSave) {
 
 export function render(container, model) {
   currentModel = model;
-  currentContainer = container;
   container.innerHTML = "";
 
   const template = document.getElementById("weakness-template");
@@ -164,7 +162,7 @@ function adjustWeights(changed) {
   if (changedLabel) changedLabel.textContent = fmt(w[changed], 2);
 
   save();
-  renderContent(currentContainer);
+  renderContent();
 }
 
 /* ---- core computation: compute risk scores ---- */

@@ -7,7 +7,6 @@ import {
 } from "../calculator.js";
 import { genId, getHomeB10 } from "../store.js";
 import { fmt, pct, toast } from "../utils.js";
-import * as weaknessModule from "./weakness.js";
 
 let currentModel = null;
 let onSaveCallback = null;
@@ -85,26 +84,22 @@ function bindEvents() {
   bindAnalysisEvents();
 }
 
+let weaknessModule = null;
 let weaknessInitialized = false;
 
-function ensureWeaknessRendered() {
+async function ensureWeaknessRendered() {
   const weaknessContainer = document.getElementById("life-tab-weakness");
   if (!weaknessContainer) return;
-  try {
-    if (!weaknessInitialized) {
-      weaknessModule.init(currentModel, onSaveCallback);
-      weaknessInitialized = true;
-    }
-    weaknessContainer.innerHTML = "";
-    weaknessModule.render(weaknessContainer, currentModel);
-  } catch (err) {
-    console.error('[Weakness] render error:', err);
-    weaknessContainer.innerHTML =
-      '<div class="card"><div class="card-body">' +
-      '<h3 style="color: var(--danger);">短板分析加载出错</h3>' +
-      '<p>请刷新页面重试，或检查控制台获取详细错误信息。</p>' +
-      '</div></div>';
+  if (!weaknessModule) {
+    weaknessModule = await import("./weakness.js");
   }
+  if (!weaknessInitialized) {
+    weaknessModule.init(currentModel, onSaveCallback);
+    weaknessInitialized = true;
+  }
+  weaknessContainer.innerHTML = "";
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  weaknessModule.render(weaknessContainer, currentModel);
 }
 
 function switchTab(tabName) {
