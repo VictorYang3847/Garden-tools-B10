@@ -21,11 +21,11 @@ import {
   loadStateAsync,
   initSync,
   getState,
-} from "./store.js?v=1.0.3";
-import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js?v=1.0.3";
-import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.js?v=1.0.3";
-import { initSyncUI } from "./sync-ui.js?v=1.0.3";
-import { hasCloudApi } from "./api.js?v=1.0.3";
+} from "./store.js?v=1.0.4";
+import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js?v=1.0.4";
+import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.js?v=1.0.4";
+import { initSyncUI } from "./sync-ui.js?v=1.0.4";
+import { hasCloudApi } from "./api.js?v=1.0.4";
 
 const projectSelect = document.getElementById("project-select");
 const productSelect = document.getElementById("product-select");

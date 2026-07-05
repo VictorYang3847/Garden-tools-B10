@@ -1,5 +1,6 @@
-import { genId, getCustomImprovements, setCustomImprovements } from "../store.js?v=1.0.3";
-import { fmt } from "../utils.js?v=1.0.3";
+import { genId, getCustomImprovements, setCustomImprovements } from "../store.js?v=1.0.4";
+import { fmt } from "../utils.js?v=1.0.4";
+import { gammaApprox } from "../calculator.js?v=1.0.4";
 
 let currentModel = null;
 let onSaveCallback = null;
@@ -662,7 +663,9 @@ function calcPhaseMetrics(phase) {
   }
 
   if (mtbf !== null) {
-    b10 = mtbf * (-Math.log(0.9));
+    const beta = 2.2;
+    const k10 = Math.pow(-Math.log(0.9), 1 / beta);
+    b10 = mtbf * k10 / gammaApprox(1 + 1 / beta);
   }
 
   return { mtbf, b10, failureCount: sorted.length, totalTime };

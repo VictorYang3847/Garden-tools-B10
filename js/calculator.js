@@ -2,7 +2,7 @@
  * B10 life calculator for gardening tools (Weibull model)
  */
 
-const K10 = Math.log(10 / 9); // ≈ 0.10536
+export const K10 = Math.log(10 / 9); // ≈ 0.10536
 
 function genId() {
   return crypto.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -33,23 +33,27 @@ export function batteryEquivB10(cycles, hoursPerCycle) {
   return cycles * hoursPerCycle;
 }
 
-export function partsB10(partValues) {
+export function partsB10(partValues, beta = 2.2) {
   const active = partValues.filter((p) => p.included && p.equivHours > 0);
   if (active.length === 0) {
     return { b10: 0, bottleneck: null };
   }
 
-  let minB10 = Infinity;
+  let sumInv = 0;
+  let maxInv = 0;
   let bottleneck = null;
 
   for (const part of active) {
-    if (part.equivHours < minB10) {
-      minB10 = part.equivHours;
+    const inv = 1 / Math.pow(part.equivHours, beta);
+    sumInv += inv;
+    if (inv > maxInv) {
+      maxInv = inv;
       bottleneck = part;
     }
   }
 
-  return { b10: minB10, bottleneck };
+  const b10 = sumInv > 0 ? Math.pow(sumInv, -1 / beta) : 0;
+  return { b10, bottleneck };
 }
 
 export function confidenceToMargin(confidence) {
@@ -114,7 +118,7 @@ export function calculateAll(inputs) {
     },
   ];
 
-  const { b10: b10Parts, bottleneck } = partsB10(partEntries);
+  const { b10: b10Parts, bottleneck } = partsB10(partEntries, beta);
   const fAtWarranty = failureRate(tw, b10Parts, beta);
   const pass = fAtWarranty <= fw;
   const gap = b10Parts - b10Target;
@@ -167,7 +171,7 @@ export function defaultModelDefinition() {
     safetyMargin: 20,
     failureDefinition: "performance",
     performanceThreshold: 70,
-    beta: 2.0,
+    beta: 2.2,
     parts: {
       motor: { included: true, b10: 400, type: "brushless" },
       battery: { included: true, cycles: 300, hoursPerCycle: 0.5, capacity: 2.0 },
@@ -380,7 +384,7 @@ export {
   lognormalCdf,
   lognormalPdf,
   fitDistribution,
-} from "./calculator-distributions.js?v=1.0.3";
+} from "./calculator-distributions.js?v=1.0.4";
 
 /**
  * Gamma function (Lanczos approximation)

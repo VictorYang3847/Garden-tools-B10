@@ -1,9 +1,9 @@
-import { defaultModelDefinition, defaultModelRecord, defaultPlanningItem, defaultAnalysisBatch } from "./calculator.js?v=1.0.3";
+import { defaultModelDefinition, defaultModelRecord, defaultPlanningItem, defaultAnalysisBatch, K10 } from "./calculator.js?v=1.0.4";
 import {
   getState as dbGetState,
   setState as dbSetState,
   migrateFromLocalStorage,
-} from "./db.js?v=1.0.3";
+} from "./db.js?v=1.0.4";
 
 const STORAGE_KEY = "reliability-tool-data";
 const LEGACY_V2_KEY = "b10-tool-v2";
@@ -13,7 +13,7 @@ const LEGACY_V1_KEY = "b10-hedge-trimmer-v1";
 let syncManagerInstance = null;
 async function getSyncManager() {
   if (!syncManagerInstance) {
-    const { getSyncManager: getSM } = await import("./sync.js?v=1.0.3");
+    const { getSyncManager: getSM } = await import("./sync.js?v=1.0.4");
     syncManagerInstance = getSM();
   }
   return syncManagerInstance;
@@ -685,7 +685,6 @@ export function getHomeB10(model) {
   const tw = warrantyYears * hoursPerYear;
   const fw = allowFailRate / 100;
   const margin = safetyMargin / 100;
-  const K10 = Math.log(10 / 9);
   const b10Calc = tw * Math.pow(K10 / -Math.log(1 - fw), 1 / beta);
   const b10 = b10Calc * (1 + margin);
   return isFinite(b10) && b10 > 0 ? b10 : 150;

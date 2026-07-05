@@ -1,4 +1,5 @@
-import { getCustomComponentLibrary, setCustomComponentLibrary, getHomeB10 } from "../store.js?v=1.0.3";
+import { getCustomComponentLibrary, setCustomComponentLibrary, getHomeB10 } from "../store.js?v=1.0.4";
+import { gammaApprox, K10 } from "../calculator.js?v=1.0.4";
 
 let onSaveCallback = null;
 let currentModel = null;
@@ -160,11 +161,11 @@ function calcSystemLambda() {
     for (let k = 1; k <= n; k++) {
       sum += Math.pow(-1, k + 1) * (1 / k) * combination(n, k);
     }
-    return totalLambda / sum;
+    return totalLambda / (n * sum);
   } else if (structure === "vote23") {
     if (totalLambda <= 0) return 0;
     const unitLambda = totalLambda / 3;
-    return (18 / 11) * unitLambda;
+    return (6 / 5) * unitLambda;
   }
   return totalLambda;
 }
@@ -191,34 +192,6 @@ function calcMtbfHours() {
   if (sysLambdaFit <= 0) return 0;
   const sysLambdaPerHour = sysLambdaFit * 1e-9;
   return 1 / sysLambdaPerHour;
-}
-
-// Gamma函数近似（Lanczos逼近），用于Weibull分布等效B10反算
-function gammaApprox(x) {
-  if (x <= 0) return Infinity;
-  if (x === 1) return 1;
-  if (x < 1) {
-    return gammaApprox(x + 1) / x;
-  }
-  const g = 7;
-  const c = [
-    0.99999999999980993,
-    676.5203681218851,
-    -1259.1392167224028,
-    771.32342877765313,
-    -176.61502916214059,
-    12.507343278686905,
-    -0.13857109526572012,
-    9.9843695780195716e-6,
-    1.5056327351493116e-7,
-  ];
-  x -= 1;
-  let a = c[0];
-  const t = x + g + 0.5;
-  for (let i = 1; i < g + 2; i++) {
-    a += c[i] / (x + i);
-  }
-  return Math.sqrt(2 * Math.PI) * Math.pow(t, x + 0.5) * Math.exp(-t) * a;
 }
 
 function renderComponentRow(item, index) {
@@ -457,7 +430,6 @@ function updateResults(container) {
   // 等效B10计算：基于Weibull分布从MTBF反算B10寿命和等效失效率
   const predBeta = Number(container.querySelector("#pred-beta")?.value) || 0;
   if (predBeta > 0 && mtbfHours > 0) {
-    const K10 = Math.log(10 / 9); // ≈ 0.10536
     const eta = mtbfHours / gammaApprox(1 + 1 / predBeta);
     const equivB10 = eta * Math.pow(K10, 1 / predBeta);
     const equivLambda = equivB10 > 0 ? (0.10536 / equivB10) * 1000000 : 0;
@@ -1601,7 +1573,7 @@ async function ensureDeratingRendered(container) {
   const deratingContainer = container.querySelector("#pred-tab-derating");
   if (!deratingContainer) return;
   if (!deratingModule) {
-    deratingModule = await import("./derating.js?v=1.0.3");
+    deratingModule = await import("./derating.js?v=1.0.4");
   }
   if (!deratingInitialized) {
     deratingModule.init(currentModel, onSaveCallback);

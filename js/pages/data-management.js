@@ -15,7 +15,7 @@ import {
   getModuleData,
   setModuleData,
   genId,
-} from "../store.js?v=1.0.3";
+} from "../store.js?v=1.0.4";
 
 let model = null;
 let onSave = null;

@@ -4,9 +4,10 @@ import {
   exponentialCdf,
   lognormalCdf,
   fitDistribution,
-} from "../calculator.js?v=1.0.3";
-import { genId, getHomeB10 } from "../store.js?v=1.0.3";
-import { fmt, pct, toast } from "../utils.js?v=1.0.3";
+  gammaApprox,
+} from "../calculator.js?v=1.0.4";
+import { genId, getHomeB10 } from "../store.js?v=1.0.4";
+import { fmt, pct, toast } from "../utils.js?v=1.0.4";
 
 let currentModel = null;
 let onSaveCallback = null;
@@ -1286,32 +1287,6 @@ function getWeaknessBatchData() {
   });
 
   return { results, totalFailures, totalSamples, batch };
-}
-
-function gammaApprox(s) {
-  if (s <= 0) return 1;
-  const g = 7;
-  const c = [
-    0.99999999999980993,
-    676.5203681218851,
-    -1259.1392167224028,
-    771.32342877765313,
-    -176.61502916214059,
-    12.507343278686905,
-    -0.13857109526572012,
-    9.9843695780195716e-6,
-    1.5056327351493116e-7,
-  ];
-  if (s < 0.5) {
-    return Math.PI / (Math.sin(Math.PI * s) * gammaApprox(1 - s));
-  }
-  s -= 1;
-  let x = c[0];
-  for (let i = 1; i < g + 2; i++) {
-    x += c[i] / (s + i);
-  }
-  const t = s + g + 0.5;
-  return Math.sqrt(2 * Math.PI) * Math.pow(t, s + 0.5) * Math.exp(-t) * x;
 }
 
 function updateWeaknessAnalysis() {

@@ -158,7 +158,7 @@ export function fitWeibullMLE(failureTimes, censoredTimes = []) {
 
   const { points } = prepareFailurePoints(failureTimes, censoredTimes);
 
-  let beta = 2.0;
+  let beta = 2.2;
   for (let iter = 0; iter < 100; iter++) {
     let sumTbeta = 0;
     let sumTbetaLogT = 0;

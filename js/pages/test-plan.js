@@ -1,5 +1,6 @@
-import { genId, getHomeB10 } from "../store.js?v=1.0.3";
-import { fmt, toast } from "../utils.js?v=1.0.3";
+import { genId, getHomeB10 } from "../store.js?v=1.0.4";
+import { fmt, toast } from "../utils.js?v=1.0.4";
+import { gammaApprox, K10 } from "../calculator.js?v=1.0.4";
 
 let currentModel = null;
 let onSaveCallback = null;
@@ -226,7 +227,6 @@ function calculateSampleSize(reliability, confidence, allowedFailures, targetB10
 
   // Weibull 优化：如果有 targetB10 + beta + testDuration 且 testDuration > targetB10
   if (b10 > 0 && b > 0 && T > b10) {
-    const K10 = Math.log(10 / 9); // ≈ 0.10536
     const R_test = Math.exp(-K10 * Math.pow(T / b10, b));
     const n = binomialSampleSize(R_test, gamma, r);
     return -n; // 负数标记 Weibull 优化
@@ -288,32 +288,13 @@ function chiSquarePdf(x, df) {
   if (x <= 0) return 0;
   return (
     (Math.pow(x, df / 2 - 1) * Math.exp(-x / 2)) /
-    (Math.pow(2, df / 2) * gammaFunc(df / 2))
+    (Math.pow(2, df / 2) * gammaApprox(df / 2))
   );
 }
 
 function chiSquareCdf(x, df) {
   if (x <= 0) return 0;
   return lowerRegularizedGamma(df / 2, x / 2);
-}
-
-function gammaFunc(z) {
-  if (z < 0.5) {
-    return Math.PI / (Math.sin(Math.PI * z) * gammaFunc(1 - z));
-  }
-  z -= 1;
-  const g = 7;
-  const c = [
-    0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
-    -176.61502916214059, 12.507343278686905, -0.13857109526572012,
-    9.9843695780195716e-6, 1.5056327351493116e-7,
-  ];
-  let x = c[0];
-  for (let i = 1; i < g + 2; i++) {
-    x += c[i] / (z + i);
-  }
-  const t = z + g + 0.5;
-  return Math.sqrt(2 * Math.PI) * Math.pow(t, z + 0.5) * Math.exp(-t) * x;
 }
 
 function lowerRegularizedGamma(a, x) {
@@ -350,7 +331,7 @@ function lowerRegularizedGamma(a, x) {
 }
 
 function lnGamma(z) {
-  return Math.log(gammaFunc(z));
+  return Math.log(gammaApprox(z));
 }
 
 function calculateTestDuration(targetLife, censorType, beta, testLevel, strategy, multiplier) {
@@ -1228,7 +1209,6 @@ function renderOptimizePanel() {
 
     // 优化方案
     const optDuration = calculateTestDuration(b10, item.censorType, b, item.testLevel, "optimized");
-    const K10 = Math.log(10 / 9);
     let optN;
     if (b10 > 0 && b > 0 && optDuration > b10) {
       const R_test = Math.exp(-K10 * Math.pow(optDuration / b10, b));
@@ -1343,7 +1323,6 @@ function calculateLifeTestAnalysis() {
   }
 
   const duration = Math.ceil(B10 * multiplier);
-  const K10 = Math.log(10 / 9);
   const R_test = Math.exp(-K10 * Math.pow(duration / B10, beta));
   const n = binomialSampleSize(R_test, CL, r);
   const totalHours = n * duration;
