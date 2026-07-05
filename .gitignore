@@ -3,3 +3,10 @@ Thumbs.db
 *.log
 node_modules/
 .wrangler/
+.env
+.env.*
+.env.local
+*.local
+deploy/
+.tcb/
+.trae/

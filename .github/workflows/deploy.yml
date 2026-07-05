@@ -47,9 +47,18 @@ jobs:
           TCB_ENV_ID: ${{ secrets.TCB_ENV_ID }}
           TCB_API_KEY_ID: ${{ secrets.TCB_API_KEY_ID }}
           TCB_API_KEY: ${{ secrets.TCB_API_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
           tcb login --apiKeyId "$TCB_API_KEY_ID" --apiKey "$TCB_API_KEY"
           echo "y" | tcb fn deploy api -e "$TCB_ENV_ID" --force
+          # 设置 JWT_SECRET 环境变量（如果已配置 GitHub Secret）
+          if [ -n "$JWT_SECRET" ]; then
+            tcb fn config update api -e "$TCB_ENV_ID" --envVariables "{\"JWT_SECRET\":\"$JWT_SECRET\"}" 2>/dev/null \
+              && echo "JWT_SECRET 已设置" \
+              || echo "⚠️ 自动设置失败，请在 CloudBase 控制台手动设置 JWT_SECRET 环境变量"
+          else
+            echo "⚠️ 未配置 JWT_SECRET GitHub Secret，请在 CloudBase 控制台手动设置"
+          fi
           tcb hosting deploy ./deploy -e "$TCB_ENV_ID"
 
       - name: Deployment summary
@@ -58,3 +67,10 @@ jobs:
           echo "- 分支: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- 提交: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- 环境: \`${{ secrets.TCB_ENV_ID }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⚠️ 安全检查" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ secrets.JWT_SECRET }}" ]; then
+            echo "- ✅ JWT_SECRET 已配置" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ **JWT_SECRET 未配置** — 请在 GitHub Secrets 和 CloudBase 控制台设置" >> $GITHUB_STEP_SUMMARY
+          fi

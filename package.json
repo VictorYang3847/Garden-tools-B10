@@ -1,0 +1,12 @@
+{
+  "name": "reliability-tool",
+  "version": "3.0.0",
+  "description": "综合性可靠性工程分析工具平台 - 10大模块",
+  "private": true,
+  "scripts": {
+    "serve": "npx serve .",
+    "deploy:cloudbase": "tcb fn deploy api --envId reliability-tool-d8erocv8e9979b2",
+    "deploy:hosting": "tcb hosting deploy ./ --envId reliability-tool-d8erocv8e9979b2"
+  },
+  "devDependencies": {}
+}

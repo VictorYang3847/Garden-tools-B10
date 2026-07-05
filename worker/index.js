@@ -1,94 +1,127 @@
 // Cloudflare Worker 后端 - 用户认证和数据同步 API
 // 提供注册、登录、数据同步和版本管理功能
 
-// CORS 响应头（允许所有来源）
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Access-Control-Max-Age": "86400",
-};
+// ── 安全配置 ──────────────────────────────────────────
 
-// 统一返回 JSON 响应
-function jsonResponse(data, status = 200) {
+const ALLOWED_ORIGINS = [
+  'https://b10.gardeningtools.com',
+  'https://gardeningtools-4g37ygvdbeb3d854-1254128272.tcloudbaseapp.com',
+  'http://localhost:3000',
+  'http://localhost:8080',
+  'http://127.0.0.1:3000',
+];
+
+function getCorsHeaders(request) {
+  const origin = (request.headers.get('Origin') || '').toLowerCase();
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Max-Age': '86400',
+    'Content-Type': 'application/json; charset=utf-8',
+    'X-Content-Type-Options': 'nosniff',
+  };
+}
+
+function jsonResponse(data, status = 200, request) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
-      "Content-Type": "application/json",
-      ...CORS_HEADERS,
+      ...getCorsHeaders(request),
     },
   });
 }
 
-// 处理 OPTIONS 预检请求
-function handleOptions() {
+function handleOptions(request) {
   return new Response(null, {
     status: 204,
-    headers: CORS_HEADERS,
+    headers: getCorsHeaders(request),
   });
 }
 
-// 使用 PBKDF2 哈希密码（Web Crypto API）
+// ── JWT 密钥管理 ──────────────────────────────────────
+
+function getJwtSecret(env) {
+  const secret = env.JWT_SECRET;
+  if (!secret || secret === 'default-secret' || secret.length < 32) {
+    throw new Error('JWT_SECRET_NOT_SET');
+  }
+  return secret;
+}
+
+// ── 常量时间比较（防止时序攻击）──────────────────────
+
+function timingSafeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+// ── 密码哈希 & 校验 ──────────────────────────────────
+
+const PBKDF2_ITERATIONS = 100000;
+
 async function hashPassword(password, salt) {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
-    "raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]
+    'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
   );
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: encoder.encode(salt), iterations: 100000, hash: "SHA-256" },
+    { name: 'PBKDF2', salt: encoder.encode(salt), iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
     keyMaterial, 256
   );
   return btoa(String.fromCharCode(...new Uint8Array(bits)));
 }
 
-// 生成随机盐值（16 字节）
 function generateSalt() {
   const arr = new Uint8Array(16);
   crypto.getRandomValues(arr);
   return btoa(String.fromCharCode(...arr));
 }
 
-// 签发 JWT（HMAC-SHA256）
+// ── JWT 签发 / 验证 ──────────────────────────────────
+
 async function signJWT(payload, secret) {
   const encoder = new TextEncoder();
-  const header = { alg: "HS256", typ: "JWT" };
-  const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, "");
-  const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, "");
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, '');
+  const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, '');
   const data = `${headerB64}.${payloadB64}`;
   const key = await crypto.subtle.importKey(
-    "raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
   );
-  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
-  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/=/g, "");
+  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(data));
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/=/g, '');
   return `${data}.${sigB64}`;
 }
 
-// 验证 JWT（验证签名和过期时间），返回 payload 或 null
 async function verifyJWT(token, secret) {
   try {
-    const parts = token.split(".");
+    const parts = token.split('.');
     if (parts.length !== 3) return null;
     const [headerB64, payloadB64, sigB64] = parts;
     const data = `${headerB64}.${payloadB64}`;
     const encoder = new TextEncoder();
 
-    // 导入 HMAC 密钥用于验签
     const key = await crypto.subtle.importKey(
-      "raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
+      'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
     );
 
-    // 将 base64 签名还原为 ArrayBuffer
     const sigStr = atob(sigB64);
     const sigBytes = new Uint8Array(sigStr.length);
     for (let i = 0; i < sigStr.length; i++) {
       sigBytes[i] = sigStr.charCodeAt(i);
     }
 
-    // 验证签名
-    const valid = await crypto.subtle.verify("HMAC", key, sigBytes, encoder.encode(data));
+    const valid = await crypto.subtle.verify('HMAC', key, sigBytes, encoder.encode(data));
     if (!valid) return null;
 
-    // 解析 payload 并检查过期时间
     const payload = JSON.parse(atob(payloadB64));
     if (payload.exp && Date.now() >= payload.exp * 1000) return null;
     return payload;
@@ -97,130 +130,121 @@ async function verifyJWT(token, secret) {
   }
 }
 
-// 从请求头中提取并验证 JWT，返回 payload 或 null
 async function authenticate(request, env) {
-  const auth = request.headers.get("Authorization");
-  if (!auth || !auth.startsWith("Bearer ")) return null;
+  const auth = request.headers.get('Authorization');
+  if (!auth || !auth.startsWith('Bearer ')) return null;
   const token = auth.slice(7);
-  const secret = env.JWT_SECRET || "default-secret";
+  const secret = getJwtSecret(env);
   return await verifyJWT(token, secret);
 }
 
-// 主入口
-export default {
-  async fetch(request, env, ctx) {
-    // 处理 CORS 预检请求
-    if (request.method === "OPTIONS") {
-      return handleOptions();
-    }
+// ── 输入校验 ──────────────────────────────────────────
 
-    const url = new URL(request.url);
-    const path = url.pathname;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD_LEN = 8;
 
-    try {
-      // 注册用户
-      if (path === "/api/auth/register" && request.method === "POST") {
-        return await handleRegister(request, env);
-      }
-      // 用户登录
-      if (path === "/api/auth/login" && request.method === "POST") {
-        return await handleLogin(request, env);
-      }
-      // 获取用户数据
-      if (path === "/api/data" && request.method === "GET") {
-        return await handleGetData(request, env);
-      }
-      // 保存用户数据
-      if (path === "/api/data" && request.method === "PUT") {
-        return await handlePutData(request, env);
-      }
-      // 获取版本列表
-      if (path === "/api/versions" && request.method === "GET") {
-        return await handleGetVersions(request, env);
-      }
-      // 未匹配到任何路由
-      return jsonResponse({ error: "未找到路由" }, 404);
-    } catch (e) {
-      // 统一错误处理
-      return jsonResponse({ error: "服务器内部错误", message: e.message }, 500);
-    }
-  },
-};
-
-// 注册用户
-async function handleRegister(request, env) {
-  const { email, password } = await request.json();
+function validateEmailPassword(email, password) {
   if (!email || !password) {
-    return jsonResponse({ error: "邮箱和密码不能为空" }, 400);
+    return { ok: false, error: '邮箱和密码不能为空' };
   }
-  // 检查邮箱是否已注册
+  if (!EMAIL_RE.test(email)) {
+    return { ok: false, error: '邮箱格式不正确' };
+  }
+  if (password.length < MIN_PASSWORD_LEN) {
+    return { ok: false, error: `密码长度不能少于 ${MIN_PASSWORD_LEN} 位` };
+  }
+  return { ok: true };
+}
+
+// ── 路由处理 ──────────────────────────────────────────
+
+async function handleRegister(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: '请求体格式错误' }, 400, request);
+  }
+
+  const { email, password } = body;
+  const v = validateEmailPassword(email, password);
+  if (!v.ok) return jsonResponse({ error: v.error }, 400, request);
+
   const kvKey = `user:${email}`;
   const existing = await env.RELIABILITY_KV.get(kvKey);
   if (existing) {
-    return jsonResponse({ error: "邮箱已注册" }, 409);
+    return jsonResponse({ error: '邮箱已注册' }, 409, request);
   }
-  // 生成盐值和密码哈希
+
   const salt = generateSalt();
   const passwordHash = await hashPassword(password, salt);
   const userId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   const userRecord = { userId, email, passwordHash, salt, createdAt };
   await env.RELIABILITY_KV.put(kvKey, JSON.stringify(userRecord));
-  return jsonResponse({ success: true });
+  return jsonResponse({ success: true }, 200, request);
 }
 
-// 用户登录
 async function handleLogin(request, env) {
-  const { email, password } = await request.json();
-  if (!email || !password) {
-    return jsonResponse({ error: "邮箱和密码不能为空" }, 400);
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: '请求体格式错误' }, 400, request);
   }
-  // 读取用户记录
+
+  const { email, password } = body;
+  const v = validateEmailPassword(email, password);
+  if (!v.ok) return jsonResponse({ error: v.error }, 400, request);
+
   const kvKey = `user:${email}`;
   const raw = await env.RELIABILITY_KV.get(kvKey);
   if (!raw) {
-    return jsonResponse({ error: "用户不存在或密码错误" }, 401);
+    return jsonResponse({ error: '邮箱或密码错误' }, 401, request);
   }
   const user = JSON.parse(raw);
-  // 对比密码哈希
+
   const hash = await hashPassword(password, user.salt);
-  if (hash !== user.passwordHash) {
-    return jsonResponse({ error: "用户不存在或密码错误" }, 401);
+  if (!timingSafeEqual(hash, user.passwordHash)) {
+    return jsonResponse({ error: '邮箱或密码错误' }, 401, request);
   }
-  // 生成 JWT，有效期 30 天
+
   const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30;
-  const secret = env.JWT_SECRET || "default-secret";
+  const secret = getJwtSecret(env);
   const token = await signJWT({ userId: user.userId, email: user.email, exp }, secret);
-  return jsonResponse({ token, userId: user.userId, email: user.email });
+  return jsonResponse({ token, userId: user.userId, email: user.email }, 200, request);
 }
 
-// 获取用户数据
 async function handleGetData(request, env) {
   const payload = await authenticate(request, env);
   if (!payload) {
-    return jsonResponse({ error: "未授权" }, 401);
+    return jsonResponse({ error: '未授权' }, 401, request);
   }
   const raw = await env.RELIABILITY_KV.get(`data:${payload.userId}`);
   if (!raw) {
-    return jsonResponse({ data: null });
+    return jsonResponse({ data: null }, 200, request);
   }
   const record = JSON.parse(raw);
-  return jsonResponse({ data: record.data, updatedAt: record.updatedAt });
+  return jsonResponse({ data: record.data, updatedAt: record.updatedAt }, 200, request);
 }
 
-// 保存用户数据
 async function handlePutData(request, env) {
   const payload = await authenticate(request, env);
   if (!payload) {
-    return jsonResponse({ error: "未授权" }, 401);
+    return jsonResponse({ error: '未授权' }, 401, request);
   }
-  const { data } = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: '请求体格式错误' }, 400, request);
+  }
+  const { data } = body;
   const updatedAt = Date.now();
   const record = { data, updatedAt };
-  // 写入当前数据
+
   await env.RELIABILITY_KV.put(`data:${payload.userId}`, JSON.stringify(record));
 
-  // 追加版本快照，最多保留 20 个版本
   const versionsKey = `versions:${payload.userId}`;
   const versionsRaw = await env.RELIABILITY_KV.get(versionsKey);
   let versions = [];
@@ -237,14 +261,13 @@ async function handlePutData(request, env) {
   }
   await env.RELIABILITY_KV.put(versionsKey, JSON.stringify(versions));
 
-  return jsonResponse({ success: true, updatedAt });
+  return jsonResponse({ success: true, updatedAt }, 200, request);
 }
 
-// 获取版本列表
 async function handleGetVersions(request, env) {
   const payload = await authenticate(request, env);
   if (!payload) {
-    return jsonResponse({ error: "未授权" }, 401);
+    return jsonResponse({ error: '未授权' }, 401, request);
   }
   const versionsRaw = await env.RELIABILITY_KV.get(`versions:${payload.userId}`);
   let versions = [];
@@ -255,5 +278,48 @@ async function handleGetVersions(request, env) {
       versions = [];
     }
   }
-  return jsonResponse({ versions });
+  return jsonResponse({ versions }, 200, request);
 }
+
+// ── 主入口 ─────────────────────────────────────────────
+
+export default {
+  async fetch(request, env, ctx) {
+    // 启动时检查 JWT_SECRET 配置
+    try {
+      getJwtSecret(env);
+    } catch (e) {
+      return jsonResponse({ error: '服务暂不可用，请联系管理员' }, 503, request);
+    }
+
+    if (request.method === 'OPTIONS') {
+      return handleOptions(request);
+    }
+
+    const url = new URL(request.url);
+    const path = url.pathname;
+
+    try {
+      if (path === '/api/auth/register' && request.method === 'POST') {
+        return await handleRegister(request, env);
+      }
+      if (path === '/api/auth/login' && request.method === 'POST') {
+        return await handleLogin(request, env);
+      }
+      if (path === '/api/data' && request.method === 'GET') {
+        return await handleGetData(request, env);
+      }
+      if (path === '/api/data' && request.method === 'PUT') {
+        return await handlePutData(request, env);
+      }
+      if (path === '/api/versions' && request.method === 'GET') {
+        return await handleGetVersions(request, env);
+      }
+      return jsonResponse({ error: '未找到路由' }, 404, request);
+    } catch (e) {
+      console.error('Worker 执行错误:', e);
+      // 生产环境不泄露内部错误信息
+      return jsonResponse({ error: '服务器内部错误' }, 500, request);
+    }
+  },
+};

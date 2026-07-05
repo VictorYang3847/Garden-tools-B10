@@ -166,11 +166,16 @@ async function renderRoute(routeKey) {
       module.render(mainContent, model);
     }
   } catch (err) {
-    console.error("Failed to load module:", err);
+    console.error('Failed to load module:', err);
+    const safeMsg = (err?.message || '未知错误')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
     mainContent.innerHTML = `
       <div class="error-state">
         <h3>加载失败</h3>
-        <p>${err.message}</p>
+        <p>${safeMsg}</p>
       </div>
     `;
   }

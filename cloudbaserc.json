@@ -4,7 +4,7 @@
   "functionDefaultConfig": {
     "timeout": 5,
     "envVariables": {},
-    "runtime": "Nodejs16.13",
+    "runtime": "Nodejs18.13",
     "memorySize": 256
   },
   "hosting": {

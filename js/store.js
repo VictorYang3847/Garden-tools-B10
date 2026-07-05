@@ -602,8 +602,18 @@ async function saveState(s) {
   }
 }
 
+// 保存队列：确保同一时间只有一个 save 在操作，避免竞态覆盖
+let saveQueue = Promise.resolve();
+
 function persist() {
-  saveState(ensureState());
+  // 深拷贝当前状态快照，防止后续修改影响本次保存
+  const snapshot = JSON.parse(JSON.stringify(ensureState()));
+  // 串行化：下一次保存等待上一次完成，避免旧数据覆盖新数据
+  saveQueue = saveQueue
+    .then(() => saveState(snapshot))
+    .catch((e) => {
+      console.warn('状态保存失败:', e);
+    });
 }
 
 /**
