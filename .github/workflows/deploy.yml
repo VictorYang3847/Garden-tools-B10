@@ -43,5 +43,5 @@ jobs:
           TCB_API_KEY: ${{ secrets.TCB_API_KEY }}
         run: |
           tcb login --apiKeyId "$TCB_API_KEY_ID" --apiKey "$TCB_API_KEY"
-          tcb fn deploy api -e "$TCB_ENV_ID" --force
+          echo "y" | tcb fn deploy api -e "$TCB_ENV_ID" --force
           tcb hosting deploy ./deploy -e "$TCB_ENV_ID"
