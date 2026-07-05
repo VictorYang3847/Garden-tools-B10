@@ -25,6 +25,7 @@ import {
 import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js";
 import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.js";
 import { initSyncUI } from "./sync-ui.js";
+import { hasCloudApi } from "./api.js";
 
 const projectSelect = document.getElementById("project-select");
 const productSelect = document.getElementById("product-select");
@@ -47,16 +48,16 @@ async function initApp() {
   await loadStateAsync();
 
   // 检测是否配置了云端 API（未配置则纯本地模式）
-  const hasCloudApi = typeof window !== 'undefined' && !!window.__API_BASE_URL__;
+  const hasCloudApiEnabled = hasCloudApi();
 
   // 2. 初始化认证 UI（仅在配置了云端 API 时启用）
-  if (hasCloudApi) {
+  if (hasCloudApiEnabled) {
     initAuthUI();
   }
 
   // 3. 初始化同步（如已登录，触发登录后同步）
   let syncManager = null;
-  if (hasCloudApi) {
+  if (hasCloudApiEnabled) {
     try {
       const syncResult = await initSync(getState());
       syncManager = syncResult.syncManager;
@@ -74,7 +75,7 @@ async function initApp() {
   initSyncUI(syncManager);
 
   // 5. 注册登录状态变化回调（登录/登出后刷新 UI）
-  if (hasCloudApi) {
+  if (hasCloudApiEnabled) {
     onAuthChange(async (loggedIn, user) => {
       updateAuthDisplay(loggedIn, user);
       if (loggedIn) {

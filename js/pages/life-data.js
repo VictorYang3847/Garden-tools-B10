@@ -98,7 +98,6 @@ async function ensureWeaknessRendered() {
     weaknessInitialized = true;
   }
   weaknessContainer.innerHTML = "";
-  await new Promise((resolve) => setTimeout(resolve, 0));
   weaknessModule.render(weaknessContainer, currentModel);
 }
 

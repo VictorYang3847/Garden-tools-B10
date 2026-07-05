@@ -8,6 +8,7 @@
  */
 
 import { getToken } from './auth.js';
+import { apiUrl } from './api.js';
 
 // 同步状态常量
 export const SyncStatus = {
@@ -17,14 +18,6 @@ export const SyncStatus = {
   ERROR: 'error',     // 同步失败
   OFFLINE: 'offline', // 离线
 };
-
-// API 基址
-function getApiBase() {
-  if (typeof window !== 'undefined' && window.__API_BASE_URL__) {
-    return window.__API_BASE_URL__;
-  }
-  return 'http://localhost:8787';
-}
 
 /**
  * 同步管理器类
@@ -146,7 +139,7 @@ export class SyncManager {
     this._setStatus(SyncStatus.SYNCING);
 
     try {
-      const res = await fetch(`${getApiBase()}/api/data`, {
+      const res = await fetch(apiUrl('/api/data'), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -193,7 +186,7 @@ export class SyncManager {
     this._setStatus(SyncStatus.SYNCING);
 
     try {
-      const res = await fetch(`${getApiBase()}/api/data`, {
+      const res = await fetch(apiUrl('/api/data'), {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -260,7 +253,7 @@ export class SyncManager {
     if (!token) return [];
 
     try {
-      const res = await fetch(`${getApiBase()}/api/versions`, {
+      const res = await fetch(apiUrl('/api/versions'), {
         method: 'GET',
         headers: { Authorization: `Bearer ${token}` },
       });

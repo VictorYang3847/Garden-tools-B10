@@ -5,8 +5,8 @@
  */
 
 import { SyncStatus } from './sync.js';
+import { hasCloudApi } from './api.js';
 
-// 状态对应的图标和文字
 const STATUS_CONFIG = {
   [SyncStatus.IDLE]: { icon: '○', text: '本地', color: '#94a3b8', title: '本地存储（未登录云端）' },
   [SyncStatus.SYNCING]: { icon: '⟳', text: '同步中', color: '#38bdf8', title: '正在同步到云端', spin: true },
@@ -14,14 +14,6 @@ const STATUS_CONFIG = {
   [SyncStatus.ERROR]: { icon: '⚠', text: '同步失败', color: '#f87171', title: '同步失败，点击重试' },
   [SyncStatus.OFFLINE]: { icon: '○', text: '离线', color: '#94a3b8', title: '网络离线，仅本地存储' },
 };
-
-/**
- * 是否配置了云端 API
- * @returns {boolean}
- */
-function hasCloudApi() {
-  return typeof window !== 'undefined' && !!window.__API_BASE_URL__;
-}
 
 /**
  * 初始化同步状态 UI

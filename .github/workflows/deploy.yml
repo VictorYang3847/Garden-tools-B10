@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: cloudbase-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -17,6 +21,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
+          cache-dependency-path: cloudbase/functions/api/package-lock.json
 
       - name: Install CloudBase CLI
         run: npm install -g @cloudbase/cli
@@ -32,7 +38,7 @@ jobs:
         run: |
           if [ -f "cloudbase/functions/api/package.json" ]; then
             cd cloudbase/functions/api
-            npm install
+            npm ci
             cd ../../..
           fi
 
@@ -45,3 +51,10 @@ jobs:
           tcb login --apiKeyId "$TCB_API_KEY_ID" --apiKey "$TCB_API_KEY"
           echo "y" | tcb fn deploy api -e "$TCB_ENV_ID" --force
           tcb hosting deploy ./deploy -e "$TCB_ENV_ID"
+
+      - name: Deployment summary
+        run: |
+          echo "### CloudBase 部署完成" >> $GITHUB_STEP_SUMMARY
+          echo "- 分支: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 提交: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 环境: \`${{ secrets.TCB_ENV_ID }}\`" >> $GITHUB_STEP_SUMMARY

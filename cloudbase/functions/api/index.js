@@ -1,4 +1,5 @@
 const cloudbase = require('@cloudbase/node-sdk');
+const crypto = require('crypto');
 
 const app = cloudbase.init({
   env: cloudbase.SYMBOL_CURRENT_ENV,
@@ -32,14 +33,12 @@ function handleOptions() {
 }
 
 async function hashPassword(password, salt) {
-  const crypto = require('crypto');
   return crypto
     .pbkdf2Sync(password, salt, 100000, 32, 'sha256')
     .toString('base64');
 }
 
 function generateSalt() {
-  const crypto = require('crypto');
   return crypto.randomBytes(16).toString('base64');
 }
 
@@ -54,7 +53,6 @@ function base64UrlDecode(str) {
 }
 
 async function signJWT(payload, secret) {
-  const crypto = require('crypto');
   const header = { alg: 'HS256', typ: 'JWT' };
   const headerB64 = base64UrlEncode(JSON.stringify(header));
   const payloadB64 = base64UrlEncode(JSON.stringify(payload));
@@ -70,7 +68,6 @@ async function verifyJWT(token, secret) {
     if (parts.length !== 3) return null;
     const [headerB64, payloadB64, sigB64] = parts;
 
-    const crypto = require('crypto');
     const data = `${headerB64}.${payloadB64}`;
     const expectedSig = crypto.createHmac('sha256', secret).update(data).digest('base64');
     const expectedSigB64 = expectedSig.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
@@ -113,7 +110,7 @@ async function handleRegister(event) {
 
   const salt = generateSalt();
   const passwordHash = await hashPassword(password, salt);
-  const userId = require('crypto').randomUUID();
+  const userId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
 
   await db.collection('users').add({

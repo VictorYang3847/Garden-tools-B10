@@ -3,14 +3,7 @@
  * 提供注册/登录/登出/JWT 管理 + 登录注册 UI 弹窗
  */
 import { getAuth, setAuth, clearAuth } from './db.js';
-
-// API 基址：优先用 window.__API_BASE_URL__（部署时注入），否则默认本地 Worker
-function getApiBase() {
-  if (typeof window !== 'undefined' && window.__API_BASE_URL__) {
-    return window.__API_BASE_URL__;
-  }
-  return 'http://localhost:8787';
-}
+import { apiUrl } from './api.js';
 
 // ====== 核心 API ======
 
@@ -22,7 +15,7 @@ function getApiBase() {
  * @throws {Error} 含 message 字段
  */
 export async function register(email, password) {
-  const res = await fetch(`${getApiBase()}/api/auth/register`, {
+  const res = await fetch(apiUrl('/api/auth/register'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -42,7 +35,7 @@ export async function register(email, password) {
  * @throws {Error}
  */
 export async function login(email, password) {
-  const res = await fetch(`${getApiBase()}/api/auth/login`, {
+  const res = await fetch(apiUrl('/api/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
