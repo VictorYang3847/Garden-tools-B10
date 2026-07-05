@@ -28,7 +28,10 @@ jobs:
         run: |
           npm install -g @cloudbase/cli
           npm install @cloudbase/manager-node
-          tcb --version
+          echo "### CLI Version" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tcb --version 2>&1 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Prepare deploy files
         run: |
@@ -36,11 +39,12 @@ jobs:
           cp index.html deploy/
           cp -r css deploy/
           cp -r js deploy/
-          echo "=== deploy 目录内容 ==="
-          find deploy -type f | head -30
-          echo "..."
-          find deploy -type f | wc -l
-          echo "files total"
+          echo "### Deploy Files" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          find deploy -type f | wc -l >> $GITHUB_STEP_SUMMARY
+          echo "files" >> $GITHUB_STEP_SUMMARY
+          find deploy -type f | head -20 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Install function dependencies
         run: |
@@ -72,32 +76,33 @@ jobs:
             echo "⚠️ 未配置 JWT_SECRET GitHub Secret，请在 CloudBase 控制台手动设置"
           fi
 
-          # 方法1: 使用 manager-node SDK 直接上传（更可靠）
-          echo "=== 方法1: SDK 上传 ==="
-          DEPLOY_DIR=./deploy node scripts/deploy-hosting.mjs 2>&1 || echo "⚠️ SDK 上传失败"
+          # SDK 方式部署静态托管
+          echo "### SDK Deploy Output" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          DEPLOY_DIR=./deploy node scripts/deploy-hosting.mjs 2>&1 | tee /tmp/sdk-output.txt >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
-          # 方法2: 使用 CLI 部署到根目录
-          echo "=== 方法2: CLI 部署到 / ==="
-          tcb hosting deploy ./deploy / -e "$TCB_ENV_ID" 2>&1 || echo "⚠️ CLI 部署到 / 失败"
+          # CLI 方式部署到根目录
+          echo "### CLI Deploy to / " >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tcb hosting deploy ./deploy / -e "$TCB_ENV_ID" 2>&1 | tee /tmp/cli-root-output.txt >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
-          # 方法3: 使用 CLI 部署到 /home
-          echo "=== 方法3: CLI 部署到 /home ==="
-          tcb hosting deploy ./deploy /home -e "$TCB_ENV_ID" 2>&1 || echo "⚠️ CLI 部署到 /home 失败"
+          # CLI 方式部署到 /home
+          echo "### CLI Deploy to /home" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tcb hosting deploy ./deploy /home -e "$TCB_ENV_ID" 2>&1 | tee /tmp/cli-home-output.txt >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
           # 验证部署结果
-          echo "=== 验证静态托管文件列表 ==="
-          tcb hosting list -e "$TCB_ENV_ID" 2>&1 || echo "⚠️ hosting list 失败"
+          echo "### Hosting List" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tcb hosting list -e "$TCB_ENV_ID" 2>&1 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Deployment summary
         run: |
-          echo "### CloudBase 部署完成" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Info" >> $GITHUB_STEP_SUMMARY
           echo "- 分支: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- 提交: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- 环境: \`${{ secrets.TCB_ENV_ID }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ⚠️ 安全检查" >> $GITHUB_STEP_SUMMARY
-          if [ -n "${{ secrets.JWT_SECRET }}" ]; then
-            echo "- ✅ JWT_SECRET 已配置" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- ❌ **JWT_SECRET 未配置** — 请在 GitHub Secrets 和 CloudBase 控制台设置" >> $GITHUB_STEP_SUMMARY
-          fi
