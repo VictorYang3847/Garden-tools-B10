@@ -1,15 +1,12 @@
 import {
-  getProjects,
-  getCurrentProject,
-  setCurrentProject,
   getCurrentProduct,
   setCurrentProduct,
   getCurrentModel,
   setCurrentModel,
   getProducts,
   getModels,
-  addProject,
-  deleteProject,
+  addProduct,
+  deleteProduct,
   exportData,
   importData,
   getModuleData,
@@ -34,8 +31,8 @@ export function render(container, m) {
   container.appendChild(content);
 
   bindTabs();
-  renderProjects();
-  renderProjectTree();
+  renderProducts();
+  renderProductTree();
   renderVersions();
   bindImportExport();
   bindReportGeneration();
@@ -61,38 +58,33 @@ function switchTab(tabName) {
   });
 }
 
-function renderProjects() {
+function renderProducts() {
   const grid = document.getElementById("dm-projects-grid");
-  const projects = getProjects();
-  const currentProject = getCurrentProject();
+  const products = getProducts();
+  const currentProduct = getCurrentProduct();
 
-  if (!projects.length) {
+  if (!products.length) {
     grid.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">📁</div>
-        <h3>暂无项目</h3>
-        <p>点击「新建项目」按钮开始创建第一个项目。</p>
+        <div class="empty-icon">📦</div>
+        <h3>暂无产品</h3>
+        <p>点击「新建产品」按钮开始创建第一个产品。</p>
       </div>
     `;
     return;
   }
 
-  grid.innerHTML = projects
+  grid.innerHTML = products
     .map((p) => {
-      const productCount = p.products?.length || 0;
-      const modelCount = (p.products || []).reduce(
-        (sum, prod) => sum + (prod.models?.length || 0),
-        0
-      );
-      const isActive = currentProject && p.id === currentProject.id;
+      const modelCount = p.models?.length || 0;
+      const isActive = currentProduct && p.id === currentProduct.id;
       return `
-        <div class="dm-project-card ${isActive ? "active" : ""}" data-project-id="${p.id}">
+        <div class="dm-product-card ${isActive ? "active" : ""}" data-product-id="${p.id}">
           <div class="dm-project-card-header">
-            <div class="dm-project-icon">📁</div>
+            <div class="dm-project-icon">📦</div>
             <div class="dm-project-info">
               <h3 class="dm-project-name">${escapeHtml(p.name)}</h3>
               <div class="dm-project-meta">
-                <span>${productCount} 个产品线</span>
                 <span>${modelCount} 个型号</span>
               </div>
             </div>
@@ -111,56 +103,43 @@ function renderProjects() {
     })
     .join("");
 
-  grid.querySelectorAll(".dm-project-card").forEach((card) => {
-    const projectId = card.dataset.projectId;
-    card.querySelector('[data-action="open"]').addEventListener("click", () => openProject(projectId));
-    card.querySelector('[data-action="rename"]').addEventListener("click", () => renameProject(projectId));
-    card.querySelector('[data-action="copy"]').addEventListener("click", () => copyProject(projectId));
-    card.querySelector('[data-action="delete"]').addEventListener("click", () => deleteProjectConfirm(projectId));
+  grid.querySelectorAll(".dm-product-card").forEach((card) => {
+    const productId = card.dataset.productId;
+    card.querySelector('[data-action="open"]').addEventListener("click", () => openProduct(productId));
+    card.querySelector('[data-action="rename"]').addEventListener("click", () => renameProduct(productId));
+    card.querySelector('[data-action="copy"]').addEventListener("click", () => copyProduct(productId));
+    card.querySelector('[data-action="delete"]').addEventListener("click", () => deleteProductConfirm(productId));
   });
 
-  document.getElementById("dm-new-project").addEventListener("click", createNewProject);
+  document.getElementById("dm-new-project").addEventListener("click", createNewProduct);
 }
 
-function renderProjectTree() {
+function renderProductTree() {
   const tree = document.getElementById("dm-project-tree");
-  const projects = getProjects();
-  const currentProject = getCurrentProject();
+  const products = getProducts();
   const currentProduct = getCurrentProduct();
   const currentModel = getCurrentModel();
 
   let html = "";
-  for (const project of projects) {
-    const isProjectActive = currentProject?.id === project.id;
+  for (const product of products) {
+    const isProductActive = currentProduct?.id === product.id;
     html += `
-      <div class="dm-tree-item dm-tree-project ${isProjectActive ? "active" : ""}" data-type="project" data-id="${project.id}">
+      <div class="dm-tree-item dm-tree-product ${isProductActive ? "active" : ""}" data-type="product" data-id="${product.id}" style="padding-left: 0;">
         <span class="dm-tree-toggle">▾</span>
-        <span class="dm-tree-icon">📁</span>
-        <span class="dm-tree-label">${escapeHtml(project.name)}</span>
+        <span class="dm-tree-icon">📦</span>
+        <span class="dm-tree-label">${escapeHtml(product.name)}</span>
       </div>
       <div class="dm-tree-children">
     `;
-    for (const product of project.products || []) {
-      const isProductActive = currentProduct?.id === product.id;
+    for (const mdl of product.models || []) {
+      const isModelActive = currentModel?.id === mdl.id;
       html += `
-        <div class="dm-tree-item dm-tree-product ${isProductActive ? "active" : ""}" data-type="product" data-id="${product.id}" style="padding-left: 1.5rem;">
-          <span class="dm-tree-toggle">▾</span>
-          <span class="dm-tree-icon">📦</span>
-          <span class="dm-tree-label">${escapeHtml(product.name)}</span>
+        <div class="dm-tree-item dm-tree-model ${isModelActive ? "active" : ""}" data-type="model" data-id="${mdl.id}" style="padding-left: 1.5rem;">
+          <span class="dm-tree-toggle" style="visibility: hidden;">▸</span>
+          <span class="dm-tree-icon">🔧</span>
+          <span class="dm-tree-label">${escapeHtml(mdl.name)}</span>
         </div>
-        <div class="dm-tree-children">
       `;
-      for (const mdl of product.models || []) {
-        const isModelActive = currentModel?.id === mdl.id;
-        html += `
-          <div class="dm-tree-item dm-tree-model ${isModelActive ? "active" : ""}" data-type="model" data-id="${mdl.id}" style="padding-left: 3rem;">
-            <span class="dm-tree-toggle" style="visibility: hidden;">▸</span>
-            <span class="dm-tree-icon">🔧</span>
-            <span class="dm-tree-label">${escapeHtml(mdl.name)}</span>
-          </div>
-        `;
-      }
-      html += `</div>`;
     }
     html += `</div>`;
   }
@@ -173,9 +152,7 @@ function renderProjectTree() {
       const type = item.dataset.type;
       const id = item.dataset.id;
 
-      if (type === "project") {
-        setCurrentProject(id);
-      } else if (type === "product") {
+      if (type === "product") {
         setCurrentProduct(id);
       } else if (type === "model") {
         setCurrentModel(id);
@@ -201,45 +178,45 @@ function renderProjectTree() {
 }
 
 function refreshUI() {
-  renderProjects();
-  renderProjectTree();
+  renderProducts();
+  renderProductTree();
   renderVersions();
 }
 
-function createNewProject() {
-  const name = prompt("请输入项目名称：", "新项目");
+function createNewProduct() {
+  const name = prompt("请输入产品名称：", "新产品");
   if (!name) return;
-  addProject(name);
+  addProduct(name);
   refreshUI();
 }
 
-function openProject(projectId) {
-  setCurrentProject(projectId);
+function openProduct(productId) {
+  setCurrentProduct(productId);
   refreshUI();
 }
 
-function renameProject(projectId) {
-  const projects = getProjects();
-  const project = projects.find((p) => p.id === projectId);
-  if (!project) return;
+function renameProduct(productId) {
+  const products = getProducts();
+  const product = products.find((p) => p.id === productId);
+  if (!product) return;
 
-  const name = prompt("请输入新的项目名称：", project.name);
-  if (!name || name === project.name) return;
+  const name = prompt("请输入新的产品名称：", product.name);
+  if (!name || name === product.name) return;
 
-  project.name = name;
+  product.name = name;
   saveToStorage();
   refreshUI();
 }
 
-function copyProject(projectId) {
-  const projects = getProjects();
-  const project = projects.find((p) => p.id === projectId);
-  if (!project) return;
+function copyProduct(productId) {
+  const products = getProducts();
+  const product = products.find((p) => p.id === productId);
+  if (!product) return;
 
-  const newProject = JSON.parse(JSON.stringify(project));
-  newProject.id = genId();
-  newProject.name = project.name + " - 副本";
-  newProject.createdAt = new Date().toISOString();
+  const newProduct = JSON.parse(JSON.stringify(product));
+  newProduct.id = genId();
+  newProduct.name = product.name + " - 副本";
+  newProduct.createdAt = new Date().toISOString();
 
   function regenerateIds(obj) {
     if (obj && typeof obj === "object") {
@@ -253,21 +230,21 @@ function copyProject(projectId) {
       }
     }
   }
-  regenerateIds(newProject);
+  regenerateIds(newProduct);
 
-  projects.push(newProject);
+  products.push(newProduct);
   saveToStorage();
   refreshUI();
 }
 
-function deleteProjectConfirm(projectId) {
-  const projects = getProjects();
-  const project = projects.find((p) => p.id === projectId);
-  if (!project) return;
+function deleteProductConfirm(productId) {
+  const products = getProducts();
+  const product = products.find((p) => p.id === productId);
+  if (!product) return;
 
-  if (!confirm(`确定要删除项目「${project.name}」吗？此操作不可恢复。`)) return;
+  if (!confirm(`确定要删除产品「${product.name}」吗？此操作不可恢复。`)) return;
 
-  deleteProject(projectId);
+  deleteProduct(productId);
   refreshUI();
 }
 
@@ -309,7 +286,7 @@ function handleImportFile(file) {
   reader.onload = (e) => {
     try {
       const data = JSON.parse(e.target.result);
-      if (!Array.isArray(data.projects)) {
+      if (!Array.isArray(data.projects) && !Array.isArray(data.products)) {
         throw new Error("无效的数据格式");
       }
       importDataCache = data;
@@ -323,18 +300,23 @@ function handleImportFile(file) {
 
 function showImportPreview(data) {
   const preview = document.getElementById("dm-import-preview");
-  let projectCount = data.projects?.length || 0;
   let productCount = 0;
   let modelCount = 0;
 
-  for (const p of data.projects || []) {
-    productCount += p.products?.length || 0;
-    for (const prod of p.products || []) {
+  if (Array.isArray(data.products)) {
+    productCount = data.products.length;
+    for (const prod of data.products) {
       modelCount += prod.models?.length || 0;
+    }
+  } else if (Array.isArray(data.projects)) {
+    for (const p of data.projects) {
+      productCount += p.products?.length || 0;
+      for (const prod of p.products || []) {
+        modelCount += prod.models?.length || 0;
+      }
     }
   }
 
-  document.getElementById("dm-preview-projects").textContent = projectCount;
   document.getElementById("dm-preview-products").textContent = productCount;
   document.getElementById("dm-preview-models").textContent = modelCount;
   preview.style.display = "";
@@ -358,35 +340,23 @@ function exportJSON(scope) {
   if (scope === "project") {
     data = exportData();
   } else {
-    const allData = JSON.parse(exportData());
-    const currentProject = getCurrentProject();
     const currentProduct = getCurrentProduct();
     const currentModel = getCurrentModel();
 
     if (scope === "model") {
       data = {
-        version: 3,
-        projects: [
+        version: 4,
+        products: [
           {
-            ...currentProject,
-            products: [
-              {
-                ...currentProduct,
-                models: [currentModel],
-              },
-            ],
+            ...currentProduct,
+            models: [currentModel],
           },
         ],
       };
     } else if (scope === "product") {
       data = {
-        version: 3,
-        projects: [
-          {
-            ...currentProject,
-            products: [currentProduct],
-          },
-        ],
+        version: 4,
+        products: [currentProduct],
       };
     }
   }
@@ -505,24 +475,37 @@ function handleImport() {
 }
 
 function mergeImportData(data) {
-  const existingProjects = getProjects();
-  for (const project of data.projects || []) {
-    function regenerateIds(obj) {
-      if (obj && typeof obj === "object") {
-        if (obj.id) obj.id = genId();
-        for (const key of Object.keys(obj)) {
-          if (Array.isArray(obj[key])) {
-            obj[key].forEach(regenerateIds);
-          } else if (typeof obj[key] === "object") {
-            regenerateIds(obj[key]);
-          }
+  const existingProducts = getProducts();
+  
+  let productsToImport = [];
+  if (Array.isArray(data.products)) {
+    productsToImport = data.products;
+  } else if (Array.isArray(data.projects)) {
+    for (const project of data.projects) {
+      if (Array.isArray(project.products)) {
+        productsToImport.push(...project.products);
+      }
+    }
+  }
+
+  function regenerateIds(obj) {
+    if (obj && typeof obj === "object") {
+      if (obj.id) obj.id = genId();
+      for (const key of Object.keys(obj)) {
+        if (Array.isArray(obj[key])) {
+          obj[key].forEach(regenerateIds);
+        } else if (typeof obj[key] === "object") {
+          regenerateIds(obj[key]);
         }
       }
     }
-    const newProject = JSON.parse(JSON.stringify(project));
-    regenerateIds(newProject);
-    newProject.name = newProject.name + " (导入)";
-    existingProjects.push(newProject);
+  }
+
+  for (const product of productsToImport) {
+    const newProduct = JSON.parse(JSON.stringify(product));
+    regenerateIds(newProduct);
+    newProduct.name = newProduct.name + " (导入)";
+    existingProducts.push(newProduct);
   }
   saveToStorage();
 }
@@ -550,14 +533,12 @@ function generateReport() {
 function buildReportHtml(template, modules) {
   const currentModel = getCurrentModel();
   const currentProduct = getCurrentProduct();
-  const currentProject = getCurrentProject();
 
   let html = `
     <div class="report-page">
       <div class="report-header">
         <h1>${getReportTitle(template)}</h1>
         <div class="report-meta">
-          <p><strong>项目：</strong>${escapeHtml(currentProject?.name || "-")}</p>
           <p><strong>产品：</strong>${escapeHtml(currentProduct?.name || "-")}</p>
           <p><strong>型号：</strong>${escapeHtml(currentModel?.name || "-")}</p>
           <p><strong>生成时间：</strong>${new Date().toLocaleString()}</p>

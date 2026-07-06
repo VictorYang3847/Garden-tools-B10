@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://reliability-tool-d8erocv8e9979b2-1327689319.ap-shanghai.app.tcloudbase.com" />
     <script>
       window.__API_BASE_URL__ = 'https://reliability-tool-d8erocv8e9979b2-1327689319.ap-shanghai.app.tcloudbase.com';
-      window.__APP_VERSION__ = '1.0.3';
+      window.__APP_VERSION__ = '1.1.0';
     </script>
   </head>
   <body>
@@ -65,7 +65,7 @@
           </a>
         </nav>
         <div class="sidebar-footer">
-          <span class="version-text">v1.0.1</span>
+          <span class="version-text">v1.1.0</span>
         </div>
       </aside>
 
@@ -81,18 +81,20 @@
           </div>
           <div class="header-right">
             <div class="header-selectors">
-              <label class="selector-group">
-                <span class="selector-label">项目</span>
-                <select id="project-select" class="header-select"></select>
-              </label>
-              <label class="selector-group">
+              <div class="selector-group">
                 <span class="selector-label">产品</span>
-                <select id="product-select" class="header-select"></select>
-              </label>
-              <label class="selector-group">
+                <div style="display: flex; gap: 0.25rem; align-items: center;">
+                  <select id="product-select" class="header-select"></select>
+                  <button type="button" id="product-add-btn" class="btn-icon" title="新建产品" style="padding: 0 0.5rem; height: 2rem; display: flex; align-items: center; justify-content: center;">+</button>
+                </div>
+              </div>
+              <div class="selector-group">
                 <span class="selector-label">型号</span>
-                <select id="model-select" class="header-select"></select>
-              </label>
+                <div style="display: flex; gap: 0.25rem; align-items: center;">
+                  <select id="model-select" class="header-select"></select>
+                  <button type="button" id="model-add-btn" class="btn-icon" title="新建型号" style="padding: 0 0.5rem; height: 2rem; display: flex; align-items: center; justify-content: center;">+</button>
+                </div>
+              </div>
               <button type="button" class="btn-secondary btn-clear-data" id="btn-clear-data" title="清空当前型号的所有模块数据">清空数据</button>
             </div>
             <div class="header-actions">
@@ -334,8 +336,8 @@
             <div class="step-card">
               <div class="step-number">1</div>
               <div class="step-content">
-                <h3>创建/选择项目型号</h3>
-                <p>在顶部选择器中创建或选择您的项目、产品和型号</p>
+                <h3>创建/选择产品型号</h3>
+                <p>在顶部选择器中创建或选择您的产品和型号</p>
               </div>
             </div>
             <div class="step-card">
@@ -2664,11 +2666,11 @@
       <div class="module-page data-management-page">
         <div class="module-header">
           <h2>数据管理</h2>
-          <p>项目管理、数据导入导出、报告生成与版本控制</p>
+          <p>产品型号管理、数据导入导出、报告生成与版本控制</p>
         </div>
         <div class="module-content">
           <div class="dm-tabs">
-            <button type="button" class="dm-tab active" data-tab="projects">项目管理</button>
+            <button type="button" class="dm-tab active" data-tab="projects">产品管理</button>
             <button type="button" class="dm-tab" data-tab="import-export">数据导入导出</button>
             <button type="button" class="dm-tab" data-tab="reports">报告生成</button>
             <button type="button" class="dm-tab" data-tab="versions">版本管理</button>
@@ -2677,13 +2679,13 @@
           <div class="dm-tab-content" id="dm-tab-projects">
             <div class="dm-projects-header">
               <button type="button" class="btn-primary" id="dm-new-project">
-                <span>➕</span> 新建项目
+                <span>➕</span> 新建产品
               </button>
             </div>
             <div class="dm-projects-grid" id="dm-projects-grid"></div>
             <div class="dm-project-tree-card card" style="margin-top: 1.5rem;">
               <div class="card-header">
-                <h3>项目结构</h3>
+                <h3>产品结构</h3>
               </div>
               <div class="card-body">
                 <div class="dm-tree" id="dm-project-tree"></div>
@@ -2711,7 +2713,7 @@
                     <select id="dm-export-scope" class="form-input">
                       <option value="model">当前型号</option>
                       <option value="product">当前产品</option>
-                      <option value="project">整个项目</option>
+                      <option value="project">全部产品</option>
                     </select>
                   </div>
                   <button type="button" class="btn-primary" id="dm-export-btn" style="width: 100%;">
@@ -2734,10 +2736,6 @@
                   <div class="dm-import-preview" id="dm-import-preview" style="display: none;">
                     <h4>导入预览</h4>
                     <div class="dm-preview-stats">
-                      <div class="dm-preview-stat">
-                        <span class="dm-preview-label">项目数</span>
-                        <span class="dm-preview-value" id="dm-preview-projects">0</span>
-                      </div>
                       <div class="dm-preview-stat">
                         <span class="dm-preview-label">产品数</span>
                         <span class="dm-preview-value" id="dm-preview-products">0</span>

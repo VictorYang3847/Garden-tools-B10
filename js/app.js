@@ -1,17 +1,12 @@
 import {
-  getProjects,
-  getCurrentProject,
-  setCurrentProject,
   getCurrentProduct,
   setCurrentProduct,
   getCurrentModel,
   setCurrentModel,
   getProducts,
   getModels,
-  addProject,
   addProduct,
   addModel,
-  deleteProject,
   deleteProduct,
   deleteModel,
   exportData,
@@ -27,9 +22,10 @@ import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.j
 import { initSyncUI } from "./sync-ui.js?v=1.0.5";
 import { hasCloudApi } from "./api.js?v=1.0.5";
 
-const projectSelect = document.getElementById("project-select");
 const productSelect = document.getElementById("product-select");
 const modelSelect = document.getElementById("model-select");
+const productAddBtn = document.getElementById("product-add-btn");
+const modelAddBtn = document.getElementById("model-add-btn");
 const pageTitle = document.getElementById("page-title");
 const mainContent = document.getElementById("main-content");
 const sidebarToggle = document.getElementById("sidebar-toggle");
@@ -265,12 +261,6 @@ function handleRouteChange(routeKey, route) {
 function initSelectors() {
   refreshAllSelectors();
 
-  projectSelect.addEventListener("change", () => {
-    setCurrentProject(projectSelect.value);
-    refreshAllSelectors();
-    refreshCurrentRoute();
-  });
-
   productSelect.addEventListener("change", () => {
     setCurrentProduct(productSelect.value);
     refreshAllSelectors();
@@ -282,28 +272,40 @@ function initSelectors() {
     refreshAllSelectors();
     refreshCurrentRoute();
   });
+
+  productAddBtn.addEventListener("click", () => {
+    const name = prompt("请输入产品名称：", "新产品");
+    if (name && name.trim()) {
+      const product = addProduct(name.trim());
+      setCurrentProduct(product.id);
+      refreshAllSelectors();
+      refreshCurrentRoute();
+    }
+  });
+
+  modelAddBtn.addEventListener("click", () => {
+    const currentProduct = getCurrentProduct();
+    if (!currentProduct) {
+      alert("请先选择一个产品");
+      return;
+    }
+    const name = prompt("请输入型号名称：", "新型号");
+    if (name && name.trim()) {
+      const model = addModel(currentProduct.id, name.trim());
+      setCurrentModel(model.id);
+      refreshAllSelectors();
+      refreshCurrentRoute();
+    }
+  });
 }
 
 function refreshAllSelectors() {
-  refreshProjectSelect();
   refreshProductSelect();
   refreshModelSelect();
 }
 
-function refreshProjectSelect() {
-  const projects = getProjects();
-  const current = getCurrentProject();
-  projectSelect.innerHTML = projects
-    .map(
-      (p) =>
-        `<option value="${p.id}" ${current && p.id === current.id ? "selected" : ""}>${escapeHtml(p.name)}</option>`
-    )
-    .join("");
-}
-
 function refreshProductSelect() {
-  const project = getCurrentProject();
-  const products = project ? getProducts(project.id) : [];
+  const products = getProducts();
   const current = getCurrentProduct();
   productSelect.innerHTML = products
     .map(
