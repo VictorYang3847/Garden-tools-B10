@@ -8,6 +8,8 @@ import {
   getProjects,
   getProducts,
   getModels,
+  getProduct,
+  getModel,
   addProject,
   addProduct,
   addModel,
