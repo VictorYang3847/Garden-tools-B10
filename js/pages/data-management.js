@@ -70,6 +70,8 @@ function renderProjects() {
   const grid = document.getElementById("dm-projects-grid");
   const projects = getProjects();
   const currentProject = getCurrentProject();
+  const currentProduct = getCurrentProduct();
+  const currentModel = getCurrentModel();
 
   if (!projects.length) {
     grid.innerHTML = `
