@@ -87,6 +87,41 @@ function renderProjects() {
       const productCount = proj.products?.length || 0;
       const modelCount = proj.products?.reduce((sum, p) => sum + (p.models?.length || 0), 0) || 0;
       const isActive = currentProject && proj.id === currentProject.id;
+
+      let productsHtml = "";
+      for (const product of proj.products || []) {
+        const isProductActive = currentProduct && product.id === currentProduct.id;
+        let modelsHtml = "";
+        for (const mdl of product.models || []) {
+          const isModelActive = currentModel && mdl.id === currentModel.id;
+          modelsHtml += `
+            <div class="dm-model-row ${isModelActive ? "active" : ""}" data-model-id="${mdl.id}" data-product-id="${product.id}">
+              <span class="dm-model-name">🔧 ${escapeHtml(mdl.name)}</span>
+              <div class="dm-model-actions">
+                <button type="button" class="dm-action-btn-sm" data-action="rename-model" title="重命名型号">✏️</button>
+                <button type="button" class="dm-action-btn-sm" data-action="delete-model" title="删除型号">🗑️</button>
+              </div>
+            </div>
+          `;
+        }
+        productsHtml += `
+          <div class="dm-product-section ${isProductActive ? "active" : ""}" data-product-id="${product.id}">
+            <div class="dm-product-header">
+              <span class="dm-product-name">📦 ${escapeHtml(product.name)}</span>
+              <div class="dm-product-actions">
+                <button type="button" class="dm-action-btn-sm" data-action="rename-product" title="重命名产品">✏️</button>
+                <button type="button" class="dm-action-btn-sm" data-action="copy-product" title="复制产品">📋</button>
+                <button type="button" class="dm-action-btn-sm dm-action-danger" data-action="delete-product" title="删除产品">🗑️</button>
+                <button type="button" class="dm-action-btn-sm" data-action="add-model" title="新建型号">➕</button>
+              </div>
+            </div>
+            <div class="dm-models-list">
+              ${modelsHtml || '<div class="dm-empty-models">暂无型号，点击 ➕ 添加</div>'}
+            </div>
+          </div>
+        `;
+      }
+
       return `
         <div class="dm-project-card ${isActive ? "active" : ""}" data-project-id="${proj.id}">
           <div class="dm-project-card-header">
@@ -98,6 +133,9 @@ function renderProjects() {
               </div>
             </div>
           </div>
+          <div class="dm-project-products">
+            ${productsHtml || '<div class="dm-empty-products">暂无产品</div>'}
+          </div>
           <div class="dm-project-card-footer">
             <span class="dm-project-date">创建于 ${formatDate(proj.createdAt)}</span>
             <div class="dm-project-actions">
@@ -105,6 +143,7 @@ function renderProjects() {
               <button type="button" class="dm-action-btn" data-action="rename" title="重命名">✏️</button>
               <button type="button" class="dm-action-btn" data-action="copy" title="复制">📋</button>
               <button type="button" class="dm-action-btn dm-action-danger" data-action="delete" title="删除">🗑️</button>
+              <button type="button" class="dm-action-btn" data-action="add-product" title="新建产品">➕</button>
             </div>
           </div>
         </div>
@@ -114,10 +153,57 @@ function renderProjects() {
 
   grid.querySelectorAll(".dm-project-card").forEach((card) => {
     const projectId = card.dataset.projectId;
+
     card.querySelector('[data-action="open"]').addEventListener("click", () => openProject(projectId));
     card.querySelector('[data-action="rename"]').addEventListener("click", () => renameProject(projectId));
     card.querySelector('[data-action="copy"]').addEventListener("click", () => copyProject(projectId));
     card.querySelector('[data-action="delete"]').addEventListener("click", () => deleteProjectConfirm(projectId));
+    card.querySelector('[data-action="add-product"]').addEventListener("click", () => addProductToProject(projectId));
+
+    card.querySelectorAll('[data-action="rename-product"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const productId = btn.closest(".dm-product-section").dataset.productId;
+        renameProduct(productId);
+      });
+    });
+
+    card.querySelectorAll('[data-action="copy-product"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const productId = btn.closest(".dm-product-section").dataset.productId;
+        copyProduct(productId);
+      });
+    });
+
+    card.querySelectorAll('[data-action="delete-product"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const productId = btn.closest(".dm-product-section").dataset.productId;
+        deleteProductConfirm(productId);
+      });
+    });
+
+    card.querySelectorAll('[data-action="add-model"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const productId = btn.closest(".dm-product-section").dataset.productId;
+        addModelToProduct(productId);
+      });
+    });
+
+    card.querySelectorAll('[data-action="rename-model"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const modelRow = btn.closest(".dm-model-row");
+        const modelId = modelRow.dataset.modelId;
+        renameModel(modelId);
+      });
+    });
+
+    card.querySelectorAll('[data-action="delete-model"]').forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const modelRow = btn.closest(".dm-model-row");
+        const modelId = modelRow.dataset.modelId;
+        const productId = modelRow.dataset.productId;
+        deleteModelConfirm(modelId, productId);
+      });
+    });
   });
 
   document.getElementById("dm-new-project").addEventListener("click", createNewProject);
@@ -269,6 +355,107 @@ function deleteProjectConfirm(projectId) {
   if (!confirm(`确定要删除项目「${project.name}」吗？此操作将删除该项目下的所有产品和型号数据，不可恢复。`)) return;
 
   deleteProject(projectId);
+  refreshUI();
+}
+
+// ========== 产品操作函数 ==========
+
+function addProductToProject(projectId) {
+  const projects = getProjects();
+  const project = projects.find((p) => p.id === projectId);
+  if (!project) return;
+
+  const name = prompt("请输入产品名称：", "新产品");
+  if (!name) return;
+
+  const product = createProduct(name);
+  project.products.push(product);
+  persistState();
+  refreshUI();
+}
+
+function renameProduct(productId) {
+  const product = getProduct(productId);
+  if (!product) return;
+
+  const name = prompt("请输入新的产品名称：", product.name);
+  if (!name || name === product.name) return;
+
+  product.name = name;
+  persistState();
+  refreshUI();
+}
+
+function copyProduct(productId) {
+  const product = getProduct(productId);
+  if (!product) return;
+
+  const newProduct = JSON.parse(JSON.stringify(product));
+  newProduct.id = genId();
+  newProduct.name = product.name + " - 副本";
+  newProduct.createdAt = new Date().toISOString();
+
+  function regenerateIds(obj) {
+    if (obj && typeof obj === "object") {
+      if (obj.id) obj.id = genId();
+      for (const key of Object.keys(obj)) {
+        if (Array.isArray(obj[key])) {
+          obj[key].forEach(regenerateIds);
+        } else if (typeof obj[key] === "object") {
+          regenerateIds(obj[key]);
+        }
+      }
+    }
+  }
+  regenerateIds(newProduct);
+
+  const currentProject = getCurrentProject();
+  if (currentProject) {
+    currentProject.products.push(newProduct);
+    persistState();
+    refreshUI();
+  }
+}
+
+function deleteProductConfirm(productId) {
+  const product = getProduct(productId);
+  if (!product) return;
+
+  if (!confirm(`确定要删除产品「${product.name}」吗？此操作将删除该产品下的所有型号数据，不可恢复。`)) return;
+
+  deleteProduct(productId);
+  refreshUI();
+}
+
+// ========== 型号操作函数 ==========
+
+function addModelToProduct(productId) {
+  const name = prompt("请输入型号名称：", "新型号");
+  if (!name) return;
+
+  addModel(productId, name);
+  refreshUI();
+}
+
+function renameModel(modelId) {
+  const model = getModel(modelId);
+  if (!model) return;
+
+  const name = prompt("请输入新的型号名称：", model.name);
+  if (!name || name === model.name) return;
+
+  model.name = name;
+  persistState();
+  refreshUI();
+}
+
+function deleteModelConfirm(modelId, productId) {
+  const model = getModel(modelId);
+  if (!model) return;
+
+  if (!confirm(`确定要删除型号「${model.name}」吗？此操作不可恢复。`)) return;
+
+  deleteModel(modelId);
   refreshUI();
 }
 

@@ -1,4 +1,4 @@
-import { getCustomComponentLibrary, setCustomComponentLibrary, getHomeB10 } from "../store.js?v=1.0.5";
+import { getCustomComponentLibrary, setCustomComponentLibrary, getHomeB10, getCurrentProduct, getProductShared } from "../store.js?v=1.0.5";
 import { gammaApprox, K10 } from "../calculator.js?v=1.0.5";
 
 let onSaveCallback = null;
@@ -844,7 +844,15 @@ function saveCustomComponents() {
 }
 
 function getAllLibraryComponents() {
-  return [...COMPONENT_LIBRARY, ...customComponentLibrary];
+  const productComponents = [];
+  const currentProduct = getCurrentProduct();
+  if (currentProduct) {
+    const shared = getProductShared(currentProduct.id);
+    if (shared.components && shared.components.length > 0) {
+      productComponents.push(...shared.components.map(c => ({ ...c, _isProductShared: true })));
+    }
+  }
+  return [...COMPONENT_LIBRARY, ...customComponentLibrary, ...productComponents];
 }
 
 function getFilteredComponents() {
@@ -886,11 +894,13 @@ function renderComponentLibrary(container) {
     const categoryLabel = COMPONENT_CATEGORY_LABELS[comp.category] || comp.category;
     const typeLabel = COMPONENT_TYPE_LABELS[comp.type] || comp.type;
     const isCustom = customComponentLibrary.some(c => c.id === comp.id);
+    const isProductShared = comp._isProductShared;
     return `
       <div class="lib-component-card" data-comp-id="${comp.id}" title="点击添加到BOM">
         <div class="lib-comp-header">
           <span class="lib-comp-name">${escapeHtml(comp.name)}</span>
           ${isCustom ? '<span class="lib-comp-custom-tag">自定义</span>' : ''}
+          ${isProductShared ? '<span class="lib-comp-product-tag">产品共享</span>' : ''}
         </div>
         <div class="lib-comp-category">
           <span class="lib-cat-badge lib-cat-${comp.category}">${categoryLabel}</span>

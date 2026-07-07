@@ -1,4 +1,4 @@
-import { genId, getCustomImprovements, setCustomImprovements } from "../store.js?v=1.0.5";
+import { genId, getCustomImprovements, setCustomImprovements, getCurrentProduct, getProductShared } from "../store.js?v=1.0.5";
 import { fmt } from "../utils.js?v=1.0.5";
 import { gammaApprox } from "../calculator.js?v=1.0.5";
 
@@ -90,6 +90,7 @@ export function render(container, model) {
   renderComparisonTable();
   drawComparisonChart();
   renderGrowthSummary();
+  renderProductHistory();
 }
 
 function ensurePhases() {
@@ -1422,6 +1423,52 @@ function renderGrowthSummary() {
     </div>
     <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); font-size: 0.8rem; color: var(--text-muted);">
       共 ${phases.length} 轮试验，累计 ${phases.reduce((sum, p) => sum + p.failures.length, 0)} 次失效记录
+    </div>
+  `;
+}
+
+function renderProductHistory() {
+  const historyDiv = document.getElementById("growth-product-history");
+  const emptyDiv = document.getElementById("growth-product-history-empty");
+  if (!historyDiv || !emptyDiv) return;
+
+  const currentProduct = getCurrentProduct();
+  if (!currentProduct) {
+    historyDiv.innerHTML = "";
+    emptyDiv.style.display = "";
+    return;
+  }
+
+  const shared = getProductShared(currentProduct.id);
+  const historyData = shared.growthHistory || [];
+
+  if (!historyData || historyData.length === 0) {
+    historyDiv.innerHTML = "";
+    emptyDiv.style.display = "";
+    return;
+  }
+
+  emptyDiv.style.display = "none";
+  historyDiv.innerHTML = `
+    <div style="display: grid; gap: 0.75rem;">
+      ${historyData.map((item, idx) => `
+        <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 6px; border-left: 3px solid ${PHASE_COLORS[idx % PHASE_COLORS.length]};">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <span style="font-weight: 600; color: var(--text-primary);">${escapeHtml(item.phaseName || `阶段 ${idx + 1}`)}</span>
+            ${item.mtbf ? `<span style="font-size: 0.85rem; color: var(--accent);">MTBF: ${fmt(item.mtbf, 1)} h</span>` : ''}
+          </div>
+          ${item.description ? `<div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">${escapeHtml(item.description)}</div>` : ''}
+          ${item.improvements && item.improvements.length > 0 ? `
+            <div style="font-size: 0.8rem;">
+              <div style="color: var(--text-muted); margin-bottom: 0.25rem;">改进措施：</div>
+              <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
+                ${item.improvements.map(imp => `<span style="padding: 0.25rem 0.5rem; background: var(--bg-tertiary); border-radius: 4px; color: var(--text-secondary);">${escapeHtml(imp)}</span>`).join('')}
+              </div>
+            </div>
+          ` : ''}
+          ${item.notes ? `<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">备注: ${escapeHtml(item.notes)}</div>` : ''}
+        </div>
+      `).join('')}
     </div>
   `;
 }

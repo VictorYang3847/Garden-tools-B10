@@ -6,6 +6,8 @@ let currentRatingInput = null;
 let currentRatingType = null;
 const expandedRows = new Set();
 
+import { getCurrentProduct, getProductShared } from "../store.js?v=1.0.5";
+
 const SEVERITY_RATINGS = [
   { score: 10, desc: "危及安全/违反法规，无预警" },
   { score: 9, desc: "危及安全/违反法规，有预警" },
@@ -623,6 +625,9 @@ function bindEvents(container) {
   const exportBtn = container.querySelector("#fmea-export-csv");
   exportBtn.addEventListener("click", exportCsv);
 
+  const inheritBtn = container.querySelector("#fmea-inherit-template");
+  inheritBtn.addEventListener("click", () => handleInheritFromTemplate(container));
+
   const ratingPanel = container.querySelector("#fmea-rating-panel");
   if (ratingPanel) {
     ratingPanel.addEventListener("click", (e) => {
@@ -663,4 +668,44 @@ export function render(container, model) {
   updateTabState(container);
   renderTable(container);
   bindEvents(container);
+}
+
+function handleInheritFromTemplate(container) {
+  const currentProduct = getCurrentProduct();
+  if (!currentProduct) {
+    alert("请先选择一个产品");
+    return;
+  }
+
+  const shared = getProductShared(currentProduct.id);
+  const templateItems = shared.fmeaTemplate?.items || [];
+
+  if (!templateItems || templateItems.length === 0) {
+    alert("当前产品的 FMEA 模板为空，请先在产品级创建模板数据");
+    return;
+  }
+
+  const existingIds = new Set(fmeaData.items.map((item) => item.id));
+  let addedCount = 0;
+
+  for (const templateItem of templateItems) {
+    if (!existingIds.has(templateItem.id)) {
+      const newItem = {
+        ...templateItem,
+        id: genId(),
+        _inherited: true,
+      };
+      updateItemCalculations(newItem);
+      fmeaData.items.push(newItem);
+      addedCount++;
+    }
+  }
+
+  if (addedCount > 0) {
+    saveData();
+    renderTable(container);
+    alert(`成功从模板继承 ${addedCount} 个失效模式`);
+  } else {
+    alert("模板中的失效模式已经全部存在");
+  }
 }

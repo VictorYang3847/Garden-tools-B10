@@ -1,4 +1,4 @@
-import { genId, getHomeB10 } from "../store.js?v=1.0.5";
+import { genId, getHomeB10, getCurrentProduct, getProductShared } from "../store.js?v=1.0.5";
 import { fmt, toast } from "../utils.js?v=1.0.5";
 import { gammaApprox, K10 } from "../calculator.js?v=1.0.5";
 
@@ -388,11 +388,13 @@ function bindTestItemsEvents() {
   const addBtn = document.getElementById("tp-add-item");
   const calcAllBtn = document.getElementById("tp-calc-all");
   const importBtn = document.getElementById("tp-import-fmea");
+  const templateBtn = document.getElementById("tp-apply-template");
   const tbody = document.getElementById("tp-items-tbody");
 
   if (addBtn) addBtn.addEventListener("click", addTestItem);
   if (calcAllBtn) calcAllBtn.addEventListener("click", calculateAllTestItems);
   if (importBtn) importBtn.addEventListener("click", importFromFmea);
+  if (templateBtn) templateBtn.addEventListener("click", applyTestPlanTemplate);
 
   if (tbody) {
     tbody.addEventListener("change", (e) => {
@@ -631,6 +633,60 @@ function importFromFmea() {
   renderDvprTable();
   const btn = document.getElementById("tp-import-fmea");
   if (btn) toast(btn, `已导入 ${imported} 项`, 1500);
+}
+
+function applyTestPlanTemplate() {
+  const currentProduct = getCurrentProduct();
+  if (!currentProduct) {
+    alert("请先选择一个产品");
+    return;
+  }
+
+  const shared = getProductShared(currentProduct.id);
+  const templateItems = shared.testPlanTemplate?.testItems || [];
+
+  if (!templateItems || templateItems.length === 0) {
+    alert("当前产品的测试计划模板为空，请先在产品级创建模板数据");
+    return;
+  }
+
+  const existingNames = new Set(currentModel.modules.testPlan.testItems.map((i) => i.name));
+  let addedCount = 0;
+
+  for (const templateItem of templateItems) {
+    const name = templateItem.name || "";
+    if (!existingNames.has(name)) {
+      const newItem = {
+        ...templateItem,
+        id: genId(),
+        _inherited: true,
+      };
+      const params = currentModel.modules.testPlan.globalParams;
+      newItem.testDuration = calculateTestDuration(
+        newItem.targetLife, newItem.censorType, newItem.beta, newItem.testLevel, params.strategy, newItem.durationMultiplier
+      );
+      newItem.sampleSize = calculateSampleSize(
+        newItem.targetReliability,
+        params.confidence,
+        params.allowedFailures,
+        newItem.targetLife,
+        newItem.beta,
+        newItem.testDuration
+      );
+      currentModel.modules.testPlan.testItems.push(newItem);
+      addedCount++;
+    }
+  }
+
+  if (addedCount > 0) {
+    autoSave();
+    renderTestItems();
+    renderDvprTable();
+    const btn = document.getElementById("tp-apply-template");
+    if (btn) toast(btn, `已应用 ${addedCount} 项模板`, 1500);
+  } else {
+    alert("模板中的测试项已经全部存在");
+  }
 }
 
 function calculateAccelFactor(plan) {

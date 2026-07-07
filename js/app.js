@@ -100,6 +100,7 @@ async function initApp() {
   initSidebar();
   initImportExport();
   initClearData();
+  updateVersionDisplay();
 
   initRouter({
     mainContent: mainContent,
@@ -461,4 +462,11 @@ function escapeHtml(s) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function updateVersionDisplay() {
+  const versionEl = document.getElementById("version-text");
+  if (versionEl && window.__APP_VERSION__) {
+    versionEl.textContent = "v" + window.__APP_VERSION__;
+  }
 }

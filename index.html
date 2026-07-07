@@ -65,7 +65,7 @@
           </a>
         </nav>
         <div class="sidebar-footer">
-          <span class="version-text">v1.2.0</span>
+          <span class="version-text" id="version-text">v1.2.0</span>
         </div>
       </aside>
 
@@ -388,6 +388,10 @@
                   <option value="L">L - 低</option>
                 </select>
               </div>
+              <button type="button" class="btn-icon" id="fmea-inherit-template">
+                <span>📋</span>
+                <span class="btn-text">从模板继承</span>
+              </button>
               <button type="button" class="btn-icon" id="fmea-add-row">
                 <span>➕</span>
                 <span class="btn-text">添加行</span>
@@ -1025,6 +1029,10 @@
               <div class="card-header">
                 <h3>试验项目明细</h3>
                 <div class="card-actions">
+                  <button type="button" class="btn-icon" id="tp-apply-template">
+                    <span>📋</span>
+                    <span class="btn-text">应用模板</span>
+                  </button>
                   <button type="button" class="btn-icon" id="tp-import-fmea">
                     <span>📥</span>
                     <span class="btn-text">从 FMEA 导入</span>
@@ -2051,6 +2059,24 @@
                 <div class="empty-icon">💡</div>
                 <h3>暂无改进措施</h3>
                 <p>点击「从措施库选择」按钮添加改进措施</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>产品历史参考数据</h3>
+              <div class="card-actions">
+                <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">来自产品级共享数据</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div id="growth-product-history" class="history-reference">
+              </div>
+              <div id="growth-product-history-empty" class="empty-state" style="padding: 2rem 1rem;">
+                <div class="empty-icon">📊</div>
+                <h3>暂无产品历史数据</h3>
+                <p>当前产品未配置历史参考数据</p>
               </div>
             </div>
           </div>
