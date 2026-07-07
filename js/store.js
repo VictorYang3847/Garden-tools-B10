@@ -227,18 +227,29 @@ export function createModel(name = "新型号") {
   };
 }
 
+// ========== V5: 产品级共享数据默认值 ==========
+function defaultProductShared() {
+  return {
+    components: [],
+    fmeaTemplate: { items: [], type: "DFMEA" },
+    testPlanTemplate: { testItems: [], globalParams: { confidence: 0.9, allowedFailures: 0, defaultCensorType: "time" } },
+    growthHistory: { phases: [], lessons: [] },
+  };
+}
+
 export function createProduct(name = "新产品") {
   const model = createModel("默认型号");
   return {
     id: genId(),
     name,
+    productShared: defaultProductShared(),
     models: [model],
     createdAt: new Date().toISOString(),
   };
 }
 
-function createProject(name = "新项目") {
-  const product = createProduct("绿篱机");
+export function createProject(name = "新项目") {
+  const product = createProduct("默认产品");
   return {
     id: genId(),
     name,
@@ -872,13 +883,15 @@ function createDefaultProduct() {
 }
 
 function defaultAppState() {
-  const product = createDefaultProduct();
+  const project = createProject("默认项目");
+  const product = project.products[0];
   const model = product.models[0];
   return {
-    version: 4,
+    version: 5,
+    currentProjectId: project.id,
     currentProductId: product.id,
     currentModelId: model.id,
-    products: [product],
+    projects: [project],
     customComponentLibrary: [],
     customImprovements: [],
     updatedAt: 0,
@@ -909,20 +922,26 @@ export async function loadStateAsync() {
   // 2. 从 IndexedDB 读取
   try {
     const data = await dbGetState();
+    if (data && data.version === 5 && Array.isArray(data.projects)) {
+      state = normalizeStateV5(data);
+      return state;
+    }
     if (data && data.version === 4 && Array.isArray(data.products)) {
-      state = normalizeStateV4(data);
+      const v4Normalized = normalizeStateV4(data);
+      state = migrateV4ToV5(v4Normalized);
       return state;
     }
     if (data && data.version === 3 && Array.isArray(data.projects)) {
       const v3Normalized = normalizeStateV3(data);
-      state = migrateV3ToV4(v3Normalized);
+      const v4 = migrateV3ToV4(v3Normalized);
+      state = migrateV4ToV5(v4);
       return state;
     }
   } catch (e) {
     console.warn('IndexedDB 读取失败，降级到 localStorage:', e);
   }
 
-  // 3. 降级到同步 loadState（含 v1/v2/v3 迁移逻辑）
+  // 3. 降级到同步 loadState（含 v1/v2/v3/v4 迁移逻辑）
   state = loadState();
 
   // 4. 若是从 localStorage 加载或新建，写入 IndexedDB 持久化
@@ -940,12 +959,17 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      if (parsed.version === 5 && Array.isArray(parsed.projects)) {
+        return normalizeStateV5(parsed);
+      }
       if (parsed.version === 4 && Array.isArray(parsed.products)) {
-        return normalizeStateV4(parsed);
+        const v4Normalized = normalizeStateV4(parsed);
+        return migrateV4ToV5(v4Normalized);
       }
       if (parsed.version === 3 && Array.isArray(parsed.projects)) {
         const v3Normalized = normalizeStateV3(parsed);
-        return migrateV3ToV4(v3Normalized);
+        const v4 = migrateV3ToV4(v3Normalized);
+        return migrateV4ToV5(v4);
       }
     }
   } catch {
@@ -959,10 +983,11 @@ function loadState() {
       if (legacy.version === 2 && Array.isArray(legacy.projects)) {
         const v3 = migrateV2ToV3(legacy);
         const v3Normalized = normalizeStateV3(v3);
-        const migrated = migrateV3ToV4(v3Normalized);
-        saveState(migrated);
+        const v4 = migrateV3ToV4(v3Normalized);
+        const v5 = migrateV4ToV5(v4);
+        saveState(v5);
         localStorage.removeItem(LEGACY_V2_KEY);
-        return migrated;
+        return v5;
       }
     } catch {
       /* ignore */
@@ -976,10 +1001,11 @@ function loadState() {
       const v2 = migrateV1ToV2(legacy);
       const v3 = migrateV2ToV3(v2);
       const v3Normalized = normalizeStateV3(v3);
-      const migrated = migrateV3ToV4(v3Normalized);
-      saveState(migrated);
+      const v4 = migrateV3ToV4(v3Normalized);
+      const v5 = migrateV4ToV5(v4);
+      saveState(v5);
       localStorage.removeItem(LEGACY_V1_KEY);
-      return migrated;
+      return v5;
     } catch {
       /* ignore */
     }
@@ -1083,8 +1109,28 @@ function normalizeStateV4(s) {
   if (!Array.isArray(s.products)) s.products = [];
   for (const product of s.products) {
     if (!Array.isArray(product.models)) product.models = [];
+    if (!product.productShared) product.productShared = defaultProductShared();
     for (const model of product.models) {
       normalizeModel(model);
+    }
+  }
+  return s;
+}
+
+function normalizeStateV5(s) {
+  if (!Array.isArray(s.customComponentLibrary)) s.customComponentLibrary = [];
+  if (!Array.isArray(s.customImprovements)) s.customImprovements = [];
+  if (typeof s.updatedAt !== 'number') s.updatedAt = 0;
+  if (!Array.isArray(s.projects)) s.projects = [];
+  for (const project of s.projects) {
+    if (!project.note) project.note = "";
+    if (!Array.isArray(project.products)) project.products = [];
+    for (const product of project.products) {
+      if (!Array.isArray(product.models)) product.models = [];
+      if (!product.productShared) product.productShared = defaultProductShared();
+      for (const model of product.models) {
+        normalizeModel(model);
+      }
     }
   }
   return s;
@@ -1110,6 +1156,7 @@ function migrateV3ToV4(v3State) {
       const newProduct = {
         ...product,
         name: finalName,
+        productShared: defaultProductShared(),
         _migratedFromProject: project.name || "",
       };
       products.push(newProduct);
@@ -1131,6 +1178,38 @@ function migrateV3ToV4(v3State) {
     customComponentLibrary: v3State.customComponentLibrary || [],
     customImprovements: v3State.customImprovements || [],
     updatedAt: v3State.updatedAt || 0,
+  };
+}
+
+function migrateV4ToV5(v4State) {
+  const defaultProject = {
+    id: genId(),
+    name: "默认项目",
+    note: "迁移自 V4 数据",
+    createdAt: new Date().toISOString(),
+    products: [],
+  };
+
+  for (const v4Product of v4State.products || []) {
+    const newProduct = {
+      id: v4Product.id,
+      name: v4Product.name,
+      createdAt: v4Product.createdAt || new Date().toISOString(),
+      productShared: v4Product.productShared || defaultProductShared(),
+      models: v4Product.models || [],
+    };
+    defaultProject.products.push(newProduct);
+  }
+
+  return {
+    version: 5,
+    currentProjectId: defaultProject.id,
+    currentProductId: defaultProject.products[0]?.id,
+    currentModelId: defaultProject.products[0]?.models[0]?.id,
+    projects: [defaultProject],
+    customComponentLibrary: v4State.customComponentLibrary || [],
+    customImprovements: v4State.customImprovements || [],
+    updatedAt: v4State.updatedAt || 0,
   };
 }
 
@@ -1326,13 +1405,17 @@ export async function initSync(localState) {
   const result = await sm.syncOnLogin(localState);
   if (result.merged === 'cloud') {
     let newState = result.newState;
-    if (newState.version === 4 && Array.isArray(newState.products)) {
-      state = normalizeStateV4(newState);
+    if (newState.version === 5 && Array.isArray(newState.projects)) {
+      state = normalizeStateV5(newState);
+    } else if (newState.version === 4 && Array.isArray(newState.products)) {
+      const v4Normalized = normalizeStateV4(newState);
+      state = migrateV4ToV5(v4Normalized);
     } else if (newState.version === 3 && Array.isArray(newState.projects)) {
       const v3Normalized = normalizeStateV3(newState);
-      state = migrateV3ToV4(v3Normalized);
+      const v4 = migrateV3ToV4(v3Normalized);
+      state = migrateV4ToV5(v4);
     } else {
-      state = normalizeStateV4(newState);
+      state = normalizeStateV5(newState);
     }
     try {
       await dbSetState(state);
@@ -1386,37 +1469,99 @@ export function getHomeB10(model) {
   return isFinite(b10) && b10 > 0 ? b10 : 150;
 }
 
-export function getProducts() {
-  return ensureState().products;
+// ========== V5: 项目级 API ==========
+
+export function getProjects() {
+  return ensureState().projects || [];
 }
 
-export function getProduct(id) {
-  return ensureState().products.find((p) => p.id === id) || null;
+export function getProject(id) {
+  return ensureState().projects.find((p) => p.id === id) || null;
 }
 
-export function addProduct(name) {
+export function addProject(name) {
   const s = ensureState();
-  const product = createProduct(name);
-  s.products.push(product);
+  const project = createProject(name);
+  s.projects.push(project);
   persist();
-  return product;
+  return project;
 }
 
-export function deleteProduct(id) {
+export function deleteProject(id) {
   const s = ensureState();
-  s.products = s.products.filter((p) => p.id !== id);
-  if (s.currentProductId === id) {
-    const first = s.products[0];
+  s.projects = s.projects.filter((p) => p.id !== id);
+  if (s.currentProjectId === id) {
+    const first = s.projects[0];
     if (first) {
-      s.currentProductId = first.id;
-      s.currentModelId = first.models[0]?.id || null;
+      s.currentProjectId = first.id;
+      s.currentProductId = first.products[0]?.id || null;
+      s.currentModelId = first.products[0]?.models[0]?.id || null;
     } else {
+      s.currentProjectId = null;
       s.currentProductId = null;
       s.currentModelId = null;
     }
   }
   persist();
 }
+
+// ========== V5: 产品级 API ==========
+
+export function getProducts() {
+  const project = getCurrentProject();
+  return project?.products || [];
+}
+
+export function getProduct(id) {
+  const s = ensureState();
+  for (const project of s.projects || []) {
+    const product = project.products?.find((p) => p.id === id);
+    if (product) return product;
+  }
+  return null;
+}
+
+export function addProduct(name) {
+  const s = ensureState();
+  const project = getCurrentProject();
+  if (!project) return null;
+  const product = createProduct(name);
+  project.products.push(product);
+  persist();
+  return product;
+}
+
+export function deleteProduct(id) {
+  const s = ensureState();
+  for (const project of s.projects || []) {
+    const idx = project.products?.findIndex((p) => p.id === id) ?? -1;
+    if (idx >= 0) {
+      project.products.splice(idx, 1);
+      if (s.currentProductId === id) {
+        s.currentProductId = project.products[0]?.id || null;
+        s.currentModelId = project.products[0]?.models[0]?.id || null;
+      }
+      persist();
+      return;
+    }
+  }
+}
+
+// ========== V5: 产品共享数据 API ==========
+
+export function getProductShared(productId) {
+  const product = getProduct(productId);
+  return product?.productShared || defaultProductShared();
+}
+
+export function setProductShared(productId, sharedData) {
+  const product = getProduct(productId);
+  if (!product) return;
+  product.productShared = sharedData;
+  persist();
+}
+
+// ========== V5: 型号级 API ==========
 
 export function getModels(productId) {
   const product = getProduct(productId);
@@ -1425,9 +1570,11 @@ export function getModels(productId) {
 
 export function getModel(id) {
   const s = ensureState();
-  for (const product of s.products) {
-    const model = product.models?.find((m) => m.id === id);
-    if (model) return model;
+  for (const project of s.projects || []) {
+    for (const product of project.products || []) {
+      const model = product.models?.find((m) => m.id === id);
+      if (model) return model;
+    }
   }
   return null;
 }
@@ -1443,15 +1590,17 @@ export function addModel(productId, name) {
 
 export function deleteModel(id) {
   const s = ensureState();
-  for (const product of s.products) {
-    const idx = product.models?.findIndex((m) => m.id === id) ?? -1;
-    if (idx >= 0) {
-      product.models.splice(idx, 1);
-      if (s.currentModelId === id) {
-        s.currentModelId = product.models[0]?.id || null;
+  for (const project of s.projects || []) {
+    for (const product of project.products || []) {
+      const idx = product.models?.findIndex((m) => m.id === id) ?? -1;
+      if (idx >= 0) {
+        product.models.splice(idx, 1);
+        if (s.currentModelId === id) {
+          s.currentModelId = product.models[0]?.id || null;
+        }
+        persist();
+        return;
       }
-      persist();
-      return;
     }
   }
 }
@@ -1470,15 +1619,39 @@ export function setModuleData(modelId, moduleName, data) {
   persist();
 }
 
+// ========== V5: 当前选中 API ==========
+
+export function getCurrentProject() {
+  const s = ensureState();
+  return getProject(s.currentProjectId) || s.projects[0] || null;
+}
+
+export function setCurrentProject(id) {
+  const s = ensureState();
+  const project = getProject(id);
+  if (!project) return;
+  s.currentProjectId = id;
+  s.currentProductId = project.products[0]?.id || null;
+  s.currentModelId = project.products[0]?.models[0]?.id || null;
+  persist();
+}
+
 export function getCurrentProduct() {
   const s = ensureState();
-  return getProduct(s.currentProductId) || s.products[0] || null;
+  return getProduct(s.currentProductId) || getCurrentProject()?.products?.[0] || null;
 }
 
 export function setCurrentProduct(id) {
   const s = ensureState();
   const product = getProduct(id);
   if (!product) return;
+  // 确保当前项目与产品所属项目一致
+  for (const project of s.projects || []) {
+    if (project.products?.some((p) => p.id === id)) {
+      s.currentProjectId = project.id;
+      break;
+    }
+  }
   s.currentProductId = id;
   s.currentModelId = product.models[0]?.id || null;
   persist();
@@ -1493,6 +1666,16 @@ export function setCurrentModel(id) {
   const s = ensureState();
   const model = getModel(id);
   if (!model) return;
+  // 确保当前产品与型号所属产品一致
+  for (const project of s.projects || []) {
+    for (const product of project.products || []) {
+      if (product.models?.some((m) => m.id === id)) {
+        s.currentProjectId = project.id;
+        s.currentProductId = product.id;
+        break;
+      }
+    }
+  }
   s.currentModelId = id;
   persist();
 }
@@ -1503,19 +1686,29 @@ export function exportData() {
 
 export function importData(json) {
   const parsed = JSON.parse(json);
-  if (Array.isArray(parsed.products)) {
+  // V5 格式：有 projects 数组
+  if (parsed.version === 5 && Array.isArray(parsed.projects)) {
+    state = normalizeStateV5(parsed);
+    persist();
+    return state;
+  }
+  // V4 格式：有 products 数组
+  if (Array.isArray(parsed.products) || parsed.version === 4) {
     parsed.version = 4;
-    state = normalizeStateV4(parsed);
+    const v4Normalized = normalizeStateV4(parsed);
+    state = migrateV4ToV5(v4Normalized);
     persist();
     return state;
   }
-  if (Array.isArray(parsed.projects)) {
+  // V3 格式：有 projects 数组但 version 是 3
+  if (parsed.version === 3 && Array.isArray(parsed.projects)) {
     const v3Normalized = normalizeStateV3(parsed);
-    state = migrateV3ToV4(v3Normalized);
+    const v4 = migrateV3ToV4(v3Normalized);
+    state = migrateV4ToV5(v4);
     persist();
     return state;
   }
-  throw new Error("无效的数据格式：缺少 products 或 projects");
+  throw new Error("无效的数据格式：缺少 projects 或 products");
 }
 
 // ====== 自定义库（原独立 localStorage key）======

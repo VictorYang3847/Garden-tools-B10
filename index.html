@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://reliability-tool-d8erocv8e9979b2-1327689319.ap-shanghai.app.tcloudbase.com" />
     <script>
       window.__API_BASE_URL__ = 'https://reliability-tool-d8erocv8e9979b2-1327689319.ap-shanghai.app.tcloudbase.com';
-      window.__APP_VERSION__ = '1.1.0';
+      window.__APP_VERSION__ = '1.2.0';
     </script>
   </head>
   <body>
@@ -65,7 +65,7 @@
           </a>
         </nav>
         <div class="sidebar-footer">
-          <span class="version-text">v1.1.0</span>
+          <span class="version-text">v1.2.0</span>
         </div>
       </aside>
 
@@ -81,6 +81,13 @@
           </div>
           <div class="header-right">
             <div class="header-selectors">
+              <div class="selector-group">
+                <span class="selector-label">项目</span>
+                <div style="display: flex; gap: 0.25rem; align-items: center;">
+                  <select id="project-select" class="header-select"></select>
+                  <button type="button" id="project-add-btn" class="btn-icon" title="新建项目" style="padding: 0 0.5rem; height: 2rem; display: flex; align-items: center; justify-content: center;">+</button>
+                </div>
+              </div>
               <div class="selector-group">
                 <span class="selector-label">产品</span>
                 <div style="display: flex; gap: 0.25rem; align-items: center;">
@@ -2670,7 +2677,7 @@
         </div>
         <div class="module-content">
           <div class="dm-tabs">
-            <button type="button" class="dm-tab active" data-tab="projects">产品管理</button>
+            <button type="button" class="dm-tab active" data-tab="projects">项目管理</button>
             <button type="button" class="dm-tab" data-tab="import-export">数据导入导出</button>
             <button type="button" class="dm-tab" data-tab="reports">报告生成</button>
             <button type="button" class="dm-tab" data-tab="versions">版本管理</button>
@@ -2679,13 +2686,13 @@
           <div class="dm-tab-content" id="dm-tab-projects">
             <div class="dm-projects-header">
               <button type="button" class="btn-primary" id="dm-new-project">
-                <span>➕</span> 新建产品
+                <span>➕</span> 新建项目
               </button>
             </div>
             <div class="dm-projects-grid" id="dm-projects-grid"></div>
             <div class="dm-project-tree-card card" style="margin-top: 1.5rem;">
               <div class="card-header">
-                <h3>产品结构</h3>
+                <h3>项目结构</h3>
               </div>
               <div class="card-body">
                 <div class="dm-tree" id="dm-project-tree"></div>
@@ -2713,7 +2720,7 @@
                     <select id="dm-export-scope" class="form-input">
                       <option value="model">当前型号</option>
                       <option value="product">当前产品</option>
-                      <option value="project">全部产品</option>
+                      <option value="project">整个项目</option>
                     </select>
                   </div>
                   <button type="button" class="btn-primary" id="dm-export-btn" style="width: 100%;">

@@ -1,12 +1,17 @@
 import {
+  getCurrentProject,
+  setCurrentProject,
   getCurrentProduct,
   setCurrentProduct,
   getCurrentModel,
   setCurrentModel,
+  getProjects,
   getProducts,
   getModels,
+  addProject,
   addProduct,
   addModel,
+  deleteProject,
   deleteProduct,
   deleteModel,
   exportData,
@@ -22,8 +27,10 @@ import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.j
 import { initSyncUI } from "./sync-ui.js?v=1.0.5";
 import { hasCloudApi } from "./api.js?v=1.0.5";
 
+const projectSelect = document.getElementById("project-select");
 const productSelect = document.getElementById("product-select");
 const modelSelect = document.getElementById("model-select");
+const projectAddBtn = document.getElementById("project-add-btn");
 const productAddBtn = document.getElementById("product-add-btn");
 const modelAddBtn = document.getElementById("model-add-btn");
 const pageTitle = document.getElementById("page-title");
@@ -261,6 +268,12 @@ function handleRouteChange(routeKey, route) {
 function initSelectors() {
   refreshAllSelectors();
 
+  projectSelect.addEventListener("change", () => {
+    setCurrentProject(projectSelect.value);
+    refreshAllSelectors();
+    refreshCurrentRoute();
+  });
+
   productSelect.addEventListener("change", () => {
     setCurrentProduct(productSelect.value);
     refreshAllSelectors();
@@ -273,7 +286,22 @@ function initSelectors() {
     refreshCurrentRoute();
   });
 
+  projectAddBtn.addEventListener("click", () => {
+    const name = prompt("请输入项目名称：", "新项目");
+    if (name && name.trim()) {
+      const project = addProject(name.trim());
+      setCurrentProject(project.id);
+      refreshAllSelectors();
+      refreshCurrentRoute();
+    }
+  });
+
   productAddBtn.addEventListener("click", () => {
+    const currentProject = getCurrentProject();
+    if (!currentProject) {
+      alert("请先选择一个项目");
+      return;
+    }
     const name = prompt("请输入产品名称：", "新产品");
     if (name && name.trim()) {
       const product = addProduct(name.trim());
@@ -300,14 +328,27 @@ function initSelectors() {
 }
 
 function refreshAllSelectors() {
+  refreshProjectSelect();
   refreshProductSelect();
   refreshModelSelect();
 }
 
+function refreshProjectSelect() {
+  const projects = getProjects();
+  const current = getCurrentProject();
+  projectSelect.innerHTML = projects
+    .map(
+      (p) =>
+        `<option value="${p.id}" ${current && p.id === current.id ? "selected" : ""}>${escapeHtml(p.name)}</option>`
+    )
+    .join("");
+}
+
 function refreshProductSelect() {
-  const products = getProducts();
+  const project = getCurrentProject();
+  const products = project ? project.products : [];
   const current = getCurrentProduct();
-  productSelect.innerHTML = products
+  productSelect.innerHTML = (products || [])
     .map(
       (p) =>
         `<option value="${p.id}" ${current && p.id === current.id ? "selected" : ""}>${escapeHtml(p.name)}</option>`
@@ -317,9 +358,9 @@ function refreshProductSelect() {
 
 function refreshModelSelect() {
   const product = getCurrentProduct();
-  const models = product ? getModels(product.id) : [];
+  const models = product ? product.models : [];
   const current = getCurrentModel();
-  modelSelect.innerHTML = models
+  modelSelect.innerHTML = (models || [])
     .map(
       (m) =>
         `<option value="${m.id}" ${current && m.id === current.id ? "selected" : ""}>${escapeHtml(m.name)}</option>`
