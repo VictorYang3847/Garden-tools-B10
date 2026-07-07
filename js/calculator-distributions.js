@@ -1,4 +1,4 @@
-const K10 = Math.log(10 / 9);
+﻿const K10 = Math.log(10 / 9);
 
 function erf(x) {
   const a1 = 0.254829592;

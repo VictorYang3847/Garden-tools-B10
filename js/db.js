@@ -1,4 +1,4 @@
-/**
+﻿/**
  * IndexedDB 封装模块
  * 作为本地主存储替代 localStorage
  */

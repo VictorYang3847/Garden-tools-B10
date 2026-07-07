@@ -1,58 +1,58 @@
-const routes = {
+﻿const routes = {
   home: {
     path: "home",
     title: "首页",
-    module: () => import("./pages/home.js?v=1.0.5"),
+    module: () => import("./pages/home.js?v=1.3.0"),
   },
   fmea: {
     path: "fmea",
     title: "FMEA",
-    module: () => import("./pages/fmea.js?v=1.0.5"),
+    module: () => import("./pages/fmea.js?v=1.3.0"),
   },
   prediction: {
     path: "prediction",
     title: "可靠性预测",
-    module: () => import("./pages/prediction.js?v=1.0.5"),
+    module: () => import("./pages/prediction.js?v=1.3.0"),
   },
   "life-data": {
     path: "life-data",
     title: "寿命数据分析",
-    module: () => import("./pages/life-data.js?v=1.0.5"),
+    module: () => import("./pages/life-data.js?v=1.3.0"),
   },
   "test-plan": {
     path: "test-plan",
     title: "测试计划",
-    module: () => import("./pages/test-plan.js?v=1.0.5"),
+    module: () => import("./pages/test-plan.js?v=1.3.0"),
   },
   fta: {
     path: "fta",
     title: "故障树分析",
-    module: () => import("./pages/fta.js?v=1.0.5"),
+    module: () => import("./pages/fta.js?v=1.3.0"),
   },
   growth: {
     path: "growth",
     title: "可靠性增长",
-    module: () => import("./pages/growth.js?v=1.0.5"),
+    module: () => import("./pages/growth.js?v=1.3.0"),
   },
   maintenance: {
     path: "maintenance",
     title: "维护可用性",
-    module: () => import("./pages/maintenance.js?v=1.0.5"),
+    module: () => import("./pages/maintenance.js?v=1.3.0"),
   },
   derating: {
     path: "derating",
     title: "降额裕度",
-    module: () => import("./pages/derating.js?v=1.0.5"),
+    module: () => import("./pages/derating.js?v=1.3.0"),
   },
   environment: {
     path: "environment",
     title: "环境适应",
-    module: () => import("./pages/environment.js?v=1.0.5"),
+    module: () => import("./pages/environment.js?v=1.3.0"),
   },
   data: {
     path: "data",
     title: "数据管理",
-    module: () => import("./pages/data-management.js?v=1.0.5"),
+    module: () => import("./pages/data-management.js?v=1.3.0"),
   },
 };
 

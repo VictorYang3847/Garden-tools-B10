@@ -1,4 +1,4 @@
-/**
+﻿/**
  * B10 life calculator for gardening tools (Weibull model)
  */
 
@@ -384,7 +384,7 @@ export {
   lognormalCdf,
   lognormalPdf,
   fitDistribution,
-} from "./calculator-distributions.js?v=1.0.5";
+} from "./calculator-distributions.js?v=1.3.0";
 
 /**
  * Gamma function (Lanczos approximation)

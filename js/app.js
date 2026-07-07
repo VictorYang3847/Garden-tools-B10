@@ -1,4 +1,4 @@
-import {
+﻿import {
   getCurrentProject,
   setCurrentProject,
   getCurrentProduct,
@@ -21,11 +21,11 @@ import {
   loadStateAsync,
   initSync,
   getState,
-} from "./store.js?v=1.0.5";
-import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js?v=1.0.5";
-import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.js?v=1.0.5";
-import { initSyncUI } from "./sync-ui.js?v=1.0.5";
-import { hasCloudApi } from "./api.js?v=1.0.5";
+} from "./store.js?v=1.3.0";
+import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js?v=1.3.0";
+import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.js?v=1.3.0";
+import { initSyncUI } from "./sync-ui.js?v=1.3.0";
+import { hasCloudApi } from "./api.js?v=1.3.0";
 
 const projectSelect = document.getElementById("project-select");
 const productSelect = document.getElementById("product-select");
