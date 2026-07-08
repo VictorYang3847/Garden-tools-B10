@@ -274,6 +274,13 @@
                     <div class="metric-value" id="home-b10">—</div>
                     <div class="metric-unit">小时</div>
                   </div>
+                  <div class="b10-sync-banner" id="b10-sync-banner" hidden>
+                    <span class="sync-banner-text">目标B10已更新，是否同步到其他模块？</span>
+                    <div class="sync-banner-actions">
+                      <button type="button" class="btn-sync-confirm" id="b10-sync-btn">同步</button>
+                      <button type="button" class="btn-sync-dismiss" id="b10-sync-dismiss">忽略</button>
+                    </div>
+                  </div>
                   <div class="metric-card">
                     <div class="metric-label">目标 B10 (不含余量)</div>
                     <div class="metric-value" id="home-b10-no-margin">—</div>
@@ -301,25 +308,25 @@
                   </div>
                   <div class="formula-section">
                     <button type="button" class="formula-toggle" id="home-formula-toggle">📐 查看计算公式</button>
-                    <div class="formula-content" id="home-formula-content" style="display: none;">
+                    <div class="formula-content formula-grid" id="home-formula-content" style="display: none;">
                       <div class="formula-item">
                         <h4>质保总时长</h4>
                         <div class="formula-equation">Tw = 质保年数 × 年使用时长</div>
                       </div>
                       <div class="formula-item">
-                        <h4>目标 B10 寿命（含安全余量）</h4>
-                        <div class="formula-equation">B10 = Tw × [ln(10/9) / -ln(1-Fw)]<sup>1/β</sup> × (1 + margin)</div>
-                        <div class="formula-vars">
-                          <div class="var-row"><span class="var-name">Tw</span><span class="var-desc">质保总时长（小时）</span></div>
-                          <div class="var-row"><span class="var-name">Fw</span><span class="var-desc">允许失效率（如2%=0.02）</span></div>
-                          <div class="var-row"><span class="var-name">β</span><span class="var-desc">形状参数</span></div>
-                          <div class="var-row"><span class="var-name">margin</span><span class="var-desc">安全余量（如20%=0.2）</span></div>
-                        </div>
-                        <div class="formula-note">ln(10/9)≈0.10536，是B10点对应的标准常数</div>
-                      </div>
-                      <div class="formula-item">
                         <h4>特征寿命 η</h4>
                         <div class="formula-equation">η = B10 / [ln(10/9)]<sup>1/β</sup></div>
+                      </div>
+                      <div class="formula-item formula-item-wide">
+                        <h4>目标 B10 寿命（含安全余量）</h4>
+                        <div class="formula-equation">B10 = Tw × [ln(10/9) / -ln(1-Fw)]<sup>1/β</sup> × (1 + margin)</div>
+                        <div class="formula-vars-inline">
+                          <span class="var-chip"><b>Tw</b>质保总时长</span>
+                          <span class="var-chip"><b>Fw</b>允许失效率</span>
+                          <span class="var-chip"><b>β</b>形状参数</span>
+                          <span class="var-chip"><b>margin</b>安全余量</span>
+                        </div>
+                        <div class="formula-note">ln(10/9)≈0.10536，B10点对应的标准常数</div>
                       </div>
                       <div class="formula-item">
                         <h4>MTBF</h4>
@@ -329,6 +336,7 @@
                         <h4>时刻可靠度</h4>
                         <div class="formula-equation">R(t) = exp(-(t/η)<sup>β</sup>)</div>
                       </div>
+                    </div>
                     </div>
                   </div>
                 </div>
@@ -1111,7 +1119,8 @@
                         <th style="width: 130px;">加速应力水平1<span class="help-icon" data-tooltip="加速试验施加的应力等级，至少需要2个水平才能计算加速因子">?</span></th>
                         <th style="width: 130px;">加速应力水平2</th>
                         <th style="width: 110px;">加速因子</th>
-                        <th style="width: 110px;">试验时长 (h)</th>
+                        <th style="width: 110px;">目标B10 (h)<span class="help-icon" data-tooltip="使用工况下的目标B10寿命，用于自动计算加速后所需测试时间">?</span></th>
+                        <th style="width: 110px;">试验时长 (h)<span class="help-icon" data-tooltip="自动计算 = 目标B10 / 加速因子，可手动覆盖">?</span></th>
                         <th style="width: 90px;">样本量</th>
                         <th style="width: 70px;">操作</th>
                       </tr>
@@ -1145,8 +1154,8 @@
                   </div>
                   <div class="alt-info-item">
                     <h4>逆幂律模型</h4>
-                    <p>适用于电压、振动等应力：AF = (V_accel / V_use)^n</p>
-                    <p class="hint">n 根据应力类型取值</p>
+                    <p>适用于电压、功率、振动等应力：AF = (S_accel / S_use)^n</p>
+                    <p class="hint">n: 电压=5, 功率=4, 振动=3, 其他=4</p>
                   </div>
                 </div>
               </div>

@@ -590,7 +590,21 @@ function createDefaultProduct() {
         resultNote: "",
       },
     ],
-    altPlans: [],
+    altPlans: [
+      {
+        id: genId(),
+        name: "整机功率加速耐久",
+        stressType: "power",
+        accelModel: "inversePower",
+        useStress: 100,
+        accelStress1: 500,
+        accelStress2: 300,
+        accelFactor: 625,
+        targetB10: 1500,
+        testDuration: 3,
+        sampleSize: 10,
+      },
+    ],
     haltTests: [],
   };
 
@@ -2117,7 +2131,21 @@ function createDefaultProject() {
         resultNote: "",
       },
     ],
-    altPlans: [],
+    altPlans: [
+      {
+        id: genId(),
+        name: "整机功率加速耐久",
+        stressType: "power",
+        accelModel: "inversePower",
+        useStress: 100,
+        accelStress1: 500,
+        accelStress2: 300,
+        accelFactor: 625,
+        targetB10: 1500,
+        testDuration: 3,
+        sampleSize: 10,
+      },
+    ],
     haltTests: [],
   };
 

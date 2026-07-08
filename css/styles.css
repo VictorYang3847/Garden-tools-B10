@@ -5869,6 +5869,72 @@ textarea.form-input {
   padding: 1rem 1.25rem;
 }
 
+/* 首页公式双列网格布局 */
+.formula-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1.25rem;
+}
+
+.formula-grid .formula-item {
+  margin-bottom: 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.formula-grid .formula-item-wide {
+  grid-column: 1 / -1;
+}
+
+.formula-grid .formula-item h4 {
+  font-size: 0.85rem;
+  margin-bottom: 0.3rem;
+}
+
+.formula-grid .formula-equation {
+  font-size: 0.95rem;
+  padding: 0.4rem 0.6rem;
+  margin-bottom: 0;
+}
+
+/* 变量内联标签 */
+.formula-vars-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.var-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.2rem;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.5rem;
+  background: var(--surface-2);
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+
+.var-chip b {
+  color: var(--accent);
+  font-family: "Cambria Math", "Times New Roman", Georgia, serif;
+  font-style: italic;
+  font-weight: 600;
+  margin-right: 0.15rem;
+}
+
+.formula-grid .formula-note {
+  font-size: 0.78rem;
+  margin-top: 0.3rem;
+}
+
+@media (max-width: 600px) {
+  .formula-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .formula-item {
   margin-bottom: 1rem;
   padding-bottom: 1rem;
@@ -6998,6 +7064,80 @@ textarea.form-input {
 
 .user-dropdown[hidden] {
   display: none;
+}
+
+/* ===== B10 同步提示横幅 ===== */
+
+.b10-sync-banner {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: rgba(59, 158, 255, 0.1);
+  border: 1px solid rgba(59, 158, 255, 0.3);
+  border-radius: 8px;
+  animation: syncSlideIn 0.3s ease;
+}
+
+.b10-sync-banner[hidden] {
+  display: none;
+}
+
+@keyframes syncSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sync-banner-text {
+  font-size: 0.85rem;
+  color: var(--text);
+  flex: 1;
+}
+
+.sync-banner-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.btn-sync-confirm {
+  background: var(--accent, #3b9eff);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.btn-sync-confirm:hover {
+  opacity: 0.85;
+}
+
+.btn-sync-dismiss {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-sync-dismiss:hover {
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 /* ===== 登录/注册弹窗 ===== */

@@ -11,6 +11,7 @@ const STRESS_TYPES = {
   humidity: "湿度",
   vibration: "振动",
   voltage: "电压",
+  power: "功率",
 };
 
 const ACCEL_MODELS = {
@@ -711,7 +712,7 @@ function calculateAccelFactor(plan) {
       return Math.pow(accel1 / useStress, n);
     }
     case "inversePower": {
-      const n = stressType === "voltage" ? 5 : stressType === "vibration" ? 3 : 4;
+      const n = stressType === "voltage" ? 5 : stressType === "vibration" ? 3 : stressType === "power" ? 4 : 4;
       if (useStress <= 0) return null;
       return Math.pow(accel1 / useStress, n);
     }
@@ -730,6 +731,7 @@ function createNewAltPlan() {
     accelStress1: 60,
     accelStress2: 85,
     accelFactor: 0,
+    targetB10: 0,
     testDuration: 1000,
     sampleSize: 10,
   };
@@ -763,6 +765,13 @@ function bindAltEvents() {
       ) {
         const af = calculateAccelFactor(plan);
         plan.accelFactor = af ? parseFloat(af.toFixed(2)) : 0;
+        if (plan.accelFactor > 0 && plan.targetB10 > 0) {
+          plan.testDuration = Math.ceil(plan.targetB10 / plan.accelFactor);
+        }
+      }
+
+      if (field === "targetB10" && plan.accelFactor > 0 && plan.targetB10 > 0) {
+        plan.testDuration = Math.ceil(plan.targetB10 / plan.accelFactor);
       }
 
       autoSave();
@@ -830,6 +839,7 @@ function renderAltPlans() {
         <td><input type="number" data-field="accelStress1" value="${plan.accelStress1}" class="item-input" step="0.1" /></td>
         <td><input type="number" data-field="accelStress2" value="${plan.accelStress2}" class="item-input" step="0.1" /></td>
         <td class="tp-af-cell">${plan.accelFactor ? plan.accelFactor.toFixed(2) + "×" : "-"}</td>
+        <td><input type="number" data-field="targetB10" value="${plan.targetB10 || 0}" min="0" class="item-input" step="1" /></td>
         <td><input type="number" data-field="testDuration" value="${plan.testDuration}" min="0" class="item-input" step="1" /></td>
         <td><input type="number" data-field="sampleSize" value="${plan.sampleSize}" min="1" class="item-input" step="1" /></td>
         <td><button type="button" data-action="delete" class="btn-sm btn-ghost" style="color: var(--danger);">删除</button></td>
@@ -840,8 +850,12 @@ function renderAltPlans() {
 
 function addAltPlan() {
   const plan = createNewAltPlan();
+  plan.targetB10 = getHomeB10(currentModel) || 1500;
   const af = calculateAccelFactor(plan);
   plan.accelFactor = af ? parseFloat(af.toFixed(2)) : 0;
+  if (plan.accelFactor > 0 && plan.targetB10 > 0) {
+    plan.testDuration = Math.ceil(plan.targetB10 / plan.accelFactor);
+  }
   currentModel.modules.testPlan.altPlans.push(plan);
   autoSave();
   renderAltPlans();

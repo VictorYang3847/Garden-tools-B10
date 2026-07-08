@@ -9,6 +9,9 @@
 
 let currentModel = null;
 let onSaveCallback = null;
+let lastSyncedB10 = null; // 上次同步到其他模块的 B10 值
+let lastSyncedModelId = null; // 跟踪模型切换
+let syncBannerTimer = null;
 
 // 产品信息字段定义
 const PRODUCT_INFO_FIELDS = [
@@ -30,6 +33,11 @@ export function init(model, onSave) {
 
 export function render(container, model) {
   currentModel = model;
+  // 模型切换时重置同步跟踪
+  if (lastSyncedModelId !== model?.id) {
+    lastSyncedModelId = model?.id;
+    lastSyncedB10 = null;
+  }
   const template = document.getElementById("home-template");
   const content = template.content.cloneNode(true);
   container.appendChild(content);
@@ -39,6 +47,7 @@ export function render(container, model) {
   updateProductInfoSummary();
   bindEvents();
   bindProductInfoEvents();
+  bindSyncBanner();
   calculate();
 }
 
@@ -148,6 +157,100 @@ function calculate() {
   if (mtbfEl) mtbfEl.textContent = mtbf.toFixed(1);
   if (reliabilityTEl) reliabilityTEl.textContent = (rt * 100).toFixed(2);
   if (failureTEl) failureTEl.textContent = (ft * 100).toFixed(2);
+
+  // 检测 B10 含余量值是否变化，提示同步
+  checkB10Sync(b10WithMargin);
+}
+
+// ========== B10 同步逻辑 ==========
+
+function checkB10Sync(b10WithMargin) {
+  if (!currentModel) return;
+
+  // 首次加载：记录初始值，不弹提示
+  if (lastSyncedB10 === null) {
+    lastSyncedB10 = b10WithMargin;
+    return;
+  }
+
+  // 值没变化，不处理
+  const diff = Math.abs(b10WithMargin - lastSyncedB10);
+  if (diff < 0.1) return;
+
+  // 值变化了，显示同步提示
+  showSyncBanner(b10WithMargin);
+}
+
+function showSyncBanner(newB10) {
+  const banner = document.getElementById("b10-sync-banner");
+  if (!banner) return;
+
+  banner.hidden = false;
+
+  // 更新提示文字
+  const textEl = banner.querySelector(".sync-banner-text");
+  if (textEl) {
+    textEl.textContent = `目标B10已更新为 ${newB10.toFixed(1)} 小时，是否同步到其他模块？`;
+  }
+
+  // 存储待同步的值
+  banner.dataset.pendingB10 = newB10.toFixed(1);
+
+  // 自动消失（15秒）
+  clearTimeout(syncBannerTimer);
+  syncBannerTimer = setTimeout(() => {
+    hideSyncBanner();
+  }, 15000);
+}
+
+function hideSyncBanner() {
+  const banner = document.getElementById("b10-sync-banner");
+  if (banner) banner.hidden = true;
+  clearTimeout(syncBannerTimer);
+}
+
+function bindSyncBanner() {
+  const syncBtn = document.getElementById("b10-sync-btn");
+  const dismissBtn = document.getElementById("b10-sync-dismiss");
+
+  if (syncBtn) {
+    syncBtn.addEventListener("click", () => {
+      const banner = document.getElementById("b10-sync-banner");
+      const pendingB10 = parseFloat(banner?.dataset.pendingB10);
+      if (!isNaN(pendingB10) && currentModel) {
+        syncB10ToModules(pendingB10);
+        lastSyncedB10 = pendingB10;
+      }
+      hideSyncBanner();
+    });
+  }
+
+  if (dismissBtn) {
+    dismissBtn.addEventListener("click", () => {
+      // 忽略：更新 lastSyncedB10 为当前值，避免重复弹窗
+      const banner = document.getElementById("b10-sync-banner");
+      const pendingB10 = parseFloat(banner?.dataset.pendingB10);
+      if (!isNaN(pendingB10)) {
+        lastSyncedB10 = pendingB10;
+      }
+      hideSyncBanner();
+    });
+  }
+}
+
+function syncB10ToModules(b10Value) {
+  if (!currentModel) return;
+
+  // 同步到预测模块的分配目标B10
+  const prediction = currentModel.modules?.prediction;
+  if (prediction?.allocation) {
+    prediction.allocation.targetB10 = b10Value;
+  }
+
+  // 保存到模型
+  if (typeof onSaveCallback === "function") {
+    onSaveCallback({});
+  }
 }
 
 // ========== 产品信息相关函数 ==========
