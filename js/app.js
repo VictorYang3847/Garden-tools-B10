@@ -21,11 +21,11 @@
   loadStateAsync,
   initSync,
   getState,
-} from "./store.js?v=1.3.0";
-import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js?v=1.3.0";
-import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.js?v=1.3.0";
-import { initSyncUI } from "./sync-ui.js?v=1.3.0";
-import { hasCloudApi } from "./api.js?v=1.3.0";
+} from "./store.js?v=1.4.0";
+import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js?v=1.4.0";
+import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.js?v=1.4.0";
+import { initSyncUI } from "./sync-ui.js?v=1.4.0";
+import { hasCloudApi } from "./api.js?v=1.4.0";
 
 const projectSelect = document.getElementById("project-select");
 const productSelect = document.getElementById("product-select");
@@ -82,9 +82,9 @@ async function initApp() {
     onAuthChange(async (loggedIn, user) => {
       updateAuthDisplay(loggedIn, user);
       if (loggedIn) {
-        // 登录成功，触发同步
         try {
           const syncResult = await initSync(getState());
+          initSyncUI(syncResult.syncManager);
           if (syncResult.stateChanged) {
             refreshAllSelectors();
             refreshCurrentRoute();
@@ -92,6 +92,8 @@ async function initApp() {
         } catch (e) {
           console.warn('登录后同步失败:', e);
         }
+      } else {
+        initSyncUI(null);
       }
     });
   }
@@ -132,9 +134,12 @@ async function initApp() {
 /**
  * 更新顶栏登录/用户显示
  */
+let authClickHandler = null;
+
 async function updateAuthDisplay(loggedIn, user) {
   const authArea = document.getElementById("auth-area");
   if (!authArea) return;
+  
   if (loggedIn && user) {
     authArea.innerHTML = `
       <div class="user-menu" id="user-menu">
@@ -147,7 +152,8 @@ async function updateAuthDisplay(loggedIn, user) {
     `;
     const userBtn = document.getElementById("user-btn");
     const dropdown = document.getElementById("user-dropdown");
-    userBtn?.addEventListener("click", () => {
+    userBtn?.addEventListener("click", (e) => {
+      e.stopPropagation();
       if (dropdown) dropdown.hidden = !dropdown.hidden;
     });
     document.getElementById("logout-btn")?.addEventListener("click", async () => {
@@ -166,13 +172,21 @@ async function updateAuthDisplay(loggedIn, user) {
       }
       if (dropdown) dropdown.hidden = true;
     });
-    // 点击外部关闭下拉
-    document.addEventListener("click", (e) => {
+    
+    if (authClickHandler) {
+      document.removeEventListener("click", authClickHandler);
+    }
+    authClickHandler = (e) => {
       if (!authArea.contains(e.target) && dropdown) {
         dropdown.hidden = true;
       }
-    });
+    };
+    document.addEventListener("click", authClickHandler);
   } else {
+    if (authClickHandler) {
+      document.removeEventListener("click", authClickHandler);
+      authClickHandler = null;
+    }
     authArea.innerHTML = `<button type="button" id="login-btn" class="btn-secondary">登录同步</button>`;
     document.getElementById("login-btn")?.addEventListener("click", () => {
       const modal = document.getElementById("auth-modal");

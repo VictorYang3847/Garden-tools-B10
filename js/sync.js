@@ -7,8 +7,8 @@
  * - 离线检测 + 自动重试
  */
 
-import { getToken } from './auth.js?v=1.3.0';
-import { apiUrl } from './api.js?v=1.3.0';
+import { getToken } from './auth.js?v=1.4.0';
+import { apiUrl } from './api.js?v=1.4.0';
 
 // 同步状态常量
 export const SyncStatus = {

@@ -4,8 +4,8 @@
  * 由 app.js 调用 initSyncUI(syncManager) 初始化
  */
 
-import { SyncStatus } from './sync.js?v=1.3.0';
-import { hasCloudApi } from './api.js?v=1.3.0';
+import { SyncStatus } from './sync.js?v=1.4.0';
+import { hasCloudApi } from './api.js?v=1.4.0';
 
 const STATUS_CONFIG = {
   [SyncStatus.IDLE]: { icon: '○', text: '本地', color: '#94a3b8', title: '本地存储（未登录云端）' },
@@ -54,7 +54,7 @@ export function initSyncUI(syncManager) {
     statusEl.addEventListener('click', () => {
       if (syncManager.getStatus() === SyncStatus.ERROR) {
         // 触发重试：导入 store 的 getState 并推送
-        import('./store.js?v=1.3.0').then(({ getState }) => {
+        import('./store.js?v=1.4.0').then(({ getState }) => {
           syncManager.pushData(getState(), true);
         });
       }

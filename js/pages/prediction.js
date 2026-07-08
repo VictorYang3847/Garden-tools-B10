@@ -1,5 +1,5 @@
-﻿import { getCustomComponentLibrary, setCustomComponentLibrary, getHomeB10, getCurrentProduct, getProductShared } from "../store.js?v=1.3.0";
-import { gammaApprox, K10 } from "../calculator.js?v=1.3.0";
+﻿import { getCustomComponentLibrary, setCustomComponentLibrary, getHomeB10, getCurrentProduct, getProductShared } from "../store.js?v=1.4.0";
+import { gammaApprox, K10 } from "../calculator.js?v=1.4.0";
 
 let onSaveCallback = null;
 let currentModel = null;
@@ -1604,7 +1604,7 @@ async function ensureDeratingRendered(container) {
   const deratingContainer = container.querySelector("#pred-tab-derating");
   if (!deratingContainer) return;
   if (!deratingModule) {
-    deratingModule = await import("./derating.js?v=1.3.0");
+    deratingModule = await import("./derating.js?v=1.4.0");
   }
   if (!deratingInitialized) {
     deratingModule.init(currentModel, onSaveCallback);

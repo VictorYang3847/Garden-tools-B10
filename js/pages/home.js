@@ -5,7 +5,7 @@
   failureRate,
   gammaApprox,
   calcMtbf,
-} from "../calculator.js?v=1.3.0";
+} from "../calculator.js?v=1.4.0";
 
 let currentModel = null;
 let onSaveCallback = null;

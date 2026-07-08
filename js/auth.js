@@ -2,8 +2,8 @@
  * 用户认证模块
  * 提供注册/登录/登出/JWT 管理 + 登录注册 UI 弹窗
  */
-import { getAuth, setAuth, clearAuth } from './db.js?v=1.3.0';
-import { apiUrl } from './api.js?v=1.3.0';
+import { getAuth, setAuth, clearAuth } from './db.js?v=1.4.0';
+import { apiUrl } from './api.js?v=1.4.0';
 
 // ====== 核心 API ======
 
@@ -68,19 +68,37 @@ export async function logout() {
 export async function getToken() {
   const auth = await getAuth();
   if (!auth || !auth.token) return null;
-  // 检查过期：解析 JWT payload
+  
   try {
     const parts = auth.token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1]));
-    if (payload.exp && Date.now() >= payload.exp * 1000) {
-      // 已过期，清除
-      await clearAuth();
-      return null;
+    if (parts.length !== 3) {
+      console.warn('Token 格式异常，跳过过期检查');
+      return auth.token;
     }
+    
+    let payload;
+    try {
+      const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = payloadBase64.padEnd(payloadBase64.length + (4 - payloadBase64.length % 4) % 4, '=');
+      payload = JSON.parse(atob(padded));
+    } catch (decodeError) {
+      console.warn('Token payload 解析失败，跳过过期检查:', decodeError);
+      return auth.token;
+    }
+    
+    if (payload.exp && typeof payload.exp === 'number') {
+      const expireTime = payload.exp * 1000;
+      if (Date.now() >= expireTime) {
+        console.log('Token 已过期，清除登录态');
+        await clearAuth();
+        return null;
+      }
+    }
+    
     return auth.token;
-  } catch {
-    return null;
+  } catch (e) {
+    console.warn('Token 验证异常:', e);
+    return auth.token;
   }
 }
 
