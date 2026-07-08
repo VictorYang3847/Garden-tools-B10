@@ -22,7 +22,7 @@
   setModuleData,
   genId,
   persistState,
-} from "../store.js?v=1.4.1";
+} from "../store.js?v=1.4.2";
 
 let model = null;
 let onSave = null;

@@ -1,6 +1,6 @@
-﻿import { genId, getCustomImprovements, setCustomImprovements, getCurrentProduct, getProductShared } from "../store.js?v=1.4.1";
-import { fmt } from "../utils.js?v=1.4.1";
-import { gammaApprox } from "../calculator.js?v=1.4.1";
+﻿import { genId, getCustomImprovements, setCustomImprovements, getCurrentProduct, getProductShared } from "../store.js?v=1.4.2";
+import { fmt } from "../utils.js?v=1.4.2";
+import { gammaApprox } from "../calculator.js?v=1.4.2";
 
 let currentModel = null;
 let onSaveCallback = null;

@@ -21,11 +21,11 @@
   loadStateAsync,
   initSync,
   getState,
-} from "./store.js?v=1.4.1";
-import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js?v=1.4.1";
-import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.js?v=1.4.1";
-import { initSyncUI } from "./sync-ui.js?v=1.4.1";
-import { hasCloudApi } from "./api.js?v=1.4.1";
+} from "./store.js?v=1.4.2";
+import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js?v=1.4.2";
+import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.js?v=1.4.2";
+import { initSyncUI } from "./sync-ui.js?v=1.4.2";
+import { hasCloudApi } from "./api.js?v=1.4.2";
 
 const projectSelect = document.getElementById("project-select");
 const productSelect = document.getElementById("product-select");
@@ -56,6 +56,7 @@ async function initApp() {
   // 2. 初始化认证 UI（仅在配置了云端 API 时启用）
   if (hasCloudApiEnabled) {
     initAuthUI();
+    initAuthDelegate();
   }
 
   // 3. 初始化同步（如已登录，触发登录后同步）
@@ -134,9 +135,7 @@ async function initApp() {
 /**
  * 更新顶栏登录/用户显示
  */
-let authClickHandler = null;
-
-async function updateAuthDisplay(loggedIn, user) {
+function updateAuthDisplay(loggedIn, user) {
   const authArea = document.getElementById("auth-area");
   if (!authArea) return;
   
@@ -150,52 +149,61 @@ async function updateAuthDisplay(loggedIn, user) {
         </div>
       </div>
     `;
+  } else {
+    authArea.innerHTML = `<button type="button" id="login-btn" class="btn-secondary">登录同步</button>`;
+  }
+}
+
+let authDelegateInitialized = false;
+
+function initAuthDelegate() {
+  if (authDelegateInitialized) return;
+  authDelegateInitialized = true;
+  
+  document.addEventListener("click", (e) => {
     const userBtn = document.getElementById("user-btn");
     const dropdown = document.getElementById("user-dropdown");
-    userBtn?.addEventListener("click", (e) => {
-      e.stopPropagation();
+    const loginBtn = document.getElementById("login-btn");
+    const logoutBtn = document.getElementById("logout-btn");
+    const manualSyncBtn = document.getElementById("manual-sync-btn");
+    const authModal = document.getElementById("auth-modal");
+    
+    if (userBtn && e.target === userBtn) {
       if (dropdown) dropdown.hidden = !dropdown.hidden;
-    });
-    document.getElementById("logout-btn")?.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      await handleLogout();
+      return;
+    }
+    
+    if (logoutBtn && e.target === logoutBtn) {
       if (dropdown) dropdown.hidden = true;
-    });
-    document.getElementById("manual-sync-btn")?.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      try {
-        const syncResult = await initSync(getState());
+      handleLogout();
+      return;
+    }
+    
+    if (manualSyncBtn && e.target === manualSyncBtn) {
+      if (dropdown) dropdown.hidden = true;
+      initSync(getState()).then((syncResult) => {
         if (syncResult.stateChanged) {
           refreshAllSelectors();
           refreshCurrentRoute();
         }
-      } catch (e) {
-        console.warn('手动同步失败:', e);
-      }
-      if (dropdown) dropdown.hidden = true;
-    });
+      }).catch((err) => {
+        console.warn('手动同步失败:', err);
+      });
+      return;
+    }
     
-    if (authClickHandler) {
-      document.removeEventListener("click", authClickHandler);
+    if (loginBtn && e.target === loginBtn) {
+      if (authModal) authModal.hidden = false;
+      return;
     }
-    authClickHandler = (e) => {
-      const currentDropdown = document.getElementById("user-dropdown");
-      if (!authArea.contains(e.target) && currentDropdown) {
-        currentDropdown.hidden = true;
+    
+    if (dropdown && !dropdown.hidden) {
+      const authArea = document.getElementById("auth-area");
+      if (authArea && !authArea.contains(e.target)) {
+        dropdown.hidden = true;
       }
-    };
-    document.addEventListener("click", authClickHandler);
-  } else {
-    if (authClickHandler) {
-      document.removeEventListener("click", authClickHandler);
-      authClickHandler = null;
     }
-    authArea.innerHTML = `<button type="button" id="login-btn" class="btn-secondary">登录同步</button>`;
-    document.getElementById("login-btn")?.addEventListener("click", () => {
-      const modal = document.getElementById("auth-modal");
-      if (modal) modal.hidden = false;
-    });
-  }
+  });
 }
 
 let globalTooltipEl = null;
