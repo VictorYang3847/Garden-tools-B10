@@ -6996,6 +6996,10 @@ textarea.form-input {
   background: rgba(255, 255, 255, 0.06);
 }
 
+.user-dropdown[hidden] {
+  display: none;
+}
+
 /* ===== 登录/注册弹窗 ===== */
 
 .auth-modal-overlay {
