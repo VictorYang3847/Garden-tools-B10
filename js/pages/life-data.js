@@ -5,9 +5,9 @@
   lognormalCdf,
   fitDistribution,
   gammaApprox,
-} from "../calculator.js?v=1.4.0";
-import { genId, getHomeB10 } from "../store.js?v=1.4.0";
-import { fmt, pct, toast } from "../utils.js?v=1.4.0";
+} from "../calculator.js?v=1.4.1";
+import { genId, getHomeB10 } from "../store.js?v=1.4.1";
+import { fmt, pct, toast } from "../utils.js?v=1.4.1";
 
 let currentModel = null;
 let onSaveCallback = null;

@@ -384,7 +384,7 @@ export {
   lognormalCdf,
   lognormalPdf,
   fitDistribution,
-} from "./calculator-distributions.js?v=1.4.0";
+} from "./calculator-distributions.js?v=1.4.1";
 
 /**
  * Gamma function (Lanczos approximation)

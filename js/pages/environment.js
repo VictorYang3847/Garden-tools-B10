@@ -1,4 +1,4 @@
-﻿import { genId } from "../store.js?v=1.4.0";
+﻿import { genId } from "../store.js?v=1.4.1";
 
 const title = "环境适应性分析";
 const description = "环境应力筛选、温度循环分析、振动分析与环境试验标准查询";

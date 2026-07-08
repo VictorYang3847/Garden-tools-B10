@@ -21,11 +21,11 @@
   loadStateAsync,
   initSync,
   getState,
-} from "./store.js?v=1.4.0";
-import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js?v=1.4.0";
-import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.js?v=1.4.0";
-import { initSyncUI } from "./sync-ui.js?v=1.4.0";
-import { hasCloudApi } from "./api.js?v=1.4.0";
+} from "./store.js?v=1.4.1";
+import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js?v=1.4.1";
+import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.js?v=1.4.1";
+import { initSyncUI } from "./sync-ui.js?v=1.4.1";
+import { hasCloudApi } from "./api.js?v=1.4.1";
 
 const projectSelect = document.getElementById("project-select");
 const productSelect = document.getElementById("product-select");
@@ -156,11 +156,13 @@ async function updateAuthDisplay(loggedIn, user) {
       e.stopPropagation();
       if (dropdown) dropdown.hidden = !dropdown.hidden;
     });
-    document.getElementById("logout-btn")?.addEventListener("click", async () => {
+    document.getElementById("logout-btn")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
       await handleLogout();
       if (dropdown) dropdown.hidden = true;
     });
-    document.getElementById("manual-sync-btn")?.addEventListener("click", async () => {
+    document.getElementById("manual-sync-btn")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
       try {
         const syncResult = await initSync(getState());
         if (syncResult.stateChanged) {
@@ -177,8 +179,9 @@ async function updateAuthDisplay(loggedIn, user) {
       document.removeEventListener("click", authClickHandler);
     }
     authClickHandler = (e) => {
-      if (!authArea.contains(e.target) && dropdown) {
-        dropdown.hidden = true;
+      const currentDropdown = document.getElementById("user-dropdown");
+      if (!authArea.contains(e.target) && currentDropdown) {
+        currentDropdown.hidden = true;
       }
     };
     document.addEventListener("click", authClickHandler);
