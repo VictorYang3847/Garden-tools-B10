@@ -1,11 +1,11 @@
-﻿import {
+import {
   targetB10,
   targetB10WithoutMargin,
   weibullEta,
   failureRate,
   gammaApprox,
   calcMtbf,
-} from "../calculator.js?v=1.4.2";
+} from "../calculator.js";
 
 let currentModel = null;
 let onSaveCallback = null;

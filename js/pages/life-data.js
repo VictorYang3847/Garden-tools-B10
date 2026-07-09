@@ -1,13 +1,13 @@
-﻿import {
+import {
   defaultAnalysisBatch,
   weibullCdf,
   exponentialCdf,
   lognormalCdf,
   fitDistribution,
   gammaApprox,
-} from "../calculator.js?v=1.4.2";
-import { genId, getHomeB10 } from "../store.js?v=1.4.2";
-import { fmt, pct, toast } from "../utils.js?v=1.4.2";
+} from "../calculator.js";
+import { genId, getHomeB10 } from "../store.js";
+import { fmt, pct, toast } from "../utils.js";
 
 let currentModel = null;
 let onSaveCallback = null;

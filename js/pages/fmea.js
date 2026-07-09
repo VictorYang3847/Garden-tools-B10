@@ -1,4 +1,4 @@
-﻿let onSaveCallback = null;
+let onSaveCallback = null;
 let currentModel = null;
 let currentFilter = "all";
 let fmeaData = null;
@@ -6,7 +6,7 @@ let currentRatingInput = null;
 let currentRatingType = null;
 const expandedRows = new Set();
 
-import { getCurrentProduct, getProductShared } from "../store.js?v=1.4.2";
+import { getCurrentProduct, getProductShared } from "../store.js";
 
 const SEVERITY_RATINGS = [
   { score: 10, desc: "危及安全/违反法规，无预警" },

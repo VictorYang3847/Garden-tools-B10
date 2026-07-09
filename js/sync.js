@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 云同步管理器
  * 负责与 Cloudflare Worker 后端同步用户数据
  * - 防抖推送（2 秒）
@@ -7,8 +7,8 @@
  * - 离线检测 + 自动重试
  */
 
-import { getToken } from './auth.js?v=1.4.2';
-import { apiUrl } from './api.js?v=1.4.2';
+import { getToken } from './auth.js';
+import { apiUrl } from './api.js';
 
 // 同步状态常量
 export const SyncStatus = {

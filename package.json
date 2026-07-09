@@ -4,9 +4,14 @@
   "description": "综合性可靠性工程分析工具平台 - 10大模块",
   "private": true,
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "serve": "npx serve .",
     "deploy:cloudbase": "tcb fn deploy api --envId reliability-tool-d8erocv8e9979b2",
     "deploy:hosting": "tcb hosting deploy ./ --envId reliability-tool-d8erocv8e9979b2"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "vite": "^6.4.3"
+  }
 }

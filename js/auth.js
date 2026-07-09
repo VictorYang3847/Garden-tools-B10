@@ -1,9 +1,9 @@
-﻿/**
+/**
  * 用户认证模块
  * 提供注册/登录/登出/JWT 管理 + 登录注册 UI 弹窗
  */
-import { getAuth, setAuth, clearAuth } from './db.js?v=1.4.2';
-import { apiUrl } from './api.js?v=1.4.2';
+import { getAuth, setAuth, clearAuth } from './db.js';
+import { apiUrl } from './api.js';
 
 // ====== 核心 API ======
 

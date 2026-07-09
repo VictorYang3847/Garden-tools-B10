@@ -27,6 +27,12 @@ jobs:
       - name: Install CloudBase CLI
         run: npm install -g @cloudbase/cli
 
+      - name: Install project dependencies
+        run: npm ci
+
+      - name: Build with Vite
+        run: npm run build
+
       - name: Install function dependencies
         run: |
           if [ -f "cloudbase/functions/api/package.json" ]; then
@@ -57,30 +63,6 @@ jobs:
             echo "⚠️ 未配置 JWT_SECRET GitHub Secret，请在 CloudBase 控制台手动设置"
           fi
 
-      - name: Bump cache-busting version and prepare static files
-        run: |
-          BUILD_VERSION="${{ github.run_number }}"
-          echo "Bumping cache-busting version to: $BUILD_VERSION"
-
-          # 准备静态文件目录
-          mkdir -p deploy_tmp
-          cp index.html deploy_tmp/
-          cp -r css deploy_tmp/
-          cp -r js deploy_tmp/
-
-          # 更新 index.html 中的版本号
-          sed -i "s/window.__APP_VERSION__ = '.*';/window.__APP_VERSION__ = '$BUILD_VERSION';/" deploy_tmp/index.html
-
-          # 替换所有 ?v=X.Y.Z 为 ?v=BUILD_VERSION（唯一版本，避免 CDN 缓存旧文件）
-          sed -i "s/?v=[^\"']*/?v=$BUILD_VERSION/g" deploy_tmp/index.html
-          find deploy_tmp/js -type f -name "*.js" -exec sed -i "s/?v=[^\"']*/?v=$BUILD_VERSION/g" {} +
-
-          # 确认替换结果
-          echo "=== index.html 版本信息 ==="
-          grep -E "APP_VERSION|\.js\?v=|\.css\?v=" deploy_tmp/index.html | head -5
-          echo "=== JS import 版本样例 ==="
-          grep -r "?v=" deploy_tmp/js/app.js deploy_tmp/js/router.js | head -3
-
       - name: Deploy static hosting to CloudBase
         continue-on-error: true
         env:
@@ -89,10 +71,10 @@ jobs:
           set -x
           # 列出文件确认
           echo "=== 静态文件列表 ==="
-          find deploy_tmp -type f | head -50
+          find dist -type f | head -50
 
           # 部署静态托管（使用 --envId 参数）
-          tcb hosting deploy ./deploy_tmp --envId "$TCB_ENV_ID"
+          tcb hosting deploy ./dist --envId "$TCB_ENV_ID"
           echo "静态托管部署退出码: $?"
 
       - name: Deployment summary

@@ -1,4 +1,4 @@
-﻿import {
+import {
   getCurrentProject,
   setCurrentProject,
   getCurrentProduct,
@@ -22,7 +22,7 @@
   setModuleData,
   genId,
   persistState,
-} from "../store.js?v=1.4.2";
+} from "../store.js";
 
 let model = null;
 let onSave = null;

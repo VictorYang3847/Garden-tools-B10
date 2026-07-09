@@ -1,11 +1,11 @@
-﻿/**
+/**
  * 同步状态 UI 模块
  * 在顶栏显示同步状态指示器（已同步/同步中/失败/离线）
  * 由 app.js 调用 initSyncUI(syncManager) 初始化
  */
 
-import { SyncStatus } from './sync.js?v=1.4.2';
-import { hasCloudApi } from './api.js?v=1.4.2';
+import { SyncStatus } from './sync.js';
+import { hasCloudApi } from './api.js';
 
 const STATUS_CONFIG = {
   [SyncStatus.IDLE]: { icon: '○', text: '本地', color: '#94a3b8', title: '本地存储（未登录云端）' },
@@ -54,7 +54,7 @@ export function initSyncUI(syncManager) {
     statusEl.addEventListener('click', () => {
       if (syncManager.getStatus() === SyncStatus.ERROR) {
         // 触发重试：导入 store 的 getState 并推送
-        import('./store.js?v=1.4.2').then(({ getState }) => {
+        import('./store.js').then(({ getState }) => {
           syncManager.pushData(getState(), true);
         });
       }

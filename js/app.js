@@ -1,4 +1,5 @@
-﻿import {
+import "../css/styles.css";
+import {
   getCurrentProject,
   setCurrentProject,
   getCurrentProduct,
@@ -21,11 +22,11 @@
   loadStateAsync,
   initSync,
   getState,
-} from "./store.js?v=1.4.2";
-import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js?v=1.4.2";
-import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.js?v=1.4.2";
-import { initSyncUI } from "./sync-ui.js?v=1.4.2";
-import { hasCloudApi } from "./api.js?v=1.4.2";
+} from "./store.js";
+import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js";
+import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.js";
+import { initSyncUI } from "./sync-ui.js";
+import { hasCloudApi } from "./api.js";
 
 const projectSelect = document.getElementById("project-select");
 const productSelect = document.getElementById("product-select");

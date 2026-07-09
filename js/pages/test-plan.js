@@ -1,6 +1,6 @@
-﻿import { genId, getHomeB10, getCurrentProduct, getProductShared } from "../store.js?v=1.4.2";
-import { fmt, toast } from "../utils.js?v=1.4.2";
-import { gammaApprox, K10 } from "../calculator.js?v=1.4.2";
+import { genId, getHomeB10, getCurrentProduct, getProductShared } from "../store.js";
+import { fmt, toast } from "../utils.js";
+import { gammaApprox, K10 } from "../calculator.js";
 
 let currentModel = null;
 let onSaveCallback = null;
