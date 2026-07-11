@@ -5843,6 +5843,12 @@ textarea.form-input {
   margin-top: 1rem;
 }
 
+.b10-formula-section {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
 .formula-toggle {
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -5869,32 +5875,41 @@ textarea.form-input {
   padding: 1rem 1.25rem;
 }
 
-/* 首页公式双列网格布局 */
+/* 首页公式水平网格布局 */
 .formula-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem 1.25rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
 }
 
 .formula-grid .formula-item {
   margin-bottom: 0;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  background: var(--surface-2);
+  border-radius: 8px;
+  border: none;
 }
 
 .formula-grid .formula-item-wide {
   grid-column: 1 / -1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1rem;
 }
 
 .formula-grid .formula-item h4 {
   font-size: 0.85rem;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-muted);
 }
 
 .formula-grid .formula-equation {
-  font-size: 0.95rem;
+  font-size: 1rem;
   padding: 0.4rem 0.6rem;
   margin-bottom: 0;
+  background: rgba(59, 158, 255, 0.08);
+  border-radius: 6px;
+  text-align: center;
 }
 
 /* 变量内联标签 */
@@ -5927,6 +5942,12 @@ textarea.form-input {
 .formula-grid .formula-note {
   font-size: 0.78rem;
   margin-top: 0.3rem;
+}
+
+@media (max-width: 900px) {
+  .formula-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 600px) {

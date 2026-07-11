@@ -537,41 +537,41 @@ function renderB10Calculator() {
               ${renderMetricCard('所需 MTBF', state.mtbf.toFixed(1), '小时')}
               ${renderMetricCard('t 时刻可靠度', (state.reliabilityT * 100).toFixed(2), '%')}
               ${renderMetricCard('t 时刻失效概率', (state.failureT * 100).toFixed(2), '%')}
-              <div class="formula-section">
-                <button type="button" class="formula-toggle" id="home-formula-toggle" @click=${toggleFormula}>${state.formulaExpanded ? ' 收起公式' : '📐 查看计算公式'}</button>
-                ${state.formulaExpanded ? html`
-                  <div class="formula-content formula-grid" id="home-formula-content">
-                    <div class="formula-item">
-                      <h4>质保总时长</h4>
-                      <div class="formula-equation">Tw = 质保年数 × 年使用时长</div>
-                    </div>
-                    <div class="formula-item">
-                      <h4>特征寿命 η</h4>
-                      <div class="formula-equation">η = B10 / [ln(10/9)]<sup>1/β</sup></div>
-                    </div>
-                    <div class="formula-item formula-item-wide">
-                      <h4>目标 B10 寿命（含安全余量）</h4>
-                      <div class="formula-equation">B10 = Tw × [ln(10/9) / -ln(1-Fw)]<sup>1/β</sup> × (1 + margin)</div>
-                      <div class="formula-vars-inline">
-                        <span class="var-chip"><b>Tw</b>质保总时长</span>
-                        <span class="var-chip"><b>Fw</b>允许失效率</span>
-                        <span class="var-chip"><b>β</b>形状参数</span>
-                        <span class="var-chip"><b>margin</b>安全余量</span>
-                      </div>
-                      <div class="formula-note">ln(10/9)≈0.10536，B10点对应的标准常数</div>
-                    </div>
-                    <div class="formula-item">
-                      <h4>MTBF</h4>
-                      <div class="formula-equation">MTBF = η × Γ(1 + 1/β)</div>
-                    </div>
-                    <div class="formula-item">
-                      <h4>t 时刻可靠度</h4>
-                      <div class="formula-equation">R(t) = exp(-(t/η)<sup>β</sup>)</div>
-                    </div>
-                  </div>
-                ` : ''}
-              </div>
             </div>
+          </div>
+          <div class="b10-formula-section">
+            <button type="button" class="formula-toggle" id="home-formula-toggle" @click=${toggleFormula}>${state.formulaExpanded ? ' 收起公式' : '📐 查看计算公式'}</button>
+            ${state.formulaExpanded ? html`
+              <div class="formula-content formula-grid" id="home-formula-content">
+                <div class="formula-item">
+                  <h4>质保总时长</h4>
+                  <div class="formula-equation">Tw = 质保年数 × 年使用时长</div>
+                </div>
+                <div class="formula-item">
+                  <h4>特征寿命 η</h4>
+                  <div class="formula-equation">η = B10 / [ln(10/9)]<sup>1/β</sup></div>
+                </div>
+                <div class="formula-item">
+                  <h4>MTBF</h4>
+                  <div class="formula-equation">MTBF = η × Γ(1 + 1/β)</div>
+                </div>
+                <div class="formula-item">
+                  <h4>t 时刻可靠度</h4>
+                  <div class="formula-equation">R(t) = exp(-(t/η)<sup>β</sup>)</div>
+                </div>
+                <div class="formula-item formula-item-wide">
+                  <h4>目标 B10 寿命（含安全余量）</h4>
+                  <div class="formula-equation">B10 = Tw × [ln(10/9) / -ln(1-Fw)]<sup>1/β</sup> × (1 + margin)</div>
+                  <div class="formula-vars-inline">
+                    <span class="var-chip"><b>Tw</b>质保总时长</span>
+                    <span class="var-chip"><b>Fw</b>允许失效率</span>
+                    <span class="var-chip"><b>β</b>形状参数</span>
+                    <span class="var-chip"><b>margin</b>安全余量</span>
+                  </div>
+                  <div class="formula-note">ln(10/9)≈0.10536，B10点对应的标准常数</div>
+                </div>
+              </div>
+            ` : ''}
           </div>
         </div>
       </div>

@@ -835,13 +835,13 @@ function drawArrow(ctx, x, y, direction) {
   ctx.fillStyle = "#3b9eff";
   ctx.beginPath();
   if (direction === "right") {
-    ctx.moveTo(x, y);
-    ctx.lineTo(x - size, y - size / 2);
-    ctx.lineTo(x - size, y + size / 2);
-  } else {
-    ctx.moveTo(x, y);
+    ctx.moveTo(x - size, y);
     ctx.lineTo(x + size, y - size / 2);
     ctx.lineTo(x + size, y + size / 2);
+  } else {
+    ctx.moveTo(x + size, y);
+    ctx.lineTo(x - size, y - size / 2);
+    ctx.lineTo(x - size, y + size / 2);
   }
   ctx.closePath();
   ctx.fill();
@@ -1478,7 +1478,7 @@ function renderAllocationTable(container) {
 
 function renderAllocationRow(item, index, container) {
   const weightPercent = item.weight ? (item.weight * 100).toFixed(2) : "0.00";
-  const allocB10 = item.allocB10 ? item.allocB10.toFixed(2) : "0.00";
+  const allocB10 = item.allocB10 ? item.allocB10.toFixed(1) : "0.0";
   const lambda = item.lambda ? item.lambda.toFixed(2) : "0.00";
   const totalScore = item.totalScore || 0;
 
@@ -1516,7 +1516,7 @@ function renderAllocationResults(container) {
   if (subsysCountEl) subsysCountEl.textContent = subsysCount;
   if (weightSumEl) weightSumEl.textContent = (weightSum * 100).toFixed(2) + "%";
   if (targetB10El) targetB10El.textContent = (allocationData?.targetB10 || 0).toFixed(1);
-  if (calcB10El) calcB10El.textContent = (allocationData?.calcSysB10 || 0).toFixed(2);
+  if (calcB10El) calcB10El.textContent = (allocationData?.calcSysB10 || 0).toFixed(1);
 }
 
 function drawPieChart(container) {
@@ -1652,7 +1652,7 @@ function updateAllAllocationRows(container) {
 
     if (scoreCell) scoreCell.textContent = subsystem.totalScore || 0;
     if (weightCell) weightCell.textContent = ((subsystem.weight || 0) * 100).toFixed(2) + "%";
-    if (b10Cell) b10Cell.textContent = (subsystem.allocB10 || 0).toFixed(2);
+    if (b10Cell) b10Cell.textContent = (subsystem.allocB10 || 0).toFixed(1);
     if (lambdaCell) lambdaCell.textContent = (subsystem.lambda || 0).toFixed(2);
 
     const numInputs = tr.querySelectorAll("input.alloc-num-input");
@@ -1713,7 +1713,7 @@ function handleAllocationDeleteClick(container, e, subsystemId) {
 
 function handleTargetB10Change(container, e) {
   const val = Number(e.target.value) || 0;
-  allocationData.targetB10 = Math.max(1, val);
+  allocationData.targetB10 = Math.max(1, parseFloat(val.toFixed(1)));
   calcAllocation();
   saveData();
   renderAllocationTable(container);
@@ -2110,7 +2110,7 @@ function initAllocationUI(container) {
 
   const targetB10Input = container.querySelector("#alloc-target-b10");
   if (targetB10Input) {
-    targetB10Input.value = allocationData.targetB10;
+    targetB10Input.value = Number(allocationData.targetB10).toFixed(1);
   }
 
   const confidenceSelect = container.querySelector("#alloc-confidence");
@@ -2405,7 +2405,7 @@ function renderTemplate(container) {
               <div class="form-row">
                 <div class="form-group">
                   <label>整机目标 B10 (小时)</label>
-                  <input type="number" id="alloc-target-b10" class="form-input" min="1" .value=${live(String(allocationData?.targetB10 || 150))} step="1" @input=${(e) => handleTargetB10Change(container, e)} />
+                  <input type="number" id="alloc-target-b10" class="form-input" min="1" .value=${live(String((allocationData?.targetB10 || 150).toFixed(1)))} step="0.1" @input=${(e) => handleTargetB10Change(container, e)} />
                 </div>
                 <div class="form-group">
                   <label>置信度</label>
@@ -2499,7 +2499,7 @@ function renderTemplate(container) {
                 </div>
                 <div class="metric-card">
                   <div class="metric-label">计算整机 B10</div>
-                  <div class="metric-value" id="alloc-calc-b10">${(allocationData?.calcSysB10 || 0).toFixed(2)}</div>
+                  <div class="metric-value" id="alloc-calc-b10">${(allocationData?.calcSysB10 || 0).toFixed(1)}</div>
                   <div class="metric-unit">小时</div>
                 </div>
               </div>
