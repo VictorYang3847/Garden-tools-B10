@@ -251,7 +251,7 @@ function renderComponentRow(item, index, container) {
       <td class="pred-factor-cell">${item.piT?.toFixed(3) || "-"}</td>
       <td><input type="number" class="item-input pred-num-input" data-field="piS" .value=${live(String(item.piS))} min="0" step="0.1" @input=${(e) => handleInputChange(container, e)} /></td>
       <td><input type="number" class="item-input pred-num-input" data-field="piQ" .value=${live(String(item.piQ))} min="0" step="0.1" @input=${(e) => handleInputChange(container, e)} /></td>
-      <td class="pred-lambda-cell">${item.lambdaOp?.toFixed(4) || "-"}</td>
+      <td class="pred-lambda-cell">${(item.lambdaOp / 1000)?.toFixed(4) || "-"}</td>
       <td class="pred-action-cell">
         <button type="button" class="pred-delete-btn" @click=${(e) => handleDeleteClick(container, e, item.id)} title="删除">🗑️</button>
       </td>
@@ -302,7 +302,7 @@ function updateRowDisplay(tr, component) {
   const piTCell = tr.querySelector(".pred-factor-cell");
   const lambdaOpCell = tr.querySelector(".pred-lambda-cell");
   if (piTCell) piTCell.textContent = component.piT.toFixed(3);
-  if (lambdaOpCell) lambdaOpCell.textContent = component.lambdaOp.toFixed(4);
+  if (lambdaOpCell) lambdaOpCell.textContent = (component.lambdaOp / 1000).toFixed(4);
 }
 
 function handleInputChange(container, e) {
@@ -455,8 +455,8 @@ function updateResults(container) {
   const reliabilityEl = container.querySelector("#pred-reliability-value");
   const missionTimeInput = container.querySelector("#pred-mission-time");
 
-  if (totalLambdaEl) totalLambdaEl.textContent = totalLambda.toFixed(4);
-  if (sysLambdaEl) sysLambdaEl.textContent = sysLambda.toFixed(4);
+  if (totalLambdaEl) totalLambdaEl.textContent = (totalLambda / 1000).toFixed(4);
+  if (sysLambdaEl) sysLambdaEl.textContent = (sysLambda / 1000).toFixed(4);
   if (mtbfHoursEl) {
     mtbfHoursEl.textContent = mtbfHours > 0 ? formatNumber(mtbfHours) : "-";
   }
@@ -930,8 +930,8 @@ function renderComponentLibrary(container) {
         </div>
         <div class="lib-comp-lambda">
           <span class="lambda-label">λb</span>
-          <span class="lambda-value">${comp.lambdaBase}</span>
-          <span class="lambda-unit">FIT</span>
+          <span class="lambda-value">${(comp.lambdaBase / 1000).toFixed(4)}</span>
+          <span class="lambda-unit">10⁻⁶/h</span>
         </div>
         ${comp.desc ? `<div class="lib-comp-desc">${escapeHtml(comp.desc)}</div>` : ''}
         <div class="lib-comp-add-btn">
@@ -1072,7 +1072,7 @@ function renderRegistryImportList(container) {
   listEl.innerHTML = components.map(comp => {
     const categoryLabel = COMPONENT_CATEGORY_LABELS[comp.category] || comp.category || '其他';
     const typeLabel = COMPONENT_TYPE_LABELS[comp.type] || comp.type || '其他';
-    const lambdaStr = comp.lambdaBase != null ? comp.lambdaBase : '-';
+    const lambdaStr = comp.lambdaBase != null ? (comp.lambdaBase / 1000).toFixed(4) : '-';
     return `
       <div class="lib-component-card" data-comp-id="${comp.id}" title="点击添加">
         <div class="lib-comp-header">
@@ -1085,7 +1085,7 @@ function renderRegistryImportList(container) {
         <div class="lib-comp-lambda">
           <span class="lambda-label">λb</span>
           <span class="lambda-value">${lambdaStr}</span>
-          <span class="lambda-unit">FIT</span>
+          <span class="lambda-unit">10⁻⁶/h</span>
         </div>
         ${comp.description ? `<div class="lib-comp-desc">${escapeHtml(comp.description)}</div>` : ''}
         <div class="lib-comp-add-btn"><span>➕</span> 添加</div>
@@ -2212,12 +2212,12 @@ function renderTemplate(container) {
                       <th style="min-width: 150px;">元器件名称</th>
                       <th style="width: 120px;">类型</th>
                       <th style="width: 80px;">数量</th>
-                      <th style="width: 120px;">基础失效率λ(FIT)<span class="help-icon" data-tooltip="基础失效率：元器件在标准条件（25°C、额定应力）下的失效率，单位FIT(10⁻⁹/h)。可从元器件手册或MIL-HDBK-217查得">?</span></th>
+                      <th style="width: 120px;">基础失效率λ(10⁻⁶/h)<span class="help-icon" data-tooltip="基础失效率：元器件在标准条件（25°C、额定应力）下的失效率，单位10⁻⁶/h。可从元器件手册或MIL-HDBK-217查得">?</span></th>
                       <th style="width: 100px;">工作温度(°C)</th>
                       <th style="width: 90px;">π_T<span class="help-icon" data-tooltip="温度加速系数：基于Arrhenius模型计算，工作温度越高值越大。25°C时=1.0，每升高10°C约增大1.5~2倍">?</span></th>
                       <th style="width: 90px;">π_S<span class="help-icon" data-tooltip="应力降额系数：实际工作应力与额定应力之比的相关因子。默认1.0，降额设计时<1.0，过载时>1.0">?</span></th>
                       <th style="width: 90px;">π_Q<span class="help-icon" data-tooltip="质量等级系数：反映元器件质量水平。军用级0.3~0.5，工业级1.0，民用级1.5~2.0">?</span></th>
-                      <th style="width: 130px;">工作失效率(FIT)</th>
+                      <th style="width: 130px;">工作失效率(10⁻⁶/h)</th>
                       <th style="width: 70px;">操作</th>
                     </tr>
                   </thead>
@@ -2254,13 +2254,13 @@ function renderTemplate(container) {
                 <div class="metrics-grid">
                   <div class="metric-card">
                     <div class="metric-label">元器件总失效率 (Σλ)</div>
-                    <div class="metric-value" id="pred-total-lambda">${getTotalLambda().toFixed(4)}</div>
-                    <div class="metric-unit">FIT</div>
+                    <div class="metric-value" id="pred-total-lambda">${(getTotalLambda() / 1000).toFixed(4)}</div>
+                    <div class="metric-unit">10⁻⁶/h</div>
                   </div>
                   <div class="metric-card">
                     <div class="metric-label">系统失效率 λs</div>
-                    <div class="metric-value" id="pred-sys-lambda">${calcSystemLambda().toFixed(4)}</div>
-                    <div class="metric-unit">FIT</div>
+                    <div class="metric-value" id="pred-sys-lambda">${(calcSystemLambda() / 1000).toFixed(4)}</div>
+                    <div class="metric-unit">10⁻⁶/h</div>
                   </div>
                   <div class="metric-card">
                     <div class="metric-label">系统 MTBF</div>
@@ -2380,7 +2380,7 @@ function renderTemplate(container) {
                   </select>
                 </div>
                 <div class="form-group">
-                  <label>基础失效率 λb (FIT)</label>
+                  <label>基础失效率 λb (10⁻⁶/h)</label>
                   <input type="number" id="custom-comp-lambda" class="form-input" min="0" step="0.01" value="0.1" />
                 </div>
                 <div class="form-group">
