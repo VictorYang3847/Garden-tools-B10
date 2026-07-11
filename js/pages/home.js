@@ -8,12 +8,20 @@ import {
   gammaApprox,
   calcMtbf,
 } from "../calculator.js";
+import {
+  getCurrentProduct,
+  addComponent,
+  updateComponent,
+  removeComponent,
+  getComponents,
+} from "../store.js";
 
 let currentModel = null;
 let onSaveCallback = null;
 let lastSyncedB10 = null;
 let lastSyncedModelId = null;
 let syncBannerTimer = null;
+let _container = null; // 渲染容器引用，由 render() 存入
 
 // 产品信息字段定义
 const PRODUCT_INFO_FIELDS = [
@@ -51,6 +59,10 @@ let state = {
   formulaExpanded: false,
   // 产品卡片折叠
   productInfoCollapsed: true,
+  // 零部件管理折叠
+  componentMgrCollapsed: false,
+  // 零部件编辑弹窗
+  componentEditing: null, // null=关闭, {mode:'add'|'edit', data:{...}}
 };
 
 export function init(model, onSave) {
@@ -60,6 +72,7 @@ export function init(model, onSave) {
 
 export function render(container, model) {
   currentModel = model;
+  _container = container;
   if (lastSyncedModelId !== model?.id) {
     lastSyncedModelId = model?.id;
     lastSyncedB10 = null;
@@ -101,8 +114,10 @@ function doRender(container) {
       ${renderWelcome()}
       ${renderToolCards()}
       ${renderProductInfoCard()}
+      ${renderComponentManager()}
       ${renderB10Calculator()}
       ${renderQuickStart()}
+      ${state.componentEditing ? renderComponentModal() : ''}
     </div>
   `, container);
 }
@@ -213,7 +228,261 @@ function getProductInfoSummary() {
 
 function toggleProductInfoCollapse() {
   state.productInfoCollapsed = !state.productInfoCollapsed;
-  doRender(document.getElementById("app-content"));
+  doRender(_container);
+}
+
+// ========== 零部件管理板块 ==========
+
+const COMPONENT_CATEGORIES = {
+  electronic: "电子类",
+  mechanical: "机械类",
+  electromechanical: "机电类",
+  electrochemical: "电化学类",
+  other: "其他",
+};
+
+const COMPONENT_TYPES = {
+  resistor: "电阻", capacitor: "电容", inductor: "电感",
+  diode: "二极管", transistor: "晶体管", ic_digital: "IC(数字)",
+  ic_analog: "IC(模拟)", sensor: "传感器", connector: "连接器",
+  relay: "继电器", switch: "开关", motor: "电机",
+  gear: "齿轮/齿轮箱", bearing: "轴承", blade: "刀片",
+  spring: "弹簧", seal: "密封件",
+  battery: "电池/电池包",
+  pcb: "PCB电路板", cable: "线缆", other: "其他",
+};
+
+function renderComponentManager() {
+  const product = getCurrentProduct();
+  if (!product) return html``;
+  const components = product.productShared?.components || [];
+
+  return html`
+    <div class="home-section">
+      <div class="card component-manager-card collapsible" data-collapsed="${state.componentMgrCollapsed ? 'true' : 'false'}">
+        <div class="card-header collapsible-header" @click=${toggleComponentMgrCollapse}>
+          <div class="collapsible-title">
+            <span class="collapse-indicator" aria-hidden="true">${state.componentMgrCollapsed ? '▶' : '▼'}</span>
+            <h3>零部件管理</h3>
+          </div>
+          <div class="component-summary">共 ${components.length} 个零部件</div>
+        </div>
+        <div class="card-body collapsible-body">
+          <div class="component-toolbar">
+            <button type="button" class="btn btn-primary btn-sm" @click=${(e) => { e.stopPropagation(); openComponentModal(); }}>
+              + 添加零部件
+            </button>
+          </div>
+          <div class="table-wrap">
+            ${components.length === 0 ? html`
+              <div class="empty-state">
+                <p>暂无零部件数据，点击「添加零部件」开始创建</p>
+                <p class="empty-hint">各分析模块中输入的零部件也会自动注册到这里</p>
+              </div>
+            ` : html`
+              <table class="data-table component-table">
+                <thead>
+                  <tr>
+                    <th style="width:36px;">#</th>
+                    <th style="width:120px;">名称</th>
+                    <th style="width:60px;">类别</th>
+                    <th style="width:70px;">类型</th>
+                    <th>描述</th>
+                    <th style="width:40px;">引用</th>
+                    <th style="width:100px;" class="col-actions">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${components.map((comp, idx) => html`
+                    <tr data-comp-id="${comp.id}">
+                      <td class="col-nowrap">${idx + 1}</td>
+                      <td class="col-nowrap">${comp.name}</td>
+                      <td class="col-nowrap">${COMPONENT_CATEGORIES[comp.category] || comp.category}</td>
+                      <td class="col-nowrap">${COMPONENT_TYPES[comp.type] || comp.type}</td>
+                      <td class="col-desc">${comp.description || '-'}</td>
+                      <td class="col-nowrap">${countComponentReferences(product, comp.id)}</td>
+                      <td class="col-actions">
+                        <button type="button" class="btn-link" @click=${(e) => { e.stopPropagation(); editComponent(comp); }}>编辑</button>
+                        <button type="button" class="btn-link btn-danger-link" @click=${(e) => { e.stopPropagation(); deleteComponent(comp.id, comp.name); }}>删除</button>
+                      </td>
+                    </tr>
+                  `)}
+                </tbody>
+              </table>
+            `}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function toggleComponentMgrCollapse() {
+  state.componentMgrCollapsed = !state.componentMgrCollapsed;
+  doRender(_container);
+}
+
+/** 统计某零部件在各模块中被引用的次数 */
+function countComponentReferences(product, componentId) {
+  let count = 0;
+  for (const model of product.models || []) {
+    const m = model.modules;
+    if (!m) continue;
+    // FMEA
+    if (m.fmea?.items) {
+      count += m.fmea.items.filter(i => i.componentId === componentId).length;
+    }
+    // Prediction
+    if (m.prediction?.components) {
+      count += m.prediction.components.filter(c => c.componentId === componentId).length;
+    }
+    // Allocation
+    if (m.prediction?.allocation?.subsystems) {
+      count += m.prediction.allocation.subsystems.filter(s => s.componentId === componentId).length;
+    }
+    // LifeData
+    if (m.lifeData?.batches) {
+      for (const batch of m.lifeData.batches) {
+        count += (batch.items || []).filter(i => i.componentId === componentId).length;
+      }
+    }
+    // Growth
+    if (m.growth?.phases) {
+      for (const phase of m.growth.phases) {
+        count += (phase.failures || []).filter(f => f.componentId === componentId).length;
+      }
+    }
+    // Maintenance
+    if (m.maintenance?.spares) {
+      count += m.maintenance.spares.filter(s => s.componentId === componentId).length;
+    }
+    // Derating
+    if (m.derating?.components) {
+      count += m.derating.components.filter(c => c.componentId === componentId).length;
+    }
+  }
+  return count;
+}
+
+function openComponentModal() {
+  state.componentEditing = {
+    mode: 'add',
+    data: { name: '', category: 'mechanical', type: 'other', description: '', aliases: '' },
+  };
+  doRender(_container);
+}
+
+function editComponent(comp) {
+  state.componentEditing = {
+    mode: 'edit',
+    id: comp.id,
+    data: {
+      name: comp.name || '',
+      category: comp.category || 'other',
+      type: comp.type || 'other',
+      description: comp.description || '',
+      aliases: (comp.aliases || []).join(', '),
+    },
+  };
+  doRender(_container);
+}
+
+function deleteComponent(componentId, name) {
+  const product = getCurrentProduct();
+  if (!product) return;
+  const refCount = countComponentReferences(product, componentId);
+  const msg = refCount > 0
+    ? `零部件「${name}」被 ${refCount} 处引用，删除后这些引用将变为悬空（各模块中仍保留原名称显示）。确认删除？`
+    : `确认删除零部件「${name}」？`;
+  if (!confirm(msg)) return;
+  removeComponent(product.id, componentId);
+  doRender(_container);
+}
+
+function renderComponentModal() {
+  const editing = state.componentEditing;
+  const d = editing.data;
+  const isEdit = editing.mode === 'edit';
+
+  return html`
+    <div class="modal-overlay" @click=${onComponentModalCancel}>
+      <div class="modal-dialog component-modal" @click=${(e) => e.stopPropagation()}>
+        <div class="modal-header">
+          <h3>${isEdit ? '编辑零部件' : '添加零部件'}</h3>
+          <button type="button" class="modal-close" @click=${onComponentModalCancel}>x</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>名称 <span class="required">*</span></label>
+            <input type="text" class="form-input" id="comp-name" .value=${d.name}
+                   placeholder="如：行星齿轮箱" @input=${(e) => { d.name = e.target.value; }} />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>类别</label>
+              <select class="form-input" id="comp-category" .value=${d.category}
+                      @change=${(e) => { d.category = e.target.value; }}>
+                ${Object.entries(COMPONENT_CATEGORIES).map(([k, v]) => html`<option value="${k}" ?selected=${d.category === k}>${v}</option>`)}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>类型</label>
+              <select class="form-input" id="comp-type" .value=${d.type}
+                      @change=${(e) => { d.type = e.target.value; }}>
+                ${Object.entries(COMPONENT_TYPES).map(([k, v]) => html`<option value="${k}" ?selected=${d.type === k}>${v}</option>`)}
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>描述</label>
+            <input type="text" class="form-input" id="comp-desc" .value=${d.description}
+                   placeholder="零部件描述（可选）" @input=${(e) => { d.description = e.target.value; }} />
+          </div>
+          <div class="form-group">
+            <label>别名</label>
+            <input type="text" class="form-input" id="comp-aliases" .value=${d.aliases}
+                   placeholder="多个别名用逗号分隔，如：齿轮箱, gearbox" @input=${(e) => { d.aliases = e.target.value; }} />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click=${onComponentModalCancel}>取消</button>
+          <button type="button" class="btn btn-primary" @click=${onComponentModalSave}>${isEdit ? '保存' : '添加'}</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function onComponentModalSave() {
+  const product = getCurrentProduct();
+  if (!product) return;
+  const editing = state.componentEditing;
+  const d = editing.data;
+  const name = (d.name || '').trim();
+  if (!name) {
+    alert('请输入零部件名称');
+    return;
+  }
+  const aliases = (d.aliases || '').split(',').map(a => a.trim()).filter(Boolean);
+  const payload = {
+    name,
+    category: d.category,
+    type: d.type,
+    description: d.description || '',
+    aliases,
+  };
+  if (editing.mode === 'edit') {
+    updateComponent(product.id, editing.id, payload);
+  } else {
+    addComponent(product.id, payload);
+  }
+  state.componentEditing = null;
+  doRender(_container);
+}
+
+function onComponentModalCancel() {
+  state.componentEditing = null;
+  doRender(_container);
 }
 
 function renderB10Calculator() {
@@ -324,7 +593,7 @@ function onB10Input(field, value) {
   state[field] = value;
   saveStateToModel();
   checkB10Sync();
-  doRender(document.getElementById("app-content"));
+  doRender(_container);
 }
 
 function calculate() {
@@ -371,13 +640,13 @@ function onSyncConfirm() {
   syncB10ToModules(state.pendingB10);
   lastSyncedB10 = state.pendingB10;
   state.showSyncBanner = false;
-  doRender(document.getElementById("app-content"));
+  doRender(_container);
 }
 
 function onSyncDismiss() {
   lastSyncedB10 = state.pendingB10;
   state.showSyncBanner = false;
-  doRender(document.getElementById("app-content"));
+  doRender(_container);
 }
 
 function syncB10ToModules(b10Value) {
@@ -393,7 +662,7 @@ function syncB10ToModules(b10Value) {
 
 function toggleFormula() {
   state.formulaExpanded = !state.formulaExpanded;
-  doRender(document.getElementById("app-content"));
+  doRender(_container);
 }
 
 function renderQuickStart() {

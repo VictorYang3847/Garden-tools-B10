@@ -1,5 +1,5 @@
 import { html, render as litRender } from 'lit-html';
-import { genId, getCustomImprovements, setCustomImprovements, getCurrentProduct, getProductShared } from "../store.js";
+import { genId, getCustomImprovements, setCustomImprovements, getCurrentProduct, getProductShared, getComponents, ensureComponentRegistered } from "../store.js";
 import { fmt } from "../utils.js";
 import { gammaApprox } from "../calculator.js";
 
@@ -102,6 +102,13 @@ export function render(container, model) {
   renderProductHistory();
 }
 
+function renderComponentDatalist() {
+  const product = getCurrentProduct();
+  if (!product) return html``;
+  const components = getComponents(product.id);
+  return html`<datalist id="growth-component-list">${components.map(c => html`<option value="${c.name}">`)}</datalist>`;
+}
+
 function template() {
   return html`
     <div class="module-page growth-page">
@@ -176,6 +183,7 @@ function template() {
                     <th style="width: 60px;">序号</th>
                     <th style="width: 120px;">失效时间 (h)</th>
                     <th style="min-width: 180px;">失效模式</th>
+                    <th style="min-width: 140px;">部件</th>
                     <th style="width: 130px;">累计时间 (h)</th>
                     <th style="width: 120px;">累计失效数</th>
                     <th style="width: 130px;">瞬时 MTBF (h)</th>
@@ -450,6 +458,7 @@ function template() {
           </div>
         </div>
       </div>
+      ${renderComponentDatalist()}
     </div>
   `;
 }
@@ -489,6 +498,10 @@ function ensurePhases() {
   if (g.targetMtbf === undefined) g.targetMtbf = null;
   for (const phase of g.phases) {
     if (!Array.isArray(phase.failures)) phase.failures = [];
+    for (const f of phase.failures) {
+      if (f.componentId === undefined) f.componentId = null;
+      if (f.component === undefined) f.component = "";
+    }
     if (!Array.isArray(phase.improvements)) phase.improvements = [];
     if (phase.totalTime === undefined) phase.totalTime = null;
     if (!phase.phaseNumber) phase.phaseNumber = 1;
@@ -773,6 +786,13 @@ function bindEvents() {
         updates = { time: Number.isFinite(val) && val > 0 ? val : 0 };
       } else if (field === "failureMode") {
         updates = { failureMode: e.target.value };
+      } else if (field === "component") {
+        updates = { component: e.target.value };
+        const product = getCurrentProduct();
+        if (product && e.target.value && e.target.value.trim()) {
+          const componentId = ensureComponentRegistered(product.id, e.target.value.trim());
+          if (componentId) updates.componentId = componentId;
+        }
       } else {
         return;
       }
@@ -880,6 +900,8 @@ async function addFailure() {
     const result = await growthService.addFailure(currentModel.id, phase.id, {
       time: Math.round(newTime * 10) / 10,
       failureMode: "",
+      component: "",
+      componentId: null,
     });
     currentModel = result.model;
   } catch (e) {
@@ -944,6 +966,9 @@ function renderFailureTable() {
         </td>
         <td>
           <input type="text" class="item-input" data-field="failureMode" value="${escapeHtml(f.failureMode || "")}" placeholder="输入失效模式" />
+        </td>
+        <td>
+          <input type="text" class="item-input" data-field="component" value="${escapeHtml(f.component || "")}" list="growth-component-list" placeholder="部件名称" />
         </td>
         <td>${fmt(cumulativeTime, 1)}</td>
         <td>${cumulativeN}</td>

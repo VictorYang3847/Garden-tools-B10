@@ -45,6 +45,10 @@ export class GrowthService extends BaseService {
     if (g.targetMtbf === undefined) g.targetMtbf = null;
     for (const phase of g.phases) {
       if (!Array.isArray(phase.failures)) phase.failures = [];
+      for (const f of phase.failures) {
+        if (f.componentId === undefined) f.componentId = null;
+        if (f.component === undefined) f.component = '';
+      }
       if (!Array.isArray(phase.improvements)) phase.improvements = [];
       if (phase.totalTime === undefined) phase.totalTime = null;
       if (!phase.phaseNumber) phase.phaseNumber = 1;

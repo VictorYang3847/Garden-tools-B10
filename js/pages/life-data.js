@@ -7,7 +7,7 @@ import {
   fitDistribution,
   gammaApprox,
 } from "../calculator.js";
-import { genId, getHomeB10 } from "../store.js";
+import { genId, getHomeB10, getCurrentProduct, getComponents, ensureComponentRegistered } from "../store.js";
 import { fmt, pct, toast } from "../utils.js";
 
 let currentModel = null;
@@ -63,6 +63,18 @@ export function render(container, model) {
   renderDataEntryTab();
   renderAnalysisTab();
   switchTab(activeTab);
+}
+
+function renderComponentDatalist() {
+  const product = getCurrentProduct();
+  if (!product) return html``;
+  const components = getComponents(product.id);
+  const partValues = Object.values(PART_LABELS);
+  const options = [
+    ...partValues.map(v => html`<option value="${v}">`),
+    ...components.filter(c => !partValues.includes(c.name)).map(c => html`<option value="${c.name}">`),
+  ];
+  return html`<datalist id="lifedata-component-list">${options}</datalist>`;
 }
 
 function renderDataEntryTabContent() {
@@ -159,6 +171,7 @@ function renderDataEntryTabContent() {
           </div>
         </div>
       </div>
+      ${renderComponentDatalist()}
     </div>
   `;
 }
@@ -570,6 +583,13 @@ function bindDataEntryEvents() {
       const field = el.dataset.field;
       if (field === "time") val = Number(val) || 0;
       if (field === "failed") val = val === "true";
+      if (field === "part") {
+        const product = getCurrentProduct();
+        if (product && val && val.trim()) {
+          const componentId = ensureComponentRegistered(product.id, val.trim());
+          if (componentId) item.componentId = componentId;
+        }
+      }
       item[field] = val;
       autoSave();
     });
@@ -620,6 +640,7 @@ function addItem() {
     time: 0,
     failed: false,
     part: "product",
+    componentId: null,
     failureMode: "",
     note: "",
   });
@@ -660,7 +681,7 @@ function importCsv(e) {
         const failureMode = cols[headers.indexOf("failuremode")] ?? cols[3] ?? "";
         const note = cols[headers.indexOf("note")] ?? cols[4] ?? "";
         if (isFinite(time) && time > 0) {
-          items.push({ id: genId(), time, failed, part, failureMode, note });
+          items.push({ id: genId(), time, failed, part, componentId: null, failureMode, note });
         }
       }
       if (items.length === 0) {
@@ -777,11 +798,7 @@ function renderItemsTable(batch) {
           </select>
         </td>
         <td>
-          <select data-field="part" class="item-input">
-            ${Object.entries(PART_LABELS)
-              .map(([k, v]) => `<option value="${k}" ${item.part === k ? "selected" : ""}>${v}</option>`)
-              .join("")}
-          </select>
+          <input type="text" data-field="part" class="item-input" list="lifedata-component-list" value="${escaped.part}" placeholder="如：电机、刀片组件…" />
         </td>
         <td><input type="text" data-field="failureMode" value="${escaped.failureMode}" class="item-input" placeholder="如：磨损、断裂…" /></td>
         <td><input type="text" data-field="note" value="${escaped.note}" class="item-input" placeholder="可选" /></td>

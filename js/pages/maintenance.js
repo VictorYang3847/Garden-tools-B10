@@ -1,5 +1,5 @@
 import { html, render as litRender } from 'lit-html';
-import { genId } from "../store.js";
+import { genId, getCurrentProduct, getComponents, ensureComponentRegistered } from "../store.js";
 import { fmt, pct } from "../utils.js";
 
 let currentModel = null;
@@ -20,6 +20,13 @@ export function render(container, model) {
   renderAvailability();
   renderSparesTable();
   renderStrategy();
+}
+
+function renderComponentDatalist() {
+  const product = getCurrentProduct();
+  if (!product) return html``;
+  const components = getComponents(product.id);
+  return html`<datalist id="maintenance-component-list">${components.map(c => html`<option value="${c.name}">`)}</datalist>`;
 }
 
 function template() {
@@ -244,6 +251,7 @@ function template() {
           </div>
         </div>
       </div>
+      ${renderComponentDatalist()}
     </div>
   `;
 }
@@ -264,6 +272,7 @@ function ensureMaintenanceData() {
         {
           id: genId(),
           name: "电机组件",
+          componentId: null,
           mtbf: 10000,
           annualHours: 2000,
           unitCount: 10,
@@ -553,6 +562,11 @@ function bindSparesEvents() {
 
       if (field === "name") {
         spare.name = e.target.value;
+        const product = getCurrentProduct();
+        if (product && e.target.value && e.target.value.trim()) {
+          const componentId = ensureComponentRegistered(product.id, e.target.value.trim());
+          if (componentId) spare.componentId = componentId;
+        }
       } else if (field === "confidence") {
         spare.confidence = parseFloat(e.target.value) || 0.9;
       } else {
@@ -603,6 +617,7 @@ function addSpare() {
   const newSpare = {
     id: genId(),
     name: "新备件",
+    componentId: null,
     mtbf: 5000,
     annualHours: 2000,
     unitCount: 10,
@@ -648,7 +663,7 @@ function renderSparesTable() {
       <tr data-id="${s.id}">
         <td>${idx + 1}</td>
         <td>
-          <input type="text" class="item-input" data-field="name" value="${escapeHtml(s.name || "")}" />
+          <input type="text" class="item-input" data-field="name" value="${escapeHtml(s.name || "")}" list="maintenance-component-list" />
         </td>
         <td>
           <input type="number" class="item-input" data-field="mtbf" value="${s.mtbf}" min="0" step="1" />

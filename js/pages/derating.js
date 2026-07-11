@@ -1,5 +1,6 @@
 import { html, render as litRender } from 'lit-html';
 import { live } from 'lit-html/directives/live.js';
+import { getCurrentProduct, getComponents, ensureComponentRegistered } from "../store.js";
 
 let onSaveCallback = null;
 let currentModel = null;
@@ -50,6 +51,13 @@ function escapeHtml(s) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function renderComponentDatalist() {
+  const product = getCurrentProduct();
+  if (!product) return html``;
+  const components = getComponents(product.id);
+  return html`<datalist id="derating-component-list">${components.map(c => html`<option value="${c.name}">`)}</datalist>`;
 }
 
 function getComponentType(typeValue) {
@@ -105,6 +113,7 @@ function createNewComponent() {
   return {
     id: genId(),
     name: "",
+    componentId: null,
     type: "resistor",
     ratedTemp: 125,
     operatingTemp: 55,
@@ -203,7 +212,7 @@ function renderRow(comp, index) {
   return html`
     <tr data-id="${comp.id}">
       <td class="derating-index">${index + 1}</td>
-      <td><input type="text" class="item-input" data-field="name" .value=${live(comp.name)} placeholder="元器件名称" @input=${_onFieldChange} /></td>
+      <td><input type="text" class="item-input" data-field="name" .value=${live(comp.name)} list="derating-component-list" placeholder="元器件名称" @input=${_onFieldChange} /></td>
       <td>
         <select class="item-input derating-type-select" data-field="type" .value=${live(comp.type)} @change=${_onFieldChange}>
           ${COMPONENT_TYPES.map((t) => html`<option value="${t.value}">${t.label}</option>`)}
@@ -279,6 +288,14 @@ function _onFieldChange(e) {
     comp[field] = Number(input.value) || 0;
   } else {
     comp[field] = input.value;
+  }
+
+  if (field === "name") {
+    const product = getCurrentProduct();
+    if (product && input.value && input.value.trim()) {
+      const componentId = ensureComponentRegistered(product.id, input.value.trim());
+      if (componentId) comp.componentId = componentId;
+    }
   }
 
   if (field === "type") {
@@ -886,6 +903,7 @@ export function render(container, model) {
           </div>
         </div>
       </div>
+      ${renderComponentDatalist()}
     </div>
   `;
 

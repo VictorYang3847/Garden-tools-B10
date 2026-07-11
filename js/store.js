@@ -1142,12 +1142,121 @@ function normalizeStateV5(s) {
     for (const product of project.products) {
       if (!Array.isArray(product.models)) product.models = [];
       if (!product.productShared) product.productShared = defaultProductShared();
+      if (!Array.isArray(product.productShared.components)) product.productShared.components = [];
       for (const model of product.models) {
         normalizeModel(model);
       }
     }
   }
+  // 自动迁移：为所有模块条目填充 componentId
+  migrateToComponentRegistry(s);
   return s;
+}
+
+/**
+ * 数据迁移：将各模块中的零部件名称/枚举自动注册到 productShared.components，
+ * 并为每条记录填充 componentId。幂等——已有 componentId 的条目不会被重复处理。
+ */
+function migrateToComponentRegistry(state) {
+  const partToName = {
+    gearbox: "齿轮箱",
+    motor: "电机",
+    battery: "电池包",
+    blade: "刀片组件",
+    bearing: "轴承",
+    product: "整机",
+  };
+
+  for (const project of state.projects || []) {
+    for (const product of project.products || []) {
+      if (!product.productShared) product.productShared = defaultProductShared();
+      if (!Array.isArray(product.productShared.components)) {
+        product.productShared.components = [];
+      }
+      const productId = product.id;
+
+      for (const model of product.models || []) {
+        if (!model.modules) continue;
+        const m = model.modules;
+
+        // 1. FMEA: item.function -> componentId
+        if (m.fmea && Array.isArray(m.fmea.items)) {
+          for (const item of m.fmea.items) {
+            if (!item.componentId && item.function) {
+              item.componentId = ensureComponentRegistered(productId, item.function, { category: "mechanical" });
+            }
+          }
+        }
+
+        // 2. Prediction: component.name -> componentId
+        if (m.prediction && Array.isArray(m.prediction.components)) {
+          for (const comp of m.prediction.components) {
+            if (!comp.componentId && comp.name) {
+              comp.componentId = ensureComponentRegistered(productId, comp.name, {
+                category: comp.category || "other",
+                type: comp.type || "other",
+                lambdaBase: comp.lambdaBase ?? null,
+              });
+            }
+          }
+        }
+
+        // 3. Allocation: subsystem.name -> componentId
+        if (m.prediction && m.prediction.allocation && Array.isArray(m.prediction.allocation.subsystems)) {
+          for (const sub of m.prediction.allocation.subsystems) {
+            if (!sub.componentId && sub.name) {
+              sub.componentId = ensureComponentRegistered(productId, sub.name);
+            }
+          }
+        }
+
+        // 4. LifeData: item.part (枚举) -> componentId
+        if (m.lifeData && Array.isArray(m.lifeData.batches)) {
+          for (const batch of m.lifeData.batches) {
+            if (!batch || !Array.isArray(batch.items)) continue;
+            for (const item of batch.items) {
+              if (!item.componentId && item.part && item.part !== "product") {
+                const name = partToName[item.part] || item.part;
+                item.componentId = ensureComponentRegistered(productId, name);
+              }
+            }
+          }
+        }
+
+        // 5. Growth: failure.failureMode -> componentId (尽力匹配)
+        if (m.growth && Array.isArray(m.growth.phases)) {
+          for (const phase of m.growth.phases) {
+            if (!phase || !Array.isArray(phase.failures)) continue;
+            for (const f of phase.failures) {
+              if (!f.componentId && f.failureMode) {
+                const matched = findComponentByName(productId, f.failureMode);
+                if (matched) f.componentId = matched.id;
+              }
+            }
+          }
+        }
+
+        // 6. Maintenance: spare.name -> componentId
+        if (m.maintenance && Array.isArray(m.maintenance.spares)) {
+          for (const spare of m.maintenance.spares) {
+            if (!spare.componentId && spare.name) {
+              spare.componentId = ensureComponentRegistered(productId, spare.name);
+            }
+          }
+        }
+
+        // 7. Derating: component.name -> componentId
+        if (m.derating && Array.isArray(m.derating.components)) {
+          for (const comp of m.derating.components) {
+            if (!comp.componentId && comp.name) {
+              comp.componentId = ensureComponentRegistered(productId, comp.name);
+            }
+          }
+        }
+      }
+    }
+  }
+  return state;
 }
 
 function migrateV3ToV4(v3State) {
@@ -1577,6 +1686,99 @@ export function setProductShared(productId, sharedData) {
   if (!product) return;
   product.productShared = sharedData;
   persist();
+}
+
+// ========== 零部件注册表 API ==========
+
+/** 获取产品的所有零部件 */
+export function getComponents(productId) {
+  const shared = getProductShared(productId);
+  return shared.components || [];
+}
+
+/** 按 ID 获取零部件 */
+export function getComponent(productId, componentId) {
+  return getComponents(productId).find((c) => c.id === componentId) || null;
+}
+
+/** 添加零部件到注册表 */
+export function addComponent(productId, component) {
+  const shared = getProductShared(productId);
+  if (!Array.isArray(shared.components)) shared.components = [];
+  const newComp = {
+    id: component.id || genId(),
+    name: component.name || "新部件",
+    category: component.category || "other",
+    type: component.type || "other",
+    description: component.description || "",
+    aliases: component.aliases || [],
+    lambdaBase: component.lambdaBase ?? null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  shared.components.push(newComp);
+  setProductShared(productId, shared);
+  return newComp;
+}
+
+/** 更新零部件 */
+export function updateComponent(productId, componentId, updates) {
+  const shared = getProductShared(productId);
+  const comp = shared.components.find((c) => c.id === componentId);
+  if (!comp) return null;
+  Object.assign(comp, updates, { updatedAt: new Date().toISOString() });
+  setProductShared(productId, shared);
+  return comp;
+}
+
+/** 删除零部件（不清理引用，仅从注册表移除） */
+export function removeComponent(productId, componentId) {
+  const shared = getProductShared(productId);
+  shared.components = shared.components.filter((c) => c.id !== componentId);
+  setProductShared(productId, shared);
+}
+
+/** 按名称查找零部件（模糊匹配 name + aliases） */
+export function findComponentByName(productId, name) {
+  if (!name) return null;
+  const components = getComponents(productId);
+  const normalized = name.trim().toLowerCase();
+  // 精确匹配优先
+  let match = components.find((c) => c.name.trim().toLowerCase() === normalized);
+  if (match) return match;
+  // 别名精确匹配
+  match = components.find((c) =>
+    (c.aliases || []).some((a) => a.trim().toLowerCase() === normalized)
+  );
+  if (match) return match;
+  // 名称包含匹配
+  match = components.find(
+    (c) =>
+      c.name.trim().toLowerCase().includes(normalized) ||
+      normalized.includes(c.name.trim().toLowerCase()) ||
+      (c.aliases || []).some(
+        (a) =>
+          normalized.includes(a.trim().toLowerCase()) ||
+          a.trim().toLowerCase().includes(normalized)
+      )
+  );
+  return match || null;
+}
+
+/** 确保零部件已注册（不存在则自动注册），返回 componentId */
+export function ensureComponentRegistered(productId, name, extra = {}) {
+  if (!name || !name.trim()) return null;
+  const existing = findComponentByName(productId, name);
+  if (existing) return existing.id;
+  const newComp = addComponent(productId, {
+    name: name.trim(),
+    category: extra.category || "other",
+    type: extra.type || "other",
+    description: extra.description || "",
+    aliases: extra.aliases || [],
+    lambdaBase: extra.lambdaBase ?? null,
+  });
+  return newComp.id;
 }
 
 // ========== V5: 型号级 API ==========

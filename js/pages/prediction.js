@@ -1,6 +1,6 @@
 import { html, render as litRender } from 'lit-html';
 import { live } from 'lit-html/directives/live.js';
-import { getCustomComponentLibrary, setCustomComponentLibrary, getHomeB10, getCurrentProduct, getProductShared } from "../store.js";
+import { getCustomComponentLibrary, setCustomComponentLibrary, getHomeB10, getCurrentProduct, getProductShared, getComponents, ensureComponentRegistered } from "../store.js";
 import { gammaApprox, K10 } from "../calculator.js";
 
 let onSaveCallback = null;
@@ -148,10 +148,24 @@ function calcLambdaOp(component) {
   return lambdaBase * piT * piS * piQ * quantity;
 }
 
+/** 渲染零部件下拉提示列表（供预测和分配模块共用） */
+function renderComponentDatalists() {
+  const product = getCurrentProduct();
+  if (!product) return html``;
+  const components = getComponents(product.id);
+  if (components.length === 0) return html``;
+  const options = components.map((c) => html`<option value="${c.name}"></option>`);
+  return html`
+    <datalist id="pred-component-list">${options}</datalist>
+    <datalist id="alloc-component-list">${options}</datalist>
+  `;
+}
+
 function createNewComponent(type = "resistor") {
   const lambdaBase = COMPONENT_BASE_LAMBDA[type] ?? 0.1;
   const component = {
     id: genId(),
+    componentId: null,
     name: COMPONENT_TYPE_LABELS[type] || "新元器件",
     type: type,
     quantity: 1,
@@ -225,7 +239,7 @@ function renderComponentRow(item, index, container) {
   return html`
     <tr data-id="${item.id}">
       <td class="pred-index">${index + 1}</td>
-      <td><input type="text" class="item-input" data-field="name" .value=${live(item.name)} placeholder="元器件名称" @input=${(e) => handleInputChange(container, e)} /></td>
+      <td><input type="text" class="item-input" data-field="name" list="pred-component-list" .value=${live(item.name)} placeholder="元器件名称" @input=${(e) => handleInputChange(container, e)} /></td>
       <td>
         <select class="item-input pred-type-select" data-field="type" @change=${(e) => handleInputChange(container, e)}>
           ${typeOptions}
@@ -315,6 +329,18 @@ function handleInputChange(container, e) {
       component.lambdaBase = baseLambda;
       const lambdaBaseInput = tr.querySelector("input[data-field='lambdaBase']");
       if (lambdaBaseInput) lambdaBaseInput.value = component.lambdaBase;
+    }
+  }
+
+  // 当 name 字段变更时，自动注册零部件到产品级注册表
+  if (field === "name" && input.value && input.value.trim()) {
+    const product = getCurrentProduct();
+    if (product) {
+      component.componentId = ensureComponentRegistered(product.id, input.value.trim(), {
+        category: component.category || "other",
+        type: component.type || "other",
+        lambdaBase: component.lambdaBase ?? null,
+      });
     }
   }
 
@@ -968,6 +994,16 @@ function addComponentFromLibrary(container, compId) {
   newComponent.lambdaBase = comp.lambdaBase;
   newComponent.lambdaOp = calcLambdaOp(newComponent);
 
+  // 注册到产品级零部件注册表
+  const product = getCurrentProduct();
+  if (product) {
+    newComponent.componentId = ensureComponentRegistered(product.id, comp.name, {
+      category: comp.category || "other",
+      type: comp.type || "other",
+      lambdaBase: comp.lambdaBase ?? null,
+    });
+  }
+
   predictionData.components.push(newComponent);
   saveData();
   renderTable(container);
@@ -976,6 +1012,132 @@ function addComponentFromLibrary(container, compId) {
   drawSystemDiagram(container);
 
   showToast(container, `已添加: ${comp.name}`);
+}
+
+// ========== 注册表导入功能 ==========
+
+let _registryImportTarget = 'prediction'; // 'prediction' | 'allocation'
+let _registryImportKeyword = '';
+
+function openRegistryImport(container, target) {
+  _registryImportTarget = target;
+  _registryImportKeyword = '';
+  const modal = container.querySelector('#registry-import-modal');
+  if (modal) {
+    modal.style.display = 'flex';
+    const searchInput = container.querySelector('#registry-import-search');
+    if (searchInput) {
+      searchInput.value = '';
+      searchInput.focus();
+    }
+    renderRegistryImportList(container);
+  }
+}
+
+function closeRegistryImport(container) {
+  const modal = container.querySelector('#registry-import-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function renderRegistryImportList(container) {
+  const listEl = container.querySelector('#registry-import-list');
+  if (!listEl) return;
+
+  const product = getCurrentProduct();
+  if (!product) {
+    listEl.innerHTML = '<div class="lib-empty-state"><p>请先选择产品</p></div>';
+    return;
+  }
+
+  let components = getComponents(product.id);
+  if (_registryImportKeyword && _registryImportKeyword.trim()) {
+    const kw = _registryImportKeyword.trim().toLowerCase();
+    components = components.filter(c =>
+      c.name.toLowerCase().includes(kw) ||
+      (c.description && c.description.toLowerCase().includes(kw))
+    );
+  }
+
+  if (components.length === 0) {
+    listEl.innerHTML = `
+      <div class="lib-empty-state">
+        <div class="lib-empty-icon">📋</div>
+        <p>暂无已注册零部件</p>
+        <p style="font-size: 0.8rem; color: var(--text-muted);">请先在首页「零部件管理」中添加，或在各模块中输入零部件名称自动注册</p>
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = components.map(comp => {
+    const categoryLabel = COMPONENT_CATEGORY_LABELS[comp.category] || comp.category || '其他';
+    const typeLabel = COMPONENT_TYPE_LABELS[comp.type] || comp.type || '其他';
+    const lambdaStr = comp.lambdaBase != null ? comp.lambdaBase : '-';
+    return `
+      <div class="lib-component-card" data-comp-id="${comp.id}" title="点击添加">
+        <div class="lib-comp-header">
+          <span class="lib-comp-name">${escapeHtml(comp.name)}</span>
+        </div>
+        <div class="lib-comp-category">
+          <span class="lib-cat-badge lib-cat-${comp.category || 'other'}">${categoryLabel}</span>
+          <span class="lib-type-label">${typeLabel}</span>
+        </div>
+        <div class="lib-comp-lambda">
+          <span class="lambda-label">λb</span>
+          <span class="lambda-value">${lambdaStr}</span>
+          <span class="lambda-unit">FIT</span>
+        </div>
+        ${comp.description ? `<div class="lib-comp-desc">${escapeHtml(comp.description)}</div>` : ''}
+        <div class="lib-comp-add-btn"><span>➕</span> 添加</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function handleRegistryImportClick(container, compId) {
+  const product = getCurrentProduct();
+  if (!product) return;
+  const components = getComponents(product.id);
+  const comp = components.find(c => c.id === compId);
+  if (!comp) return;
+
+  if (_registryImportTarget === 'prediction') {
+    // 添加到预计 BOM 表
+    const newComponent = createNewComponent(comp.type || 'other');
+    newComponent.name = comp.name;
+    newComponent.componentId = comp.id;
+    if (comp.lambdaBase != null) {
+      newComponent.lambdaBase = comp.lambdaBase;
+    }
+    newComponent.lambdaOp = calcLambdaOp(newComponent);
+    predictionData.components.push(newComponent);
+    saveData();
+    renderTable(container);
+    updateResults(container);
+    drawBarChart(container);
+    drawSystemDiagram(container);
+    showToast(container, `已添加: ${comp.name}`);
+  } else if (_registryImportTarget === 'allocation') {
+    // 添加为分配子系统
+    const newSub = {
+      id: genId(),
+      componentId: comp.id,
+      name: comp.name,
+      complexity: 5,
+      maturity: 5,
+      environment: 5,
+      mission: 5,
+    };
+    allocationData.subsystems.push(newSub);
+    calcAllocation();
+    saveData();
+    renderAllocationTable(container);
+    renderAllocationResults(container);
+    drawPieChart(container);
+    renderFmeaComparison(container);
+    renderPredComparison(container);
+    showToast(container, `已添加子系统: ${comp.name}`);
+  }
 }
 
 function openCustomComponentModal(container) {
@@ -1133,6 +1295,33 @@ function bindEvents(container) {
 
   const calculateBtn = container.querySelector("#pred-calculate");
   calculateBtn.addEventListener("click", () => handleCalculate(container));
+
+  // 注册表导入按钮（预计）
+  const importPredBtn = container.querySelector("#pred-import-registry");
+  if (importPredBtn) {
+    importPredBtn.addEventListener("click", () => openRegistryImport(container, 'prediction'));
+  }
+
+  // 注册表导入弹窗事件
+  const regImportClose = container.querySelector("#registry-import-close");
+  if (regImportClose) regImportClose.addEventListener("click", () => closeRegistryImport(container));
+  const regImportOverlay = container.querySelector("#registry-import-overlay");
+  if (regImportOverlay) regImportOverlay.addEventListener("click", () => closeRegistryImport(container));
+  const regImportSearch = container.querySelector("#registry-import-search");
+  if (regImportSearch) {
+    regImportSearch.addEventListener("input", (e) => {
+      _registryImportKeyword = e.target.value;
+      renderRegistryImportList(container);
+    });
+  }
+  const regImportList = container.querySelector("#registry-import-list");
+  if (regImportList) {
+    regImportList.addEventListener("click", (e) => {
+      const card = e.target.closest("[data-comp-id]");
+      if (!card) return;
+      handleRegistryImportClick(container, card.dataset.compId);
+    });
+  }
 
   // β参数变化时重新计算等效B10和λ
   const predBetaInput = container.querySelector("#pred-beta");
@@ -1296,7 +1485,7 @@ function renderAllocationRow(item, index, container) {
   return html`
     <tr data-id="${item.id}">
       <td class="alloc-index">${index + 1}</td>
-      <td><input type="text" class="item-input" data-field="name" .value=${live(item.name)} placeholder="子系统名称" @input=${(e) => handleAllocationInputChange(container, e)} /></td>
+      <td><input type="text" class="item-input" data-field="name" list="alloc-component-list" .value=${live(item.name)} placeholder="子系统名称" @input=${(e) => handleAllocationInputChange(container, e)} /></td>
       <td><input type="number" class="item-input alloc-num-input" data-field="complexity" .value=${live(String(item.complexity || 0))} min="1" max="10" step="1" @input=${(e) => handleAllocationInputChange(container, e)} /></td>
       <td><input type="number" class="item-input alloc-num-input" data-field="maturity" .value=${live(String(item.maturity || 0))} min="1" max="10" step="1" @input=${(e) => handleAllocationInputChange(container, e)} /></td>
       <td><input type="number" class="item-input alloc-num-input" data-field="environment" .value=${live(String(item.environment || 0))} min="1" max="10" step="1" @input=${(e) => handleAllocationInputChange(container, e)} /></td>
@@ -1417,6 +1606,7 @@ function drawPieChart(container) {
 function addAllocationSubsystem(container) {
   const newSubsystem = {
     id: genId(),
+    componentId: null,
     name: "新子系统",
     complexity: 5,
     maturity: 5,
@@ -1497,6 +1687,14 @@ function handleAllocationInputChange(container, e) {
     subsystem[field] = val;
   } else {
     subsystem[field] = input.value;
+  }
+
+  // 当 name 字段变更时，自动注册零部件到产品级注册表
+  if (field === "name" && input.value && input.value.trim()) {
+    const product = getCurrentProduct();
+    if (product) {
+      subsystem.componentId = ensureComponentRegistered(product.id, input.value.trim());
+    }
   }
 
   calcAllocation();
@@ -1639,6 +1837,12 @@ function bindAllocationEvents(container) {
     emptyAddBtn.addEventListener("click", () => addAllocationSubsystem(container));
   }
 
+  // 注册表导入按钮（分配）
+  const importAllocBtn = container.querySelector("#alloc-import-registry");
+  if (importAllocBtn) {
+    importAllocBtn.addEventListener("click", () => openRegistryImport(container, 'allocation'));
+  }
+
   let resizeTimeout;
   window.addEventListener("resize", () => {
     clearTimeout(resizeTimeout);
@@ -1666,13 +1870,35 @@ function getFmeaLambdaEstimate(occurrence) {
   return OCCURRENCE_TO_LAMBDA[occurrence] || 10000;
 }
 
-function getFmeaSubsystemData(subsystemName) {
+function getFmeaSubsystemData(subsystemName, subsystemComponentId) {
   if (!currentModel?.modules?.fmea?.items) return null;
-  
-  const items = currentModel.modules.fmea.items.filter(item => 
-    item.function && item.function.includes(subsystemName)
-  );
-  
+
+  // 优先使用 componentId 精确匹配
+  let items = [];
+  if (subsystemComponentId) {
+    items = currentModel.modules.fmea.items.filter(item =>
+      item.componentId && item.componentId === subsystemComponentId
+    );
+  }
+
+  // 降级：字符串模糊匹配，并自动补全 componentId
+  if (items.length === 0 && subsystemName) {
+    items = currentModel.modules.fmea.items.filter(item =>
+      item.function && item.function.includes(subsystemName)
+    );
+    // 自动补全 componentId
+    if (items.length > 0) {
+      const product = getCurrentProduct();
+      if (product) {
+        for (const item of items) {
+          if (!item.componentId && item.function) {
+            item.componentId = ensureComponentRegistered(product.id, item.function);
+          }
+        }
+      }
+    }
+  }
+
   if (items.length === 0) return null;
   
   const avgOccurrence = items.reduce((sum, item) => sum + (item.occurrence || 5), 0) / items.length;
@@ -1792,7 +2018,7 @@ function renderFmeaComparison(container) {
   }
 
   const comparisonData = subsystems.map(s => {
-    const fmeaInfo = getFmeaSubsystemData(s.name);
+    const fmeaInfo = getFmeaSubsystemData(s.name, s.componentId);
     const allocLambda = s.lambda || 0;
     const fmeaLambda = fmeaInfo?.lambda || 0;
     
@@ -1916,6 +2142,7 @@ function renderTemplate(container) {
 
   litRender(html`
     <div class="module-page prediction-page">
+      ${renderComponentDatalists()}
       <div class="module-header">
         <h2>可靠性预测</h2>
         <p>基于零部件失效率的系统可靠性预计与计算（简化版 MIL-HDBK-217）</p>
@@ -1950,6 +2177,10 @@ function renderTemplate(container) {
               </div>
             </div>
             <div class="prediction-toolbar-right">
+              <button type="button" class="btn-icon" id="pred-import-registry" title="从首页零部件注册表批量导入">
+                <span>📥</span>
+                <span class="btn-text">从注册表导入</span>
+              </button>
               <button type="button" class="btn-icon" id="pred-component-library">
                 <span>📚</span>
                 <span class="btn-text">元器件库</span>
@@ -2204,6 +2435,10 @@ function renderTemplate(container) {
               <h3>子系统评分表</h3>
               <div class="card-actions">
                 <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">共 <span id="alloc-subsystem-count">${allocationData?.subsystems?.length || 0}</span> 个子系统</span>
+                <button type="button" class="btn-icon btn-sm" id="alloc-import-registry" title="从首页零部件注册表批量导入为子系统">
+                  <span>📥</span>
+                  <span class="btn-text">从注册表导入</span>
+                </button>
                 <button type="button" class="btn-icon btn-sm" id="alloc-add-subsystem">
                   <span>➕</span>
                   <span class="btn-text">添加子系统</span>
@@ -2296,6 +2531,25 @@ function renderTemplate(container) {
             <div class="card-body">
               <div id="alloc-fmea-compare-panel"></div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 注册表导入弹窗 -->
+      <div class="component-library-modal" id="registry-import-modal" style="display: none;">
+        <div class="component-library-overlay" id="registry-import-overlay"></div>
+        <div class="component-library-panel">
+          <div class="component-library-header">
+            <h3>📥 从零部件注册表导入</h3>
+            <button type="button" class="component-library-close" id="registry-import-close">×</button>
+          </div>
+          <div class="component-library-search">
+            <input type="text" id="registry-import-search" class="form-input" placeholder="搜索零部件名称..." />
+          </div>
+          <div class="component-library-list" id="registry-import-list">
+          </div>
+          <div class="component-library-footer">
+            <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">点击零部件卡片即可添加到当前表格</span>
           </div>
         </div>
       </div>
