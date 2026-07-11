@@ -1,3 +1,4 @@
+import { html, render as litRender } from 'lit-html';
 import {
   defaultAnalysisBatch,
   weibullCdf,
@@ -31,15 +32,433 @@ export function init(model, onSave) {
 
 export function render(container, model) {
   currentModel = model;
-  const template = document.getElementById("life-data-template");
-  const content = template.content.cloneNode(true);
-  container.appendChild(content);
-
   ensureLifeData();
+
+  // 使用 lit-html 渲染主模板
+  litRender(html`
+    <div class="module-page life-data-page">
+      <div class="module-header">
+        <h2>寿命数据分析</h2>
+        <p>基于 Weibull、指数分布、对数正态分布的寿命数据分析与 B10 寿命计算</p>
+      </div>
+      <div class="module-content">
+        <div class="life-data-toolbar">
+          <div class="life-data-tabs">
+            <button type="button" class="life-data-tab active" data-tab="data-entry">数据录入</button>
+            <button type="button" class="life-data-tab" data-tab="analysis">结果分析</button>
+            <button type="button" class="life-data-tab" data-tab="weakness">短板分析</button>
+          </div>
+        </div>
+
+        ${renderDataEntryTabContent()}
+
+        ${renderAnalysisTabContent()}
+
+        ${renderWeaknessTabContent()}
+      </div>
+    </div>
+  `, container);
+
   bindEvents();
   renderDataEntryTab();
   renderAnalysisTab();
   switchTab(activeTab);
+}
+
+function renderDataEntryTabContent() {
+  return html`
+    <div class="life-data-tab-content" id="life-tab-data-entry">
+      <div class="card">
+        <div class="card-header">
+          <h3>试验批次管理</h3>
+          <div class="card-actions">
+            <button type="button" class="btn-icon" id="ld-new-batch">
+              <span>➕</span>
+              <span class="btn-text">新建批次</span>
+            </button>
+            <button type="button" class="btn-icon" id="ld-import">
+              <span>📥</span>
+              <span class="btn-text">导入 CSV</span>
+            </button>
+            <input type="file" id="ld-import-file" accept=".csv" hidden />
+            <button type="button" class="btn-icon" id="ld-download-template">
+              <span>📄</span>
+              <span class="btn-text">下载模板</span>
+            </button>
+            <button type="button" class="btn-icon btn-danger" id="ld-batch-delete">
+              <span>🗑️</span>
+              <span class="btn-text">删除批次</span>
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="batch-tabs" id="ld-batch-tabs"></div>
+          <div id="ld-batch-detail-section" style="display: none;">
+            <div class="form-row">
+              <div class="form-group">
+                <label>批次名称</label>
+                <input type="text" id="ld-batch-name" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label>测试对象</label>
+                <select id="ld-batch-part" class="form-input">
+                  <option value="product">整机</option>
+                  <option value="motor">电机</option>
+                  <option value="battery">电池包</option>
+                  <option value="gearbox">齿轮箱/传动</option>
+                  <option value="blade">刀片组件</option>
+                  <option value="bearing">轴承</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>开始日期</label>
+                <input type="date" id="ld-batch-date" class="form-input" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group full-width">
+                <label>备注</label>
+                <textarea id="ld-batch-note" class="form-input" rows="2"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="ld-batch-items-section" style="display: none;">
+        <div class="card-header">
+          <h3>试验数据</h3>
+          <div class="card-actions">
+            <button type="button" class="btn-icon" id="ld-add-item">
+              <span>➕</span>
+              <span class="btn-text">添加样本</span>
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 50px;">序号</th>
+                  <th style="width: 120px;">时间 (h)</th>
+                  <th style="width: 120px;">状态</th>
+                  <th style="width: 150px;">零件</th>
+                  <th style="min-width: 150px;">失效模式</th>
+                  <th style="min-width: 180px;">备注</th>
+                  <th style="width: 70px;">操作</th>
+                </tr>
+              </thead>
+              <tbody id="ld-items-tbody"></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="ld-items-empty" style="display: none;">
+            <div class="empty-icon">📊</div>
+            <h3>暂无试验数据</h3>
+            <p>点击「添加样本」按钮开始录入试验数据。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderAnalysisTabContent() {
+  return html`
+    <div class="life-data-tab-content" id="life-tab-analysis" style="display: none;">
+      <div class="card">
+        <div class="card-header">
+          <h3>分析配置</h3>
+        </div>
+        <div class="card-body">
+          <!-- 模式切换 + 分布类型 + 方法选择（紧凑同一行） -->
+          <div class="form-row">
+            <div class="form-group">
+              <label>查看模式</label>
+              <div class="segmented-control" id="ld-mode-segmented">
+                <button type="button" class="segmented-btn active" data-mode="merged">合并</button>
+                <button type="button" class="segmented-btn" data-mode="batch">分轮</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>分布类型</label>
+              <select id="ld-distribution" class="form-input">
+                <option value="weibull">Weibull 分布</option>
+                <option value="exponential">指数分布</option>
+                <option value="lognormal">对数正态分布</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>参数估计方法</label>
+              <select id="ld-method" class="form-input">
+                <option value="rrx">RRX (X方向秩回归)</option>
+                <option value="rry">RRY (Y方向秩回归)</option>
+                <option value="mle">MLE (最大似然估计)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="ld-merged-results">
+        <div class="card">
+          <div class="card-header">
+            <h3>拟合结果</h3>
+          </div>
+          <div class="card-body">
+            <div class="metrics-grid" id="ld-fit-metrics">
+              <div class="metric-card">
+                <div class="metric-label">样本总数</div>
+                <div class="metric-value" id="ld-total-samples">—</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">失效数</div>
+                <div class="metric-value" id="ld-failure-count">—</div>
+              </div>
+              <div class="metric-card" id="ld-metric-censored" style="display: none;">
+                <div class="metric-label">右删失数<span class="help-icon" data-tooltip="试验结束时仍未失效的样品，只知道寿命大于某个值">?</span></div>
+                <div class="metric-value" id="ld-censored-count">—</div>
+              </div>
+              <div class="metric-card" id="ld-metric-beta">
+                <div class="metric-label">形状参数 β<span class="help-icon" data-tooltip="β<1早期失效，β≈1偶然失效，β>1磨损失效。电动工具典型值2.0~2.5">?</span></div>
+                <div class="metric-value" id="ld-beta">—</div>
+              </div>
+              <div class="metric-card" id="ld-metric-eta">
+                <div class="metric-label">特征寿命 η<span class="help-icon" data-tooltip="可靠度为36.8%时的寿命时间，代表整体寿命量级">?</span></div>
+                <div class="metric-value" id="ld-eta">—</div>
+                <div class="metric-unit">h</div>
+              </div>
+              <div class="metric-card" id="ld-metric-lambda" style="display: none;">
+                <div class="metric-label">失效率 λ</div>
+                <div class="metric-value" id="ld-lambda">—</div>
+                <div class="metric-unit">/h</div>
+              </div>
+              <div class="metric-card" id="ld-metric-mu" style="display: none;">
+                <div class="metric-label">对数均值 μ</div>
+                <div class="metric-value" id="ld-mu">—</div>
+              </div>
+              <div class="metric-card" id="ld-metric-sigma" style="display: none;">
+                <div class="metric-label">对数标准差 σ</div>
+                <div class="metric-value" id="ld-sigma">—</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">B10 寿命</div>
+                <div class="metric-value" id="ld-b10">—</div>
+                <div class="metric-unit">h</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">B50 寿命</div>
+                <div class="metric-value" id="ld-b50">—</div>
+                <div class="metric-unit">h</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">拟合优度 R²</div>
+                <div class="metric-value" id="ld-r2">—</div>
+              </div>
+            </div>
+            <div class="metrics-grid" id="ld-target-comparison" style="margin-top: 1rem;">
+              <div class="metric-card">
+                <div class="metric-label">目标 B10</div>
+                <div class="metric-value" id="ld-target-b10">—</div>
+                <div class="metric-unit">h</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">验证结果</div>
+                <div class="metric-value" id="ld-result-pass">—</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">差距</div>
+                <div class="metric-value" id="ld-result-gap-analysis">—</div>
+                <div class="metric-unit">h</div>
+              </div>
+            </div>
+            <div class="formula-section">
+              <button type="button" class="formula-toggle" id="ld-formula-toggle">📐 查看计算公式</button>
+              <div class="formula-content" id="ld-formula-content" style="display: none;">
+                <div class="formula-item">
+                  <h4>威布尔可靠度公式</h4>
+                  <div class="formula-equation">R(t) = exp(-(t/η)<sup>β</sup>)</div>
+                  <div class="formula-vars">
+                    <div class="var-row"><span class="var-name">R(t)</span><span class="var-desc">时刻 t 的可靠度</span></div>
+                    <div class="var-row"><span class="var-name">t</span><span class="var-desc">时间（小时）</span></div>
+                    <div class="var-row"><span class="var-name">η</span><span class="var-desc">特征寿命（尺度参数）</span></div>
+                    <div class="var-row"><span class="var-name">β</span><span class="var-desc">形状参数</span></div>
+                  </div>
+                </div>
+                <div class="formula-item">
+                  <h4>B10 寿命公式</h4>
+                  <div class="formula-equation">B10 = η × [-ln(0.9)]<sup>1/β</sup></div>
+                  <div class="formula-note">可靠度为90%时对应的寿命，即10%产品失效的时间</div>
+                </div>
+                <div class="formula-item">
+                  <h4>MTBF 公式</h4>
+                  <div class="formula-equation">MTBF = η × Γ(1 + 1/β)</div>
+                  <div class="formula-note">平均失效前时间，Γ为伽马函数</div>
+                </div>
+                <div class="formula-item">
+                  <h4>失效率公式</h4>
+                  <div class="formula-equation">h(t) = (β/η) × (t/η)<sup>β-1</sup></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>指定时长可靠度计算器</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-row">
+              <div class="form-group">
+                <label>时间 t <span class="hint">(小时)</span></label>
+                <div style="display: flex; gap: 0.75rem; align-items: center;">
+                  <input type="number" id="ld-reliability-time" class="form-input" min="0" step="1" value="40" style="max-width: 180px;" />
+                  <span class="hint" id="ld-reliability-warranty-label">质保期</span>
+                </div>
+              </div>
+            </div>
+            <div class="metrics-grid" style="margin-top: 1rem;">
+              <div class="metric-card">
+                <div class="metric-label">可靠度 R(t)</div>
+                <div class="metric-value" id="ld-reliability-value">—</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">失效率 F(t)</div>
+                <div class="metric-value" id="ld-failure-rate-value">—</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">质保期失效率</div>
+                <div class="metric-value" id="ld-warranty-failure-rate">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>概率图 (P-P 图)</h3>
+          </div>
+          <div class="card-body">
+            <canvas id="ld-pp-canvas" width="700" height="400"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>累积分布函数 (CDF)</h3>
+          </div>
+          <div class="card-body">
+            <canvas id="ld-cdf-canvas" width="700" height="400"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div id="ld-batch-results" class="ld-batch-results-container"></div>
+    </div>
+  `;
+}
+
+function renderWeaknessTabContent() {
+  return html`
+    <div class="life-data-tab-content" id="life-tab-weakness" style="display: none;">
+      <div class="card">
+        <div class="card-header">
+          <h3>批次选择</h3>
+        </div>
+        <div class="card-body">
+          <div class="batch-tabs" id="ld-weakness-batch-tabs"></div>
+        </div>
+      </div>
+
+      <div class="card weakness-core-card" id="ld-weakness-core-card" style="display: none;">
+        <div class="card-header">
+          <h3>🔴 核心短板识别</h3>
+        </div>
+        <div class="card-body">
+          <div class="weakness-core-content">
+            <div class="weakness-core-mode" id="ld-weakness-core-mode">—</div>
+            <div class="weakness-core-metrics">
+              <div class="metric-card weakness-highlight">
+                <div class="metric-label">B10 寿命</div>
+                <div class="metric-value" id="ld-weakness-core-b10">—</div>
+                <div class="metric-unit">h</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">失效占比</div>
+                <div class="metric-value" id="ld-weakness-core-pct">—</div>
+                <div class="metric-unit">%</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">失效数</div>
+                <div class="metric-value" id="ld-weakness-core-count">—</div>
+              </div>
+            </div>
+            <div class="weakness-suggestion">
+              <span class="suggestion-icon">💡</span>
+              <span id="ld-weakness-suggestion">建议针对该失效模式优先优化，可显著提升整机寿命</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="ld-weakness-table-card" style="display: none;">
+        <div class="card-header">
+          <h3>拟合参数对比</h3>
+        </div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table class="data-table weakness-table">
+              <thead>
+                <tr>
+                  <th style="min-width: 200px;">失效模式</th>
+                  <th style="width: 90px;">样本数</th>
+                  <th style="width: 90px;">失效数</th>
+                  <th style="width: 90px;">β</th>
+                  <th style="width: 110px;">η (h)</th>
+                  <th style="width: 110px;">B10 (h)</th>
+                  <th style="width: 110px;">MTBF (h)</th>
+                </tr>
+              </thead>
+              <tbody id="ld-weakness-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="ld-weakness-charts-card" style="display: none;">
+        <div class="card-header">
+          <h3>图表分析</h3>
+        </div>
+        <div class="card-body">
+          <div class="weakness-charts-row">
+            <div class="weakness-chart-col">
+              <h4 class="chart-title">B10 寿命对比</h4>
+              <div class="chart-container">
+                <canvas id="ld-weakness-bar-canvas" width="500" height="350"></canvas>
+              </div>
+            </div>
+            <div class="weakness-chart-col">
+              <h4 class="chart-title">失效模式占比</h4>
+              <div class="chart-container">
+                <canvas id="ld-weakness-pie-canvas" width="500" height="350"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="ld-weakness-empty-card">
+        <div class="card-body">
+          <div class="empty-state">
+            <div class="empty-icon">📊</div>
+            <h3>数据不足，无法进行短板分析</h3>
+            <p>请确保当前批次有至少2种失效模式，且每种失效模式至少有2个失效样本。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function ensureLifeData() {
@@ -334,7 +753,7 @@ function renderItemsTable(batch) {
   if (!tbody) return;
 
   if (!batch.items || batch.items.length === 0) {
-    tbody.innerHTML = "";
+    litRender(html``, tbody);
     if (empty) empty.style.display = "";
     return;
   }

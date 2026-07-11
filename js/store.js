@@ -1457,6 +1457,10 @@ export function getState() {
   return ensureState();
 }
 
+export function setState(newState) {
+  state = newState;
+}
+
 /**
  * 获取首页 B10 计算器得出的目标 B10 值
  * 如果首页未计算（参数不完整），返回默认值 150

@@ -1,3 +1,4 @@
+import { html, render as litRender } from 'lit-html';
 import { genId } from "../store.js";
 import { fmt, pct, toast } from "../utils.js";
 
@@ -43,17 +44,159 @@ export function init(model, onSave) {
 
 export function render(container, model) {
   currentModel = model;
-  const template = document.getElementById("fta-template");
-  const content = template.content.cloneNode(true);
-  container.appendChild(content);
-
   ensureFta();
+  
+  litRender(template(), container);
+  
   bindEvents();
   renderTreeTabs();
   renderLibrary();
   renderTree();
   renderResults();
   updateEmptyState();
+}
+
+function template() {
+  return html`
+    <div class="module-page fta-page">
+      <div class="module-header">
+        <h2>故障树分析</h2>
+        <p>故障树分析（Fault Tree Analysis）与顶事件概率计算、最小割集分析</p>
+      </div>
+      <div class="module-content">
+        <div class="fta-toolbar">
+          <div class="fta-tree-tabs" id="fta-tree-tabs"></div>
+          <div class="fta-toolbar-right">
+            <button type="button" class="btn-icon" id="fta-new-tree">
+              <span>➕</span>
+              <span class="btn-text">新建故障树</span>
+            </button>
+            <div class="dropdown">
+              <button type="button" class="btn-icon" id="fta-add-event-btn">
+                <span>➕</span>
+                <span class="btn-text">添加事件</span>
+                <span class="dropdown-arrow">▾</span>
+              </button>
+              <div class="dropdown-menu" id="fta-add-event-menu">
+                <button type="button" class="dropdown-item" data-add-type="top">顶事件</button>
+                <button type="button" class="dropdown-item" data-add-type="intermediate">中间事件</button>
+                <button type="button" class="dropdown-item" data-add-type="basic">基本事件</button>
+                <button type="button" class="dropdown-item" data-add-type="and">AND 门</button>
+                <button type="button" class="dropdown-item" data-add-type="or">OR 门</button>
+                <button type="button" class="dropdown-item" data-add-type="vote23">2/3 表决门</button>
+              </div>
+            </div>
+            <button type="button" class="btn-icon" id="fta-calc-mcs">
+              <span>🔢</span>
+              <span class="btn-text">最小割集</span>
+            </button>
+            <button type="button" class="btn-icon btn-danger" id="fta-delete-tree">
+              <span>🗑️</span>
+              <span class="btn-text">删除故障树</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="fta-main-layout">
+          <aside class="fta-library-panel">
+            <div class="panel-header">
+              <h3>事件库</h3>
+            </div>
+            <div class="panel-body">
+              <div class="library-section">
+                <div class="library-section-title">基本事件</div>
+                <div class="library-list" id="fta-basic-events-list"></div>
+              </div>
+              <div class="library-section">
+                <div class="library-section-title">中间事件</div>
+                <div class="library-list" id="fta-intermediate-events-list"></div>
+              </div>
+              <div class="library-section">
+                <div class="library-section-title">逻辑门</div>
+                <div class="library-list" id="fta-gates-list"></div>
+              </div>
+            </div>
+          </aside>
+
+          <div class="fta-canvas-container">
+            <div class="fta-canvas" id="fta-canvas">
+              <div class="fta-empty-state" id="fta-empty-state" style="display: none;">
+                <div class="empty-icon">🌳</div>
+                <h3>暂无故障树</h3>
+                <p>点击「新建故障树」按钮开始创建您的第一个故障树。</p>
+                <button type="button" class="btn-primary" id="fta-empty-new-btn">新建故障树</button>
+              </div>
+              <div class="fta-tree-container" id="fta-tree-container"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="fta-results-panel">
+          <div class="panel-header">
+            <h3>分析结果</h3>
+          </div>
+          <div class="panel-body">
+            <div class="results-metrics">
+              <div class="metric-card">
+                <div class="metric-label">顶事件概率</div>
+                <div class="metric-value" id="fta-top-probability">—</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">最小割集数</div>
+                <div class="metric-value" id="fta-mcs-count">—</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">基本事件数</div>
+                <div class="metric-value" id="fta-basic-count">—</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">最小割集阶数</div>
+                <div class="metric-value" id="fta-mcs-order">—</div>
+              </div>
+            </div>
+            <div class="results-section">
+              <h4>最小割集列表</h4>
+              <div class="table-wrap">
+                <table class="data-table" id="fta-mcs-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 60px;">序号</th>
+                      <th style="width: 80px;">阶数</th>
+                      <th>割集事件</th>
+                      <th style="width: 120px;">概率</th>
+                    </tr>
+                  </thead>
+                  <tbody id="fta-mcs-tbody"></tbody>
+                </table>
+              </div>
+              <div class="empty-state" id="fta-mcs-empty" style="display: none;">
+                <p>暂无最小割集数据</p>
+              </div>
+            </div>
+            <div class="results-section">
+              <h4>结构重要度排序</h4>
+              <div class="table-wrap">
+                <table class="data-table" id="fta-importance-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 60px;">排名</th>
+                      <th>事件名称</th>
+                      <th style="width: 120px;">结构重要度</th>
+                      <th style="width: 120px;">概率重要度</th>
+                    </tr>
+                  </thead>
+                  <tbody id="fta-importance-tbody"></tbody>
+                </table>
+              </div>
+              <div class="empty-state" id="fta-importance-empty" style="display: none;">
+                <p>暂无重要度数据</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function bindEvents() {
@@ -594,11 +737,11 @@ function renderTree() {
     return;
   }
 
-  let html = `<div class="fta-tree">`;
+  let htmlContent = `<div class="fta-tree">`;
 
   for (let levelIdx = 0; levelIdx < levels.length; levelIdx++) {
     const level = levels[levelIdx];
-    html += `<div class="fta-tree-level" data-level="${levelIdx}">`;
+    htmlContent += `<div class="fta-tree-level" data-level="${levelIdx}">`;
 
     for (const node of level) {
       const isSelected = selectedNodeId === node.id;
@@ -608,7 +751,7 @@ function renderTree() {
       const connectingClass = isConnecting ? "connecting" : "";
       const nodeTypeClass = `fta-node-${node.type}`;
 
-      html += `
+      htmlContent += `
         <div class="fta-node-wrapper" data-node-id="${node.id}">
           <div class="fta-node ${nodeTypeClass} ${selectedClass} ${connectingClass}" data-node-id="${node.id}" style="border-color: ${typeInfo.color};">
             <div class="fta-node-header">
@@ -627,17 +770,17 @@ function renderTree() {
       `;
 
       if (node.childIds.length > 0) {
-        html += `<div class="fta-node-children-line"></div>`;
+        htmlContent += `<div class="fta-node-children-line"></div>`;
       }
 
-      html += `</div>`;
+      htmlContent += `</div>`;
     }
 
-    html += `</div>`;
+    htmlContent += `</div>`;
   }
 
-  html += `</div>`;
-  container.innerHTML = html;
+  htmlContent += `</div>`;
+  container.innerHTML = htmlContent;
 
   drawConnections(container, levels);
 }

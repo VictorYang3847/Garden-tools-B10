@@ -1,3 +1,4 @@
+﻿import { html, render as litRender } from 'lit-html';
 const routes = {
   home: {
     path: "home",
@@ -65,6 +66,8 @@ let navItems = [];
 let onRouteChangeCallback = null;
 let getModelCallback = null;
 let saveModelCallback = null;
+let servicesCallback = null;
+
 
 export function initRouter(options = {}) {
   mainContent = options.mainContent || document.getElementById("main-content");
@@ -72,6 +75,7 @@ export function initRouter(options = {}) {
   onRouteChangeCallback = options.onRouteChange || null;
   getModelCallback = options.getModel || null;
   saveModelCallback = options.saveModel || null;
+  servicesCallback = options.services || null;
 
   window.addEventListener("hashchange", handleHashChange);
 
@@ -139,7 +143,8 @@ function updateNavHighlight() {
 async function renderRoute(routeKey) {
   if (!mainContent) return;
 
-  mainContent.innerHTML = '<div class="page-loading">加载中...</div>';
+  // 用 lit-html 渲染加载状态（不混用 innerHTML，避免 lit-html 内部状态损坏）
+  litRender(html`<div class="page-loading">加载中...</div>`, mainContent);
 
   try {
     const module = await routes[routeKey].module();
@@ -154,10 +159,9 @@ async function renderRoute(routeKey) {
     };
 
     if (typeof module.init === "function") {
-      module.init(model, onSave);
+      module.init(model, onSave, servicesCallback);
     }
     if (typeof module.render === "function") {
-      mainContent.innerHTML = "";
       module.render(mainContent, model);
     }
   } catch (err) {
@@ -167,12 +171,12 @@ async function renderRoute(routeKey) {
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
-    mainContent.innerHTML = `
+    litRender(html`
       <div class="error-state">
         <h3>加载失败</h3>
         <p>${safeMsg}</p>
       </div>
-    `;
+    `, mainContent);
   }
 }
 

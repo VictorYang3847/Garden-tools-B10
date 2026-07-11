@@ -1,3 +1,4 @@
+import { html, render as litRender } from 'lit-html';
 import { genId } from "../store.js";
 
 const title = "环境适应性分析";
@@ -145,15 +146,7 @@ export function render(container, model) {
   const data = ensureData();
   activeVibType = data.vibration?.type || "sine";
 
-  const template = document.getElementById("environment-template");
-  if (!template) {
-    container.innerHTML = `<div class="error-state"><h3>模板未找到</h3><p>environment-template 不存在</p></div>`;
-    return;
-  }
-
-  const clone = template.content.cloneNode(true);
-  container.innerHTML = "";
-  container.appendChild(clone);
+  litRender(template(), container);
 
   bindEvents(container, data);
   renderThermalCycle(container, data);
@@ -161,6 +154,355 @@ export function render(container, model) {
   renderEnvStresses(container, data);
   renderStandards(container, data, "all", "");
   drawThermalCurve(container, data.thermalCycle);
+}
+
+function template() {
+  return html`
+    <div class="module-page environment-page">
+      <div class="module-header">
+        <h2>环境适应性分析</h2>
+        <p>环境应力筛选、温度循环分析、振动分析与环境试验标准查询</p>
+      </div>
+      <div class="module-content">
+        <div class="env-toolbar">
+          <div class="env-tabs">
+            <button type="button" class="env-tab active" data-tab="thermal-cycle">温度循环</button>
+            <button type="button" class="env-tab" data-tab="vibration">振动分析</button>
+            <button type="button" class="env-tab" data-tab="env-mapping">环境映射</button>
+            <button type="button" class="env-tab" data-tab="standards">试验标准</button>
+          </div>
+        </div>
+
+        <div class="env-tab-content" id="env-tab-thermal-cycle">
+          <div class="card-grid">
+            <div class="card">
+              <div class="card-header">
+                <h3>输入参数</h3>
+              </div>
+              <div class="card-body">
+                <form id="env-thermal-form">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>温度上限 (°C)</label>
+                      <input type="number" name="tempHigh" class="form-input" step="1" />
+                    </div>
+                    <div class="form-group">
+                      <label>温度下限 (°C)</label>
+                      <input type="number" name="tempLow" class="form-input" step="1" />
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>温变率 (°C/min)</label>
+                      <input type="number" name="rampRate" class="form-input" min="0.1" step="0.1" />
+                    </div>
+                    <div class="form-group">
+                      <label>循环次数</label>
+                      <input type="number" name="cycles" class="form-input" min="1" step="1" />
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>每次循环持温时间 (min)</label>
+                      <input type="number" name="holdTime" class="form-input" min="0" step="1" />
+                    </div>
+                    <div class="form-group">
+                      <label>Coffin-Manson 指数 n</label>
+                      <input type="number" name="coffinMansonN" class="form-input" min="0.1" step="0.1" />
+                    </div>
+                  </div>
+                  <div class="action-row">
+                    <button type="button" class="btn-primary" id="env-thermal-calc">计算</button>
+                    <button type="button" class="btn-ghost" id="env-thermal-reset">重置</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3>计算结果</h3>
+              </div>
+              <div class="card-body">
+                <div class="metrics-grid">
+                  <div class="metric-card">
+                    <div class="metric-label">温度范围 ΔT</div>
+                    <div class="metric-value" id="env-delta-t">—</div>
+                    <div class="metric-unit">°C</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">每循环损伤量</div>
+                    <div class="metric-value" id="env-cycle-damage">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">总累积损伤</div>
+                    <div class="metric-value" id="env-total-damage">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">预测寿命</div>
+                    <div class="metric-value" id="env-predicted-life">—</div>
+                    <div class="metric-unit">循环</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">等效寿命</div>
+                    <div class="metric-value" id="env-equiv-life">—</div>
+                    <div class="metric-unit">小时/年</div>
+                  </div>
+                </div>
+                <div class="status-banner" id="env-thermal-status" style="display: none;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>温度循环曲线</h3>
+            </div>
+            <div class="card-body">
+              <div class="thermal-chart-container">
+                <canvas id="env-thermal-canvas" width="800" height="300"></canvas>
+              </div>
+              <div class="chart-legend">
+                <div class="legend-item">
+                  <span class="legend-color" style="background: var(--accent);"></span>
+                  <span>温度-时间曲线</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="env-tab-content" id="env-tab-vibration" style="display: none;">
+          <div class="card-grid">
+            <div class="card vibration-card">
+              <div class="card-header">
+                <h3>振动类型</h3>
+              </div>
+              <div class="card-body">
+                <div class="vibration-type-switch">
+                  <button type="button" class="vib-type-btn active" data-type="sine">正弦振动</button>
+                  <button type="button" class="vib-type-btn" data-type="random">随机振动</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-grid">
+            <div class="card" id="env-sine-card">
+              <div class="card-header">
+                <h3>正弦振动参数</h3>
+              </div>
+              <div class="card-body">
+                <form id="env-sine-form">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>起始频率 (Hz)</label>
+                      <input type="number" name="freqStart" class="form-input" min="0.1" step="0.1" />
+                    </div>
+                    <div class="form-group">
+                      <label>终止频率 (Hz)</label>
+                      <input type="number" name="freqEnd" class="form-input" min="0.1" step="0.1" />
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>加速度幅值 (g)</label>
+                      <input type="number" name="amplitude" class="form-input" min="0.1" step="0.1" />
+                    </div>
+                    <div class="form-group">
+                      <label>振动方向</label>
+                      <select name="direction" class="form-input">
+                        <option value="x">X 轴</option>
+                        <option value="y">Y 轴</option>
+                        <option value="z">Z 轴</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>持续时间 (min)</label>
+                      <input type="number" name="duration" class="form-input" min="0" step="1" />
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div class="card" id="env-random-card" style="display: none;">
+              <div class="card-header">
+                <h3>随机振动参数</h3>
+              </div>
+              <div class="card-body">
+                <form id="env-random-form">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>起始频率 (Hz)</label>
+                      <input type="number" name="freqStart" class="form-input" min="0.1" step="0.1" />
+                    </div>
+                    <div class="form-group">
+                      <label>终止频率 (Hz)</label>
+                      <input type="number" name="freqEnd" class="form-input" min="0.1" step="0.1" />
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>PSD 谱密度 (g²/Hz)</label>
+                      <input type="number" name="psd" class="form-input" min="0.001" step="0.001" />
+                    </div>
+                    <div class="form-group">
+                      <label>持续时间 (min)</label>
+                      <input type="number" name="duration" class="form-input" min="0" step="1" />
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3>分析结果</h3>
+              </div>
+              <div class="card-body">
+                <div class="metrics-grid">
+                  <div class="metric-card">
+                    <div class="metric-label">Grms (随机振动)</div>
+                    <div class="metric-value" id="env-grms">—</div>
+                    <div class="metric-unit">g</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">振动应力水平</div>
+                    <div class="metric-value" id="env-stress-level">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">疲劳损伤估算</div>
+                    <div class="metric-value" id="env-fatigue-damage">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">建议试验等级</div>
+                    <div class="metric-value" id="env-suggested-level">—</div>
+                  </div>
+                </div>
+                <div class="action-row">
+                  <button type="button" class="btn-primary" id="env-vib-calc">计算</button>
+                  <button type="button" class="btn-ghost" id="env-vib-reset">重置</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="env-tab-content" id="env-tab-env-mapping" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <h3>环境应力映射表</h3>
+              <div class="card-actions">
+                <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">共 <span id="env-stress-count">0</span> 种应力</span>
+              </div>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <div class="env-table-container table-wrap">
+                <table class="data-table env-stress-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 60px;">序号</th>
+                      <th style="min-width: 100px;">应力类型</th>
+                      <th style="min-width: 140px;">使用环境等级</th>
+                      <th style="width: 100px;">环境因子 π_E</th>
+                      <th style="min-width: 180px;">试验标准参考</th>
+                      <th style="min-width: 180px;">备注</th>
+                    </tr>
+                  </thead>
+                  <tbody id="env-stress-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>环境因子说明 (π_E)</h3>
+            </div>
+            <div class="card-body">
+              <div class="env-factor-grid">
+                <div class="env-factor-item">
+                  <div class="factor-name">地面良好 (Ground Benign)</div>
+                  <div class="factor-value">π_E = 1.0</div>
+                  <div class="factor-desc">受控环境，温度稳定，无振动</div>
+                </div>
+                <div class="env-factor-item">
+                  <div class="factor-name">地面固定 (Ground Fixed)</div>
+                  <div class="factor-value">π_E = 1.5</div>
+                  <div class="factor-desc">固定安装，有一定温湿度变化</div>
+                </div>
+                <div class="env-factor-item">
+                  <div class="factor-name">地面移动 (Ground Mobile)</div>
+                  <div class="factor-value">π_E = 3.0</div>
+                  <div class="factor-desc">车载设备，振动和温度变化较大</div>
+                </div>
+                <div class="env-factor-item">
+                  <div class="factor-name">户外 (Outdoor)</div>
+                  <div class="factor-value">π_E = 4.0</div>
+                  <div class="factor-desc">直接暴露于自然环境</div>
+                </div>
+                <div class="env-factor-item">
+                  <div class="factor-name">舰载 (Naval)</div>
+                  <div class="factor-value">π_E = 5.0</div>
+                  <div class="factor-desc">海上环境，盐雾、湿度、摇摆</div>
+                </div>
+                <div class="env-factor-item">
+                  <div class="factor-name">机载 (Airborne)</div>
+                  <div class="factor-value">π_E = 7.0</div>
+                  <div class="factor-desc">航空环境，温度、压力、振动变化剧烈</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="env-tab-content" id="env-tab-standards" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <h3>试验标准库</h3>
+              <div class="card-actions">
+                <div class="standards-filter">
+                  <select id="env-standard-category" class="form-input" style="width: 160px;">
+                    <option value="all">全部分类</option>
+                    <option value="IEC 60068">IEC 60068 系列</option>
+                    <option value="GJB 150">GJB 150 系列</option>
+                    <option value="MIL-STD-810">MIL-STD-810</option>
+                    <option value="GB/T 2423">GB/T 2423</option>
+                  </select>
+                  <input type="text" id="env-standard-search" class="form-input" placeholder="搜索标准编号或名称..." style="width: 220px;" />
+                </div>
+              </div>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <div class="standards-table-container table-wrap">
+                <table class="data-table standards-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px;">序号</th>
+                      <th style="min-width: 180px;">标准编号</th>
+                      <th style="min-width: 180px;">标准名称</th>
+                      <th style="width: 130px;">标准分类</th>
+                      <th style="min-width: 180px;">适用范围</th>
+                      <th style="min-width: 200px;">常用试验项目</th>
+                    </tr>
+                  </thead>
+                  <tbody id="env-standards-tbody"></tbody>
+                </table>
+                <div class="empty-state" id="env-standards-empty" style="display: none;">
+                  <div class="empty-icon">📋</div>
+                  <h3>未找到匹配的标准</h3>
+                  <p>请尝试其他搜索关键词或分类筛选。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function bindEvents(container, data) {
@@ -673,7 +1015,7 @@ function renderStandards(container, data, category, search) {
   }
 
   if (filtered.length === 0) {
-    tbody.innerHTML = "";
+    litRender(html``, tbody);
     if (emptyEl) emptyEl.style.display = "";
     return;
   }

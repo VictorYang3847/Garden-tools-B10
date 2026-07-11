@@ -11,4 +11,7 @@ export default defineConfig({
     port: 5173,
     open: true,
   },
+  optimizeDeps: {
+    include: ['lit-html'],
+  },
 });

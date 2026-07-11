@@ -27,6 +27,9 @@ import { initRouter, navigateTo, routes, refreshCurrentRoute } from "./router.js
 import { initAuthUI, onAuthChange, handleLogout, getCurrentUser } from "./auth.js";
 import { initSyncUI } from "./sync-ui.js";
 import { hasCloudApi } from "./api.js";
+import { localRepository } from "./repository/local-repository.js";
+import { GrowthService } from "./services/growth-service.js";
+import { eventBus, Events } from "./eventbus.js";
 
 const projectSelect = document.getElementById("project-select");
 const productSelect = document.getElementById("product-select");
@@ -119,6 +122,14 @@ async function initApp() {
         refreshAllSelectors();
       }
     },
+    services: {
+      growth: new GrowthService(localRepository),
+    },
+  });
+
+  // Service 层保存数据后刷新选择器
+  eventBus.on(Events.MODEL_SAVED, () => {
+    refreshAllSelectors();
   });
 
   navItems.forEach((item) => {

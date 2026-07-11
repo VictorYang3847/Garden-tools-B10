@@ -1,4 +1,7 @@
-﻿let onSaveCallback = null;
+import { html, render as litRender } from 'lit-html';
+import { live } from 'lit-html/directives/live.js';
+
+let onSaveCallback = null;
 let currentModel = null;
 let deratingData = null;
 
@@ -174,7 +177,7 @@ function levelLabel(level) {
 }
 
 function statusDot(status) {
-  return `<span class="status-dot status-${status}"></span>`;
+  return html`<span class="status-dot status-${status}"></span>`;
 }
 
 function statusLabel(status) {
@@ -197,47 +200,47 @@ function renderRow(comp, index) {
   const level2Limit = standard[worstRatio === comp.tempDeratingRatio && showTemp ? "temp" : showVoltage && worstRatio === comp.voltageDeratingRatio ? "voltage" : showCurrent && worstRatio === comp.currentDeratingRatio ? "current" : "power"]?.level2 ?? 0.8;
   const level3Limit = standard[worstRatio === comp.tempDeratingRatio && showTemp ? "temp" : showVoltage && worstRatio === comp.voltageDeratingRatio ? "voltage" : showCurrent && worstRatio === comp.currentDeratingRatio ? "current" : "power"]?.level3 ?? 0.9;
 
-  return `
+  return html`
     <tr data-id="${comp.id}">
       <td class="derating-index">${index + 1}</td>
-      <td><input type="text" class="item-input" data-field="name" value="${escapeHtml(comp.name)}" placeholder="元器件名称" /></td>
+      <td><input type="text" class="item-input" data-field="name" .value=${live(comp.name)} placeholder="元器件名称" @input=${_onFieldChange} /></td>
       <td>
-        <select class="item-input derating-type-select" data-field="type">
-          ${COMPONENT_TYPES.map((t) => `<option value="${t.value}" ${comp.type === t.value ? "selected" : ""}>${t.label}</option>`).join("")}
+        <select class="item-input derating-type-select" data-field="type" .value=${live(comp.type)} @change=${_onFieldChange}>
+          ${COMPONENT_TYPES.map((t) => html`<option value="${t.value}">${t.label}</option>`)}
         </select>
       </td>
       <td class="col-temp" style="${showTemp ? "" : "display: none;"}">
-        <input type="number" class="item-input derating-num-input" data-field="ratedTemp" value="${comp.ratedTemp}" min="0" step="1" />
+        <input type="number" class="item-input derating-num-input" data-field="ratedTemp" .value=${live(String(comp.ratedTemp))} min="0" step="1" @input=${_onFieldChange} />
       </td>
       <td class="col-temp" style="${showTemp ? "" : "display: none;"}">
-        <input type="number" class="item-input derating-num-input" data-field="operatingTemp" value="${comp.operatingTemp}" min="0" step="1" />
+        <input type="number" class="item-input derating-num-input" data-field="operatingTemp" .value=${live(String(comp.operatingTemp))} min="0" step="1" @input=${_onFieldChange} />
       </td>
       <td class="col-temp derating-ratio-cell" style="${showTemp ? "" : "display: none;"}">
         <span class="ratio-text level-${comp.tempLevel}">${formatRatio(comp.tempDeratingRatio)}</span>
       </td>
       <td class="col-voltage" style="${showVoltage ? "" : "display: none;"}">
-        <input type="number" class="item-input derating-num-input" data-field="ratedVoltage" value="${comp.ratedVoltage}" min="0" step="0.1" />
+        <input type="number" class="item-input derating-num-input" data-field="ratedVoltage" .value=${live(String(comp.ratedVoltage))} min="0" step="0.1" @input=${_onFieldChange} />
       </td>
       <td class="col-voltage" style="${showVoltage ? "" : "display: none;"}">
-        <input type="number" class="item-input derating-num-input" data-field="operatingVoltage" value="${comp.operatingVoltage}" min="0" step="0.1" />
+        <input type="number" class="item-input derating-num-input" data-field="operatingVoltage" .value=${live(String(comp.operatingVoltage))} min="0" step="0.1" @input=${_onFieldChange} />
       </td>
       <td class="col-voltage derating-ratio-cell" style="${showVoltage ? "" : "display: none;"}">
         <span class="ratio-text level-${comp.voltageLevel}">${formatRatio(comp.voltageDeratingRatio)}</span>
       </td>
       <td class="col-current" style="${showCurrent ? "" : "display: none;"}">
-        <input type="number" class="item-input derating-num-input" data-field="ratedCurrent" value="${comp.ratedCurrent}" min="0" step="0.01" />
+        <input type="number" class="item-input derating-num-input" data-field="ratedCurrent" .value=${live(String(comp.ratedCurrent))} min="0" step="0.01" @input=${_onFieldChange} />
       </td>
       <td class="col-current" style="${showCurrent ? "" : "display: none;"}">
-        <input type="number" class="item-input derating-num-input" data-field="operatingCurrent" value="${comp.operatingCurrent}" min="0" step="0.01" />
+        <input type="number" class="item-input derating-num-input" data-field="operatingCurrent" .value=${live(String(comp.operatingCurrent))} min="0" step="0.01" @input=${_onFieldChange} />
       </td>
       <td class="col-current derating-ratio-cell" style="${showCurrent ? "" : "display: none;"}">
         <span class="ratio-text level-${comp.currentLevel}">${formatRatio(comp.currentDeratingRatio)}</span>
       </td>
       <td class="col-power" style="${showPower ? "" : "display: none;"}">
-        <input type="number" class="item-input derating-num-input" data-field="ratedPower" value="${comp.ratedPower}" min="0" step="0.01" />
+        <input type="number" class="item-input derating-num-input" data-field="ratedPower" .value=${live(String(comp.ratedPower))} min="0" step="0.01" @input=${_onFieldChange} />
       </td>
       <td class="col-power" style="${showPower ? "" : "display: none;"}">
-        <input type="number" class="item-input derating-num-input" data-field="operatingPower" value="${comp.operatingPower}" min="0" step="0.01" />
+        <input type="number" class="item-input derating-num-input" data-field="operatingPower" .value=${live(String(comp.operatingPower))} min="0" step="0.01" @input=${_onFieldChange} />
       </td>
       <td class="col-power derating-ratio-cell" style="${showPower ? "" : "display: none;"}">
         <span class="ratio-text level-${comp.powerLevel}">${formatRatio(comp.powerDeratingRatio)}</span>
@@ -253,10 +256,97 @@ function renderRow(comp, index) {
         <span>${statusLabel(comp.overallStatus)}</span>
       </td>
       <td class="derating-action-cell">
-        <button type="button" class="derating-delete-btn" data-action="delete" title="删除">🗑️</button>
+        <button type="button" class="derating-delete-btn" data-action="delete" title="删除" @click=${_onDeleteClick}>🗑️</button>
       </td>
     </tr>
   `;
+}
+
+// current render context for event handlers
+let _container = null;
+
+function _onFieldChange(e) {
+  const input = e.target;
+  if (!input.matches("[data-field]")) return;
+  const tr = input.closest("tr");
+  if (!tr) return;
+  const id = tr.dataset.id;
+  const field = input.dataset.field;
+  const comp = deratingData.components.find((c) => c.id === id);
+  if (!comp) return;
+
+  if (input.type === "number") {
+    comp[field] = Number(input.value) || 0;
+  } else {
+    comp[field] = input.value;
+  }
+
+  if (field === "type") {
+    updateComponentCalculations(comp);
+    saveData();
+    renderTable(_container);
+    renderStats(_container);
+    renderMarginAnalysis(_container);
+    return;
+  }
+
+  updateComponentCalculations(comp);
+  saveData();
+
+  const ratioCell = tr.querySelector(`.col-${field.replace(/^rated|^operating/, "").toLowerCase()}.derating-ratio-cell .ratio-text`);
+  const statusCell = tr.querySelector(".derating-status-cell");
+  const levelCell = tr.querySelector(".derating-level-cell .level-badge");
+
+  if (field.startsWith("ratedTemp") || field.startsWith("operatingTemp")) {
+    const tempRatioCell = tr.querySelector(".col-temp.derating-ratio-cell .ratio-text");
+    if (tempRatioCell) {
+      tempRatioCell.textContent = formatRatio(comp.tempDeratingRatio);
+      tempRatioCell.className = `ratio-text level-${comp.tempLevel}`;
+    }
+  }
+  if (field.startsWith("ratedVoltage") || field.startsWith("operatingVoltage")) {
+    const voltRatioCell = tr.querySelector(".col-voltage.derating-ratio-cell .ratio-text");
+    if (voltRatioCell) {
+      voltRatioCell.textContent = formatRatio(comp.voltageDeratingRatio);
+      voltRatioCell.className = `ratio-text level-${comp.voltageLevel}`;
+    }
+  }
+  if (field.startsWith("ratedCurrent") || field.startsWith("operatingCurrent")) {
+    const currRatioCell = tr.querySelector(".col-current.derating-ratio-cell .ratio-text");
+    if (currRatioCell) {
+      currRatioCell.textContent = formatRatio(comp.currentDeratingRatio);
+      currRatioCell.className = `ratio-text level-${comp.currentLevel}`;
+    }
+  }
+  if (field.startsWith("ratedPower") || field.startsWith("operatingPower")) {
+    const powRatioCell = tr.querySelector(".col-power.derating-ratio-cell .ratio-text");
+    if (powRatioCell) {
+      powRatioCell.textContent = formatRatio(comp.powerDeratingRatio);
+      powRatioCell.className = `ratio-text level-${comp.powerLevel}`;
+    }
+  }
+
+  if (statusCell) {
+    statusCell.innerHTML = `<span class="status-dot status-${comp.overallStatus}"></span><span>${statusLabel(comp.overallStatus)}</span>`;
+  }
+
+  renderStats(_container);
+  renderMarginAnalysis(_container);
+}
+
+function _onDeleteClick(e) {
+  const btn = e.target.closest("[data-action='delete']");
+  if (!btn) return;
+  const tr = btn.closest("tr");
+  if (!tr) return;
+  const id = tr.dataset.id;
+  if (!id) return;
+  if (!confirm("确定要删除这个元器件吗？")) return;
+  deratingData.components = deratingData.components.filter((c) => c.id !== id);
+  saveData();
+  renderTable(_container);
+  renderStats(_container);
+  renderMarginAnalysis(_container);
 }
 
 function renderTable(container) {
@@ -268,13 +358,13 @@ function renderTable(container) {
   countEl.textContent = items.length;
 
   if (!items || items.length === 0) {
-    tbody.innerHTML = "";
+    litRender(html``, tbody);
     emptyState.style.display = "block";
     return;
   }
 
   emptyState.style.display = "none";
-  tbody.innerHTML = items.map((item, index) => renderRow(item, index)).join("");
+  litRender(html`${items.map((item, index) => renderRow(item, index))}`, tbody);
 }
 
 function updateTableHeaderVisibility(container) {
@@ -489,96 +579,6 @@ function saveData() {
   }
 }
 
-function handleInputChange(container, e) {
-  const input = e.target;
-  if (!input.matches("[data-field]")) return;
-
-  const tr = input.closest("tr");
-  if (!tr) return;
-
-  const id = tr.dataset.id;
-  const field = input.dataset.field;
-  const comp = deratingData.components.find((c) => c.id === id);
-  if (!comp) return;
-
-  if (input.type === "number") {
-    comp[field] = Number(input.value) || 0;
-  } else {
-    comp[field] = input.value;
-  }
-
-  if (field === "type") {
-    updateComponentCalculations(comp);
-    saveData();
-    renderTable(container);
-    renderStats(container);
-    renderMarginAnalysis(container);
-    return;
-  }
-
-  updateComponentCalculations(comp);
-  saveData();
-
-  const ratioCell = tr.querySelector(`.col-${field.replace(/^rated|^operating/, "").toLowerCase()}.derating-ratio-cell .ratio-text`);
-  const statusCell = tr.querySelector(".derating-status-cell");
-  const levelCell = tr.querySelector(".derating-level-cell .level-badge");
-
-  if (field.startsWith("ratedTemp") || field.startsWith("operatingTemp")) {
-    const tempRatioCell = tr.querySelector(".col-temp.derating-ratio-cell .ratio-text");
-    if (tempRatioCell) {
-      tempRatioCell.textContent = formatRatio(comp.tempDeratingRatio);
-      tempRatioCell.className = `ratio-text level-${comp.tempLevel}`;
-    }
-  }
-  if (field.startsWith("ratedVoltage") || field.startsWith("operatingVoltage")) {
-    const voltRatioCell = tr.querySelector(".col-voltage.derating-ratio-cell .ratio-text");
-    if (voltRatioCell) {
-      voltRatioCell.textContent = formatRatio(comp.voltageDeratingRatio);
-      voltRatioCell.className = `ratio-text level-${comp.voltageLevel}`;
-    }
-  }
-  if (field.startsWith("ratedCurrent") || field.startsWith("operatingCurrent")) {
-    const currRatioCell = tr.querySelector(".col-current.derating-ratio-cell .ratio-text");
-    if (currRatioCell) {
-      currRatioCell.textContent = formatRatio(comp.currentDeratingRatio);
-      currRatioCell.className = `ratio-text level-${comp.currentLevel}`;
-    }
-  }
-  if (field.startsWith("ratedPower") || field.startsWith("operatingPower")) {
-    const powRatioCell = tr.querySelector(".col-power.derating-ratio-cell .ratio-text");
-    if (powRatioCell) {
-      powRatioCell.textContent = formatRatio(comp.powerDeratingRatio);
-      powRatioCell.className = `ratio-text level-${comp.powerLevel}`;
-    }
-  }
-
-  if (statusCell) {
-    statusCell.innerHTML = `${statusDot(comp.overallStatus)}<span>${statusLabel(comp.overallStatus)}</span>`;
-  }
-
-  renderStats(container);
-  renderMarginAnalysis(container);
-}
-
-function handleDeleteClick(container, e) {
-  const btn = e.target.closest("[data-action='delete']");
-  if (!btn) return;
-
-  const tr = btn.closest("tr");
-  if (!tr) return;
-
-  const id = tr.dataset.id;
-  if (!id) return;
-
-  if (!confirm("确定要删除这个元器件吗？")) return;
-
-  deratingData.components = deratingData.components.filter((c) => c.id !== id);
-  saveData();
-  renderTable(container);
-  renderStats(container);
-  renderMarginAnalysis(container);
-}
-
 function handleAddComponent(container) {
   const newComp = createNewComponent();
   updateComponentCalculations(newComp);
@@ -701,11 +701,6 @@ function exportCsv() {
 }
 
 function bindEvents(container) {
-  const tbody = container.querySelector("#derating-table-body");
-  tbody.addEventListener("input", (e) => handleInputChange(container, e));
-  tbody.addEventListener("click", (e) => handleDeleteClick(container, e));
-  tbody.addEventListener("change", (e) => handleInputChange(container, e));
-
   const addBtn = container.querySelector("#derating-add-component");
   addBtn.addEventListener("click", () => handleAddComponent(container));
 
@@ -726,16 +721,7 @@ export function init(model, onSave) {
 
 export function render(container, model) {
   currentModel = model;
-
-  const template = document.getElementById("derating-template");
-  if (!template) {
-    container.innerHTML = '<div class="error-state"><h3>加载失败</h3><p>降额裕度模板未找到</p></div>';
-    return;
-  }
-
-  const clone = template.content.cloneNode(true);
-  container.innerHTML = "";
-  container.appendChild(clone);
+  _container = container;
 
   deratingData = model?.modules?.derating || { components: [], standard: "mil-hdbk-217" };
   if (!deratingData.components) deratingData.components = [];
@@ -745,13 +731,167 @@ export function render(container, model) {
     updateComponentCalculations(comp);
   }
 
-  const standardSelect = container.querySelector("#derating-standard-select");
-  if (standardSelect) {
-    standardSelect.value = deratingData.standard;
-  }
+  const stats = calculateStats();
+
+  const tpl = html`
+    <div class="module-page derating-page">
+      <div class="module-header">
+        <h2>降额裕度</h2>
+        <p>元器件降额设计分析与裕度评估</p>
+      </div>
+      <div class="module-content">
+        <div class="derating-toolbar">
+          <div class="derating-toolbar-left">
+            <label class="selector-group">
+              <span class="selector-label">降额标准</span>
+              <select id="derating-standard-select" class="header-select" .value=${live(deratingData.standard)} @change=${(e) => handleStandardChange(container, e)}>
+                <option value="mil-hdbk-217">Mil-Hdbk-217</option>
+                <option value="gjb-z35">GJB/Z 35</option>
+                <option value="custom">自定义</option>
+              </select>
+            </label>
+          </div>
+          <div class="derating-toolbar-right">
+            <button type="button" class="btn-icon btn-primary" id="derating-add-component" @click=${() => handleAddComponent(container)}>
+              <span>➕</span>
+              <span class="btn-text">添加元器件</span>
+            </button>
+            <button type="button" class="btn-icon" id="derating-export-report" @click=${exportCsv}>
+              <span>📄</span>
+              <span class="btn-text">生成报告</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="derating-table-card card">
+          <div class="card-header">
+            <h3>降额检查清单</h3>
+            <div class="card-actions">
+              <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">共 <span id="derating-component-count">${deratingData.components.length}</span> 个元器件</span>
+            </div>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <div class="derating-table-container table-wrap">
+              <table class="data-table derating-table">
+                <thead>
+                  <tr>
+                    <th style="width: 50px;">序号</th>
+                    <th style="min-width: 150px;">元器件名称</th>
+                    <th style="width: 100px;">类型</th>
+                    <th class="col-temp" style="width: 130px;">额定温度 (°C)</th>
+                    <th class="col-temp" style="width: 130px;">工作温度 (°C)</th>
+                    <th class="col-temp" style="width: 110px;">温度降额比</th>
+                    <th class="col-voltage" style="width: 120px;">额定电压 (V)</th>
+                    <th class="col-voltage" style="width: 120px;">工作电压 (V)</th>
+                    <th class="col-voltage" style="width: 110px;">电压降额比</th>
+                    <th class="col-current" style="width: 120px;">额定电流 (A)</th>
+                    <th class="col-current" style="width: 120px;">工作电流 (A)</th>
+                    <th class="col-current" style="width: 110px;">电流降额比</th>
+                    <th class="col-power" style="width: 120px;">额定功率 (W)</th>
+                    <th class="col-power" style="width: 120px;">工作功率 (W)</th>
+                    <th class="col-power" style="width: 110px;">功率降额比</th>
+                    <th style="width: 90px;">Ⅰ级上限</th>
+                    <th style="width: 90px;">Ⅱ级上限</th>
+                    <th style="width: 90px;">Ⅲ级上限</th>
+                    <th style="width: 90px;">降额等级</th>
+                    <th style="width: 90px;">状态</th>
+                    <th style="width: 70px;">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="derating-table-body">
+                </tbody>
+              </table>
+              <div class="derating-empty-state empty-state" id="derating-empty-state" style="${deratingData.components.length === 0 ? '' : 'display: none;'}">
+                <div class="empty-icon">📋</div>
+                <h3>暂无元器件数据</h3>
+                <p>点击「添加元器件」按钮开始创建您的第一个元器件条目。</p>
+                <button type="button" class="btn-primary" id="derating-empty-add-btn" @click=${() => handleAddComponent(container)}>添加第一个元器件</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="derating-bottom-grid">
+          <div class="card derating-stats-card">
+            <div class="card-header">
+              <h3>降额统计</h3>
+            </div>
+            <div class="card-body">
+              <div class="metrics-grid derating-stats-metrics">
+                <div class="metric-card derating-stat-pass">
+                  <div class="metric-label">合格</div>
+                  <div class="metric-value" id="derating-pass-count">${stats.pass}</div>
+                </div>
+                <div class="metric-card derating-stat-warning">
+                  <div class="metric-label">警告</div>
+                  <div class="metric-value" id="derating-warning-count">${stats.warning}</div>
+                </div>
+                <div class="metric-card derating-stat-fail">
+                  <div class="metric-label">不合格</div>
+                  <div class="metric-value" id="derating-fail-count">${stats.fail}</div>
+                </div>
+              </div>
+              <div class="derating-pie-container">
+                <canvas id="derating-pie-canvas" width="300" height="300"></canvas>
+              </div>
+              <div class="derating-legend">
+                <div class="legend-item">
+                  <span class="legend-dot" style="background: var(--success);"></span>
+                  <span>合格 (Ⅰ/Ⅱ级)</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot" style="background: var(--warning);"></span>
+                  <span>警告 (Ⅲ级)</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot" style="background: var(--danger);"></span>
+                  <span>不合格</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card derating-margin-card">
+            <div class="card-header">
+              <h3>裕度分析</h3>
+            </div>
+            <div class="card-body">
+              <div class="margin-section">
+                <h4 class="margin-section-title">热裕度</h4>
+                <div class="margin-bars" id="derating-thermal-margin">
+                  <div class="margin-empty-hint">暂无数据</div>
+                </div>
+              </div>
+              <div class="margin-section">
+                <h4 class="margin-section-title">电气裕度</h4>
+                <div class="margin-bars" id="derating-electrical-margin">
+                  <div class="margin-empty-hint">暂无数据</div>
+                </div>
+              </div>
+              <div class="margin-summary">
+                <div class="margin-summary-item">
+                  <span class="summary-label">平均热裕度</span>
+                  <span class="summary-value" id="derating-avg-thermal-margin">—</span>
+                </div>
+                <div class="margin-summary-item">
+                  <span class="summary-label">平均电气裕度</span>
+                  <span class="summary-value" id="derating-avg-electrical-margin">—</span>
+                </div>
+                <div class="margin-summary-item">
+                  <span class="summary-label">最低裕度器件</span>
+                  <span class="summary-value" id="derating-min-margin-component">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  litRender(tpl, container);
 
   renderTable(container);
   renderStats(container);
   renderMarginAnalysis(container);
-  bindEvents(container);
 }

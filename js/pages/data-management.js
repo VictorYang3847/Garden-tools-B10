@@ -1,3 +1,4 @@
+import { html, render as litRender } from 'lit-html';
 import {
   getCurrentProject,
   setCurrentProject,
@@ -36,17 +37,250 @@ export function init(m, save) {
 
 export function render(container, m) {
   model = m;
-  const template = document.getElementById("data-management-template");
-  const content = template.content.cloneNode(true);
-  container.appendChild(content);
+
+  const tpl = html`
+    <div class="module-page data-management-page">
+      <div class="module-header">
+        <h2>数据管理</h2>
+        <p>产品型号管理、数据导入导出、报告生成与版本控制</p>
+      </div>
+      <div class="module-content">
+        <div class="dm-tabs">
+          <button type="button" class="dm-tab active" data-tab="projects" @click=${() => switchTab('projects')}>项目管理</button>
+          <button type="button" class="dm-tab" data-tab="import-export" @click=${() => switchTab('import-export')}>数据导入导出</button>
+          <button type="button" class="dm-tab" data-tab="reports" @click=${() => switchTab('reports')}>报告生成</button>
+          <button type="button" class="dm-tab" data-tab="versions" @click=${() => switchTab('versions')}>版本管理</button>
+        </div>
+
+        <div class="dm-tab-content" id="dm-tab-projects">
+          <div class="dm-projects-header">
+            <button type="button" class="btn-primary" id="dm-new-project" @click=${createNewProject}>
+              <span>➕</span> 新建项目
+            </button>
+          </div>
+          <div class="dm-projects-grid" id="dm-projects-grid"></div>
+          <div class="dm-project-tree-card card" style="margin-top: 1.5rem;">
+            <div class="card-header">
+              <h3>项目结构</h3>
+            </div>
+            <div class="card-body">
+              <div class="dm-tree" id="dm-project-tree"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dm-tab-content" id="dm-tab-import-export" style="display: none;">
+          <div class="dm-ie-grid">
+            <div class="card dm-export-card">
+              <div class="card-header">
+                <h3>数据导出</h3>
+              </div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label>导出格式</label>
+                  <select id="dm-export-format" class="form-input">
+                    <option value="json">JSON（完整数据）</option>
+                    <option value="csv-fmea">CSV（FMEA 表格）</option>
+                    <option value="csv-life">CSV（寿命数据）</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>导出范围</label>
+                  <select id="dm-export-scope" class="form-input">
+                    <option value="model">当前型号</option>
+                    <option value="product">当前产品</option>
+                    <option value="project">整个项目</option>
+                  </select>
+                </div>
+                <button type="button" class="btn-primary" id="dm-export-btn" style="width: 100%;" @click=${handleExport}>
+                  <span>📤</span> 导出数据
+                </button>
+              </div>
+            </div>
+
+            <div class="card dm-import-card">
+              <div class="card-header">
+                <h3>数据导入</h3>
+              </div>
+              <div class="card-body">
+                <div class="dm-drop-zone" id="dm-drop-zone">
+                  <div class="dm-drop-icon">📥</div>
+                  <div class="dm-drop-text">拖拽文件到此处，或点击选择文件</div>
+                  <div class="dm-drop-hint">支持 .json 格式</div>
+                  <input type="file" id="dm-import-file" accept=".json" hidden />
+                </div>
+                <div class="dm-import-preview" id="dm-import-preview" style="display: none;">
+                  <h4>导入预览</h4>
+                  <div class="dm-preview-stats">
+                    <div class="dm-preview-stat">
+                      <span class="dm-preview-label">产品数</span>
+                      <span class="dm-preview-value" id="dm-preview-products">0</span>
+                    </div>
+                    <div class="dm-preview-stat">
+                      <span class="dm-preview-label">型号数</span>
+                      <span class="dm-preview-value" id="dm-preview-models">0</span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>导入模式</label>
+                    <select id="dm-import-mode" class="form-input">
+                      <option value="merge">合并（保留现有数据）</option>
+                      <option value="overwrite">覆盖（替换现有数据）</option>
+                    </select>
+                  </div>
+                  <button type="button" class="btn-primary" id="dm-import-btn" style="width: 100%;" @click=${handleImport}>
+                    <span>📥</span> 确认导入
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dm-tab-content" id="dm-tab-reports" style="display: none;">
+          <div class="dm-reports-layout">
+            <div class="card dm-report-settings">
+              <div class="card-header">
+                <h3>报告设置</h3>
+              </div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label>报告模板</label>
+                  <select id="dm-report-template" class="form-input">
+                    <option value="fmea">FMEA 报告</option>
+                    <option value="life">寿命分析报告</option>
+                    <option value="test-plan">测试计划报告</option>
+                    <option value="comprehensive">综合可靠性报告</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>报告内容</label>
+                  <div class="dm-report-modules">
+                    <label class="dm-checkbox">
+                      <input type="checkbox" name="report-modules" value="basic" checked />
+                      <span>基本信息</span>
+                    </label>
+                    <label class="dm-checkbox">
+                      <input type="checkbox" name="report-modules" value="fmea" checked />
+                      <span>FMEA 分析</span>
+                    </label>
+                    <label class="dm-checkbox">
+                      <input type="checkbox" name="report-modules" value="life" checked />
+                      <span>寿命分析</span>
+                    </label>
+                    <label class="dm-checkbox">
+                      <input type="checkbox" name="report-modules" value="prediction" checked />
+                      <span>可靠性预测</span>
+                    </label>
+                    <label class="dm-checkbox">
+                      <input type="checkbox" name="report-modules" value="test-plan" checked />
+                      <span>测试计划</span>
+                    </label>
+                    <label class="dm-checkbox">
+                      <input type="checkbox" name="report-modules" value="derating" checked />
+                      <span>降额分析</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>报告格式</label>
+                  <select id="dm-report-format" class="form-input">
+                    <option value="html">HTML（可打印为 PDF）</option>
+                  </select>
+                </div>
+                <button type="button" class="btn-primary" id="dm-generate-report" style="width: 100%;" @click=${generateReport}>
+                  <span>📄</span> 生成报告
+                </button>
+              </div>
+            </div>
+
+            <div class="card dm-report-preview-card">
+              <div class="card-header">
+                <h3>报告预览</h3>
+                <div class="card-actions">
+                  <button type="button" class="btn-icon" id="dm-print-report" style="display: none;" @click=${printReport}>
+                    <span>🖨️</span>
+                    <span class="btn-text">打印</span>
+                  </button>
+                  <button type="button" class="btn-icon" id="dm-open-report" style="display: none;" @click=${openReportInNewWindow}>
+                    <span>🗗</span>
+                    <span class="btn-text">新窗口</span>
+                  </button>
+                </div>
+              </div>
+              <div class="card-body" style="padding: 0;">
+                <div class="dm-report-preview" id="dm-report-preview">
+                  <div class="empty-state">
+                    <div class="empty-icon">📄</div>
+                    <h3>暂无报告</h3>
+                    <p>选择报告模板并点击「生成报告」按钮。</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dm-tab-content" id="dm-tab-versions" style="display: none;">
+          <div class="dm-versions-header">
+            <div class="dm-current-version">
+              <span class="dm-version-label">当前版本：</span>
+              <span class="dm-version-value" id="dm-current-version">工作副本</span>
+            </div>
+            <button type="button" class="btn-primary" id="dm-new-snapshot" @click=${createSnapshot}>
+              <span>📸</span> 创建快照
+            </button>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>版本快照</h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <div class="dm-versions-list" id="dm-versions-list">
+                <div class="empty-state">
+                  <div class="empty-icon">📸</div>
+                  <h3>暂无版本快照</h3>
+                  <p>点击「创建快照」按钮保存当前版本。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="dm-version-compare" id="dm-version-compare" style="display: none; margin-top: 1.5rem;">
+            <div class="card">
+              <div class="card-header">
+                <h3>版本对比</h3>
+                <div class="card-actions">
+                  <button type="button" class="btn-ghost" id="dm-close-compare" @click=${() => { document.getElementById("dm-version-compare").style.display = "none"; }}>关闭对比</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="dm-compare-selectors">
+                  <div class="form-group">
+                    <label>版本 A</label>
+                    <select id="dm-compare-a" class="form-input"></select>
+                  </div>
+                  <div class="dm-compare-arrow">VS</div>
+                  <div class="form-group">
+                    <label>版本 B</label>
+                    <select id="dm-compare-b" class="form-input"></select>
+                  </div>
+                </div>
+                <div class="dm-compare-results" id="dm-compare-results"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  litRender(tpl, container);
 
   bindTabs();
   renderProjects();
   renderProjectTree();
   renderVersions();
   bindImportExport();
-  bindReportGeneration();
-  bindVersionManagement();
 }
 
 function bindTabs() {
@@ -209,8 +443,6 @@ function renderProjects() {
       });
     });
   });
-
-  document.getElementById("dm-new-project").addEventListener("click", createNewProject);
 }
 
 function renderProjectTree() {
@@ -220,10 +452,10 @@ function renderProjectTree() {
   const currentProduct = getCurrentProduct();
   const currentModel = getCurrentModel();
 
-  let html = "";
+  let htmlContent = "";
   for (const proj of projects) {
     const isProjectActive = currentProject?.id === proj.id;
-    html += `
+    htmlContent += `
       <div class="dm-tree-item dm-tree-project ${isProjectActive ? "active" : ""}" data-type="project" data-id="${proj.id}" style="padding-left: 0;">
         <span class="dm-tree-toggle">▾</span>
         <span class="dm-tree-icon">📁</span>
@@ -233,7 +465,7 @@ function renderProjectTree() {
     `;
     for (const product of proj.products || []) {
       const isProductActive = currentProduct?.id === product.id;
-      html += `
+      htmlContent += `
         <div class="dm-tree-item dm-tree-product ${isProductActive ? "active" : ""}" data-type="product" data-id="${product.id}" style="padding-left: 1rem;">
           <span class="dm-tree-toggle">▾</span>
           <span class="dm-tree-icon">📦</span>
@@ -243,7 +475,7 @@ function renderProjectTree() {
       `;
       for (const mdl of product.models || []) {
         const isModelActive = currentModel?.id === mdl.id;
-        html += `
+        htmlContent += `
           <div class="dm-tree-item dm-tree-model ${isModelActive ? "active" : ""}" data-type="model" data-id="${mdl.id}" style="padding-left: 2rem;">
             <span class="dm-tree-toggle" style="visibility: hidden;">▸</span>
             <span class="dm-tree-icon">🔧</span>
@@ -251,12 +483,12 @@ function renderProjectTree() {
           </div>
         `;
       }
-      html += `</div>`;
+      htmlContent += `</div>`;
     }
-    html += `</div>`;
+    htmlContent += `</div>`;
   }
 
-  tree.innerHTML = html;
+  tree.innerHTML = htmlContent;
 
   tree.querySelectorAll(".dm-tree-item").forEach((item) => {
     item.addEventListener("click", (e) => {
@@ -466,8 +698,6 @@ function deleteModelConfirm(modelId, productId) {
 function bindImportExport() {
   const dropZone = document.getElementById("dm-drop-zone");
   const fileInput = document.getElementById("dm-import-file");
-  const exportBtn = document.getElementById("dm-export-btn");
-  const importBtn = document.getElementById("dm-import-btn");
 
   dropZone.addEventListener("click", () => fileInput.click());
 
@@ -491,9 +721,6 @@ function bindImportExport() {
     const file = e.target.files?.[0];
     if (file) handleImportFile(file);
   });
-
-  exportBtn.addEventListener("click", handleExport);
-  importBtn.addEventListener("click", handleImport);
 }
 
 function handleImportFile(file) {
@@ -765,12 +992,6 @@ function mergeImportData(data) {
   saveToStorage();
 }
 
-function bindReportGeneration() {
-  document.getElementById("dm-generate-report").addEventListener("click", generateReport);
-  document.getElementById("dm-print-report").addEventListener("click", printReport);
-  document.getElementById("dm-open-report").addEventListener("click", openReportInNewWindow);
-}
-
 function generateReport() {
   const template = document.getElementById("dm-report-template").value;
   const modules = Array.from(
@@ -789,7 +1010,7 @@ function buildReportHtml(template, modules) {
   const currentModel = getCurrentModel();
   const currentProduct = getCurrentProduct();
 
-  let html = `
+  let htmlContent = `
     <div class="report-page">
       <div class="report-header">
         <h1>${getReportTitle(template)}</h1>
@@ -802,32 +1023,32 @@ function buildReportHtml(template, modules) {
   `;
 
   if (modules.includes("basic")) {
-    html += buildBasicInfoSection(currentModel);
+    htmlContent += buildBasicInfoSection(currentModel);
   }
   if (modules.includes("fmea") && (template === "fmea" || template === "comprehensive")) {
-    html += buildFmeaSection(currentModel);
+    htmlContent += buildFmeaSection(currentModel);
   }
   if (modules.includes("life") && (template === "life" || template === "comprehensive")) {
-    html += buildLifeSection(currentModel);
+    htmlContent += buildLifeSection(currentModel);
   }
   if (modules.includes("prediction") && template === "comprehensive") {
-    html += buildPredictionSection(currentModel);
+    htmlContent += buildPredictionSection(currentModel);
   }
   if (modules.includes("test-plan") && (template === "test-plan" || template === "comprehensive")) {
-    html += buildTestPlanSection(currentModel);
+    htmlContent += buildTestPlanSection(currentModel);
   }
   if (modules.includes("derating") && template === "comprehensive") {
-    html += buildDeratingSection(currentModel);
+    htmlContent += buildDeratingSection(currentModel);
   }
 
-  html += `
+  htmlContent += `
       <div class="report-footer">
         <p>本报告由可靠性工具平台自动生成</p>
       </div>
     </div>
   `;
 
-  return html;
+  return htmlContent;
 }
 
 function getReportTitle(template) {
@@ -1179,13 +1400,6 @@ function openReportInNewWindow() {
     </html>
   `);
   win.document.close();
-}
-
-function bindVersionManagement() {
-  document.getElementById("dm-new-snapshot").addEventListener("click", createSnapshot);
-  document.getElementById("dm-close-compare").addEventListener("click", () => {
-    document.getElementById("dm-version-compare").style.display = "none";
-  });
 }
 
 function renderVersions() {

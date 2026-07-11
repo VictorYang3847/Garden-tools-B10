@@ -1,3 +1,5 @@
+import { html, render as litRender } from 'lit-html';
+import { live } from 'lit-html/directives/live.js';
 import { getCustomComponentLibrary, setCustomComponentLibrary, getHomeB10, getCurrentProduct, getProductShared } from "../store.js";
 import { gammaApprox, K10 } from "../calculator.js";
 
@@ -215,29 +217,29 @@ function calcMtbfHours() {
   return 1 / sysLambdaPerHour;
 }
 
-function renderComponentRow(item, index) {
-  const typeOptions = Object.entries(COMPONENT_TYPE_LABELS)
-    .map(([val, label]) => `<option value="${val}" ${item.type === val ? "selected" : ""}>${label}</option>`)
-    .join("");
+function renderComponentRow(item, index, container) {
+  const typeOptions = Object.entries(COMPONENT_TYPE_LABELS).map(([val, label]) => 
+    html`<option value="${val}" ?selected=${item.type === val}>${label}</option>`
+  );
 
-  return `
+  return html`
     <tr data-id="${item.id}">
       <td class="pred-index">${index + 1}</td>
-      <td><input type="text" class="item-input" data-field="name" value="${escapeHtml(item.name)}" placeholder="元器件名称" /></td>
+      <td><input type="text" class="item-input" data-field="name" .value=${live(item.name)} placeholder="元器件名称" @input=${(e) => handleInputChange(container, e)} /></td>
       <td>
-        <select class="item-input pred-type-select" data-field="type">
+        <select class="item-input pred-type-select" data-field="type" @change=${(e) => handleInputChange(container, e)}>
           ${typeOptions}
         </select>
       </td>
-      <td><input type="number" class="item-input pred-num-input" data-field="quantity" value="${item.quantity}" min="1" step="1" /></td>
-      <td><input type="number" class="item-input pred-num-input" data-field="lambdaBase" value="${item.lambdaBase}" min="0" step="0.01" /></td>
-      <td><input type="number" class="item-input pred-num-input" data-field="temperature" value="${item.temperature}" step="1" /></td>
+      <td><input type="number" class="item-input pred-num-input" data-field="quantity" .value=${live(String(item.quantity))} min="1" step="1" @input=${(e) => handleInputChange(container, e)} /></td>
+      <td><input type="number" class="item-input pred-num-input" data-field="lambdaBase" .value=${live(String(item.lambdaBase))} min="0" step="0.01" @input=${(e) => handleInputChange(container, e)} /></td>
+      <td><input type="number" class="item-input pred-num-input" data-field="temperature" .value=${live(String(item.temperature))} step="1" @input=${(e) => handleInputChange(container, e)} /></td>
       <td class="pred-factor-cell">${item.piT?.toFixed(3) || "-"}</td>
-      <td><input type="number" class="item-input pred-num-input" data-field="piS" value="${item.piS}" min="0" step="0.1" /></td>
-      <td><input type="number" class="item-input pred-num-input" data-field="piQ" value="${item.piQ}" min="0" step="0.1" /></td>
+      <td><input type="number" class="item-input pred-num-input" data-field="piS" .value=${live(String(item.piS))} min="0" step="0.1" @input=${(e) => handleInputChange(container, e)} /></td>
+      <td><input type="number" class="item-input pred-num-input" data-field="piQ" .value=${live(String(item.piQ))} min="0" step="0.1" @input=${(e) => handleInputChange(container, e)} /></td>
       <td class="pred-lambda-cell">${item.lambdaOp?.toFixed(4) || "-"}</td>
       <td class="pred-action-cell">
-        <button type="button" class="pred-delete-btn" data-action="delete" title="删除">🗑️</button>
+        <button type="button" class="pred-delete-btn" @click=${(e) => handleDeleteClick(container, e, item.id)} title="删除">🗑️</button>
       </td>
     </tr>
   `;
@@ -249,7 +251,7 @@ function renderTable(container) {
   const countSpan = container.querySelector("#pred-component-count");
 
   if (!predictionData.components || predictionData.components.length === 0) {
-    tbody.innerHTML = "";
+    litRender(html``, tbody);
     emptyState.style.display = "block";
     countSpan.textContent = "0";
     return;
@@ -257,9 +259,11 @@ function renderTable(container) {
 
   emptyState.style.display = "none";
   countSpan.textContent = predictionData.components.length;
-  tbody.innerHTML = predictionData.components
-    .map((item, index) => renderComponentRow(item, index))
-    .join("");
+  
+  litRender(
+    predictionData.components.map((item, index) => renderComponentRow(item, index, container)),
+    tbody
+  );
 }
 
 function saveData() {
@@ -322,19 +326,11 @@ function handleInputChange(container, e) {
   drawSystemDiagram(container);
 }
 
-function handleDeleteClick(container, e) {
-  const btn = e.target.closest("[data-action='delete']");
-  if (!btn) return;
-
-  const tr = btn.closest("tr");
-  if (!tr) return;
-
-  const id = tr.dataset.id;
-  if (!id) return;
-
+function handleDeleteClick(container, e, componentId) {
+  e.stopPropagation();
   if (!confirm("确定要删除这个元器件吗？")) return;
 
-  predictionData.components = predictionData.components.filter((c) => c.id !== id);
+  predictionData.components = predictionData.components.filter((c) => c.id !== componentId);
   saveData();
   renderTable(container);
   updateResults(container);
@@ -1129,26 +1125,11 @@ function bindComponentLibraryEvents(container) {
 }
 
 function bindEvents(container) {
-  const tbody = container.querySelector("#pred-table-body");
-  tbody.addEventListener("input", (e) => handleInputChange(container, e));
-  tbody.addEventListener("click", (e) => handleDeleteClick(container, e));
-  tbody.addEventListener("change", (e) => handleInputChange(container, e));
-
   const addBtn = container.querySelector("#pred-add-component");
   addBtn.addEventListener("click", () => handleAddComponent(container));
 
   const emptyAddBtn = container.querySelector("#pred-empty-add-btn");
   emptyAddBtn.addEventListener("click", () => handleAddComponent(container));
-
-  const structureSelect = container.querySelector("#pred-structure-select");
-  structureSelect.addEventListener("change", (e) => handleStructureChange(container, e));
-
-  const parallelCountInput = container.querySelector("#pred-parallel-count");
-  parallelCountInput.addEventListener("change", (e) => handleParallelCountChange(container, e));
-  parallelCountInput.addEventListener("input", (e) => handleParallelCountChange(container, e));
-
-  const missionTimeInput = container.querySelector("#pred-mission-time");
-  missionTimeInput.addEventListener("input", (e) => handleMissionTimeChange(container, e));
 
   const calculateBtn = container.querySelector("#pred-calculate");
   calculateBtn.addEventListener("click", () => handleCalculate(container));
@@ -1291,7 +1272,7 @@ function renderAllocationTable(container) {
   const countSpan = container.querySelector("#alloc-subsystem-count");
 
   if (!allocationData?.subsystems || allocationData.subsystems.length === 0) {
-    tbody.innerHTML = "";
+    litRender(html``, tbody);
     emptyState.style.display = "block";
     countSpan.textContent = "0";
     return;
@@ -1299,31 +1280,33 @@ function renderAllocationTable(container) {
 
   emptyState.style.display = "none";
   countSpan.textContent = allocationData.subsystems.length;
-  tbody.innerHTML = allocationData.subsystems
-    .map((item, index) => renderAllocationRow(item, index))
-    .join("");
+  
+  litRender(
+    allocationData.subsystems.map((item, index) => renderAllocationRow(item, index, container)),
+    tbody
+  );
 }
 
-function renderAllocationRow(item, index) {
+function renderAllocationRow(item, index, container) {
   const weightPercent = item.weight ? (item.weight * 100).toFixed(2) : "0.00";
   const allocB10 = item.allocB10 ? item.allocB10.toFixed(2) : "0.00";
   const lambda = item.lambda ? item.lambda.toFixed(2) : "0.00";
   const totalScore = item.totalScore || 0;
 
-  return `
+  return html`
     <tr data-id="${item.id}">
       <td class="alloc-index">${index + 1}</td>
-      <td><input type="text" class="item-input" data-field="name" value="${escapeHtml(item.name)}" placeholder="子系统名称" /></td>
-      <td><input type="number" class="item-input alloc-num-input" data-field="complexity" value="${item.complexity || 0}" min="1" max="10" step="1" /></td>
-      <td><input type="number" class="item-input alloc-num-input" data-field="maturity" value="${item.maturity || 0}" min="1" max="10" step="1" /></td>
-      <td><input type="number" class="item-input alloc-num-input" data-field="environment" value="${item.environment || 0}" min="1" max="10" step="1" /></td>
-      <td><input type="number" class="item-input alloc-num-input" data-field="mission" value="${item.mission || 0}" min="1" max="10" step="1" /></td>
+      <td><input type="text" class="item-input" data-field="name" .value=${live(item.name)} placeholder="子系统名称" @input=${(e) => handleAllocationInputChange(container, e)} /></td>
+      <td><input type="number" class="item-input alloc-num-input" data-field="complexity" .value=${live(String(item.complexity || 0))} min="1" max="10" step="1" @input=${(e) => handleAllocationInputChange(container, e)} /></td>
+      <td><input type="number" class="item-input alloc-num-input" data-field="maturity" .value=${live(String(item.maturity || 0))} min="1" max="10" step="1" @input=${(e) => handleAllocationInputChange(container, e)} /></td>
+      <td><input type="number" class="item-input alloc-num-input" data-field="environment" .value=${live(String(item.environment || 0))} min="1" max="10" step="1" @input=${(e) => handleAllocationInputChange(container, e)} /></td>
+      <td><input type="number" class="item-input alloc-num-input" data-field="mission" .value=${live(String(item.mission || 0))} min="1" max="10" step="1" @input=${(e) => handleAllocationInputChange(container, e)} /></td>
       <td class="alloc-score-cell">${totalScore}</td>
       <td class="alloc-weight-cell">${weightPercent}%</td>
       <td class="alloc-b10-cell">${allocB10}</td>
       <td class="alloc-lambda-cell">${lambda}</td>
       <td class="alloc-action-cell">
-        <button type="button" class="alloc-delete-btn" data-action="delete" title="删除">🗑️</button>
+        <button type="button" class="alloc-delete-btn" @click=${(e) => handleAllocationDeleteClick(container, e, item.id)} title="删除">🗑️</button>
       </td>
     </tr>
   `;
@@ -1525,17 +1508,9 @@ function handleAllocationInputChange(container, e) {
   renderPredComparison(container);
 }
 
-function handleAllocationDeleteClick(container, e) {
-  const btn = e.target.closest("[data-action='delete']");
-  if (!btn) return;
-
-  const tr = btn.closest("tr");
-  if (!tr) return;
-
-  const id = tr.dataset.id;
-  if (!id) return;
-
-  deleteAllocationSubsystem(container, id);
+function handleAllocationDeleteClick(container, e, subsystemId) {
+  e.stopPropagation();
+  deleteAllocationSubsystem(container, subsystemId);
 }
 
 function handleTargetB10Change(container, e) {
@@ -1610,7 +1585,7 @@ async function ensureDeratingRendered(container) {
     deratingModule.init(currentModel, onSaveCallback);
     deratingInitialized = true;
   }
-  deratingContainer.innerHTML = "";
+  litRender(html``, deratingContainer);
   deratingModule.render(deratingContainer, currentModel);
 }
 
@@ -1654,13 +1629,6 @@ function switchPredTab(container, tabName) {
 }
 
 function bindAllocationEvents(container) {
-  const tbody = container.querySelector("#alloc-table-body");
-  if (tbody) {
-    tbody.addEventListener("input", (e) => handleAllocationInputChange(container, e));
-    tbody.addEventListener("click", (e) => handleAllocationDeleteClick(container, e));
-    tbody.addEventListener("change", (e) => handleAllocationInputChange(container, e));
-  }
-
   const addBtn = container.querySelector("#alloc-add-subsystem");
   if (addBtn) {
     addBtn.addEventListener("click", () => addAllocationSubsystem(container));
@@ -1670,33 +1638,6 @@ function bindAllocationEvents(container) {
   if (emptyAddBtn) {
     emptyAddBtn.addEventListener("click", () => addAllocationSubsystem(container));
   }
-
-  const targetB10Input = container.querySelector("#alloc-target-b10");
-  if (targetB10Input) {
-    targetB10Input.addEventListener("input", (e) => handleTargetB10Change(container, e));
-  }
-
-  const confidenceSelect = container.querySelector("#alloc-confidence");
-  if (confidenceSelect) {
-    confidenceSelect.addEventListener("change", (e) => handleConfidenceChange(container, e));
-  }
-
-  const structureSelect = container.querySelector("#alloc-system-structure");
-  if (structureSelect) {
-    structureSelect.addEventListener("change", (e) => handleAllocStructureChange(container, e));
-  }
-
-  const betaInput = container.querySelector("#alloc-beta");
-  if (betaInput) {
-    betaInput.addEventListener("input", (e) => handleBetaChange(container, e));
-  }
-
-  const tabs = container.querySelectorAll(".pred-tab");
-  tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      switchPredTab(container, tab.dataset.tab);
-    });
-  });
 
   let resizeTimeout;
   window.addEventListener("resize", () => {
@@ -1968,6 +1909,400 @@ function initAllocationUI(container) {
   renderPredComparison(container);
 }
 
+function renderTemplate(container) {
+  const typeOptions = Object.entries(COMPONENT_TYPE_LABELS).map(([val, label]) => 
+    html`<option value="${val}" ?selected=${predictionData.systemStructure === val}>${label}</option>`
+  );
+
+  litRender(html`
+    <div class="module-page prediction-page">
+      <div class="module-header">
+        <h2>可靠性预测</h2>
+        <p>基于零部件失效率的系统可靠性预计与计算（简化版 MIL-HDBK-217）</p>
+      </div>
+      <div class="module-content">
+        <div class="prediction-tabs">
+          <button type="button" class="pred-tab ${activePredTab === 'derating' ? 'active' : ''}" @click=${() => switchPredTab(container, 'derating')}>降额裕度</button>
+          <button type="button" class="pred-tab ${activePredTab === 'prediction' ? 'active' : ''}" @click=${() => switchPredTab(container, 'prediction')}>可靠性预计</button>
+          <button type="button" class="pred-tab ${activePredTab === 'allocation' ? 'active' : ''}" @click=${() => switchPredTab(container, 'allocation')}>可靠性分配</button>
+        </div>
+
+        <div id="pred-tab-derating" class="pred-tab-content" style="display: ${activePredTab === 'derating' ? 'block' : 'none'};">
+          <!-- 降额裕度模块容器，由 JS 动态渲染 -->
+        </div>
+
+        <div id="pred-tab-prediction" class="pred-tab-content" style="display: ${activePredTab === 'prediction' ? 'block' : 'none'};">
+          <div class="prediction-toolbar">
+            <div class="prediction-structure-select">
+              <label class="selector-group">
+                <span class="selector-label">系统结构</span>
+                <select id="pred-structure-select" class="header-select" @change=${(e) => handleStructureChange(container, e)}>
+                  <option value="series" ?selected=${predictionData.systemStructure === 'series'}>串联系统</option>
+                  <option value="parallel" ?selected=${predictionData.systemStructure === 'parallel'}>并联系统</option>
+                  <option value="vote23" ?selected=${predictionData.systemStructure === 'vote23'}>2/3 表决系统</option>
+                </select>
+              </label>
+              <div class="parallel-count-group" id="parallel-count-group" style="display: ${predictionData.systemStructure === 'parallel' ? 'block' : 'none'};">
+                <label class="selector-group">
+                  <span class="selector-label">并联数量</span>
+                  <input type="number" id="pred-parallel-count" class="form-input" min="2" .value=${live(String(predictionData.parallelCount))} @input=${(e) => handleParallelCountChange(container, e)} style="width: 80px;" />
+                </label>
+              </div>
+            </div>
+            <div class="prediction-toolbar-right">
+              <button type="button" class="btn-icon" id="pred-component-library">
+                <span>📚</span>
+                <span class="btn-text">元器件库</span>
+              </button>
+              <button type="button" class="btn-icon" id="pred-add-component">
+                <span>➕</span>
+                <span class="btn-text">添加元器件</span>
+              </button>
+              <button type="button" class="btn-icon btn-primary" id="pred-calculate">
+                <span>🔢</span>
+                <span class="btn-text">计算</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="pred-components-card card">
+            <div class="card-header">
+              <h3>元器件清单</h3>
+              <div class="card-actions">
+                <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">共 <span id="pred-component-count">${predictionData.components?.length || 0}</span> 种元器件</span>
+              </div>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <div class="pred-table-container table-wrap">
+                <table class="data-table pred-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px;">序号</th>
+                      <th style="min-width: 150px;">元器件名称</th>
+                      <th style="width: 120px;">类型</th>
+                      <th style="width: 80px;">数量</th>
+                      <th style="width: 120px;">基础失效率λ(FIT)<span class="help-icon" data-tooltip="基础失效率：元器件在标准条件（25°C、额定应力）下的失效率，单位FIT(10⁻⁹/h)。可从元器件手册或MIL-HDBK-217查得">?</span></th>
+                      <th style="width: 100px;">工作温度(°C)</th>
+                      <th style="width: 90px;">π_T<span class="help-icon" data-tooltip="温度加速系数：基于Arrhenius模型计算，工作温度越高值越大。25°C时=1.0，每升高10°C约增大1.5~2倍">?</span></th>
+                      <th style="width: 90px;">π_S<span class="help-icon" data-tooltip="应力降额系数：实际工作应力与额定应力之比的相关因子。默认1.0，降额设计时<1.0，过载时>1.0">?</span></th>
+                      <th style="width: 90px;">π_Q<span class="help-icon" data-tooltip="质量等级系数：反映元器件质量水平。军用级0.3~0.5，工业级1.0，民用级1.5~2.0">?</span></th>
+                      <th style="width: 130px;">工作失效率(FIT)</th>
+                      <th style="width: 70px;">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="pred-table-body">
+                  </tbody>
+                </table>
+                <div class="pred-empty-state empty-state" id="pred-empty-state" style="display: ${!predictionData.components || predictionData.components.length === 0 ? 'block' : 'none'};">
+                  <div class="empty-icon">📋</div>
+                  <h3>暂无元器件数据</h3>
+                  <p>点击「添加元器件」按钮开始创建您的第一个元器件条目。</p>
+                  <button type="button" class="btn-primary" id="pred-empty-add-btn">添加第一个元器件</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pred-bottom-grid">
+            <div class="card pred-diagram-card">
+              <div class="card-header">
+                <h3>系统结构示意图</h3>
+              </div>
+              <div class="card-body">
+                <div class="pred-diagram-container" id="pred-diagram-container">
+                  <canvas id="pred-diagram-canvas" width="500" height="200"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <div class="card pred-results-card">
+              <div class="card-header">
+                <h3>计算结果</h3>
+              </div>
+              <div class="card-body">
+                <div class="metrics-grid">
+                  <div class="metric-card">
+                    <div class="metric-label">元器件总失效率 (Σλ)</div>
+                    <div class="metric-value" id="pred-total-lambda">${getTotalLambda().toFixed(4)}</div>
+                    <div class="metric-unit">FIT</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">系统失效率 λs</div>
+                    <div class="metric-value" id="pred-sys-lambda">${calcSystemLambda().toFixed(4)}</div>
+                    <div class="metric-unit">FIT</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">系统 MTBF</div>
+                    <div class="metric-value" id="pred-mtbf-hours">${calcMtbfHours() > 0 ? formatNumber(calcMtbfHours()) : '—'}</div>
+                    <div class="metric-unit">小时</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">系统 MTBF</div>
+                    <div class="metric-value" id="pred-mtbf-years">${calcMtbfHours() > 0 ? (calcMtbfHours() / HOURS_PER_YEAR).toFixed(2) : '—'}</div>
+                    <div class="metric-unit">年</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">等效 B10 寿命</div>
+                    <div class="metric-value" id="pred-equiv-b10">—</div>
+                    <div class="metric-unit">小时</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">等效失效率 λ</div>
+                    <div class="metric-value" id="pred-equiv-lambda">—</div>
+                    <div class="metric-unit">10⁻⁶/h</div>
+                  </div>
+                </div>
+
+                <div class="pred-beta-section" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Weibull 形状参数 β<span class="help-icon" data-tooltip="Weibull形状参数：β>1磨损失效(典型2.0~2.5)，β=1随机失效，β<1早期失效。用于从MTBF反算等效B10">?</span></label>
+                      <input type="number" id="pred-beta" class="form-input" min="0.1" step="0.1" value="2.2" style="width: 100px;" />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pred-reliability-section">
+                  <h4 style="margin: 1rem 0 0.75rem; font-size: 0.9rem;">可靠度 R(t) = e^(-λt)</h4>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>任务时间 t (小时)</label>
+                      <input type="number" id="pred-mission-time" class="form-input" min="0" .value=${live(String(predictionData.missionTime))} step="100" @input=${(e) => handleMissionTimeChange(container, e)} />
+                    </div>
+                    <div class="form-group">
+                      <label>可靠度 R(t)</label>
+                      <div class="readonly-value" id="pred-reliability-value">${(calcReliability(predictionData.missionTime) * 100).toFixed(4)}%</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pred-chart-section">
+                  <h4 style="margin: 1rem 0 0.75rem; font-size: 0.9rem;">元器件失效率占比</h4>
+                  <div class="pred-chart-container">
+                    <canvas id="pred-bar-canvas" width="400" height="200"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="component-library-modal" id="component-library-modal" style="display: none;">
+            <div class="component-library-overlay" id="component-library-overlay"></div>
+            <div class="component-library-panel">
+              <div class="component-library-header">
+                <h3>📚 元器件库</h3>
+                <button type="button" class="component-library-close" id="component-library-close">×</button>
+              </div>
+              <div class="component-library-search">
+                <input type="text" id="component-library-search-input" class="form-input" placeholder="搜索元器件名称或描述..." />
+              </div>
+              <div class="component-library-categories">
+                <button type="button" class="lib-cat-btn active" data-category="all">全部</button>
+                <button type="button" class="lib-cat-btn" data-category="electronic">电子类</button>
+                <button type="button" class="lib-cat-btn" data-category="mechanical">机械类</button>
+                <button type="button" class="lib-cat-btn" data-category="electromechanical">机电类</button>
+              </div>
+              <div class="component-library-list" id="component-library-list">
+              </div>
+              <div class="component-library-footer">
+                <button type="button" class="btn-secondary" id="add-custom-component-btn">
+                  <span>➕</span>
+                  <span>添加自定义元器件</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="custom-component-modal" id="custom-component-modal" style="display: none;">
+            <div class="custom-component-overlay" id="custom-component-overlay"></div>
+            <div class="custom-component-panel">
+              <div class="custom-component-header">
+                <h3>添加自定义元器件</h3>
+                <button type="button" class="custom-component-close" id="custom-component-close">×</button>
+              </div>
+              <div class="custom-component-body">
+                <div class="form-group">
+                  <label>元器件名称</label>
+                  <input type="text" id="custom-comp-name" class="form-input" placeholder="请输入元器件名称" />
+                </div>
+                <div class="form-group">
+                  <label>类别</label>
+                  <select id="custom-comp-category" class="form-input">
+                    <option value="electronic">电子类</option>
+                    <option value="mechanical">机械类</option>
+                    <option value="electromechanical">机电类</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>类型</label>
+                  <select id="custom-comp-type" class="form-input">
+                    <option value="resistor">电阻</option>
+                    <option value="capacitor">电容</option>
+                    <option value="inductor">电感</option>
+                    <option value="diode">二极管</option>
+                    <option value="transistor">晶体管</option>
+                    <option value="ic_digital">IC(数字)</option>
+                    <option value="ic_analog">IC(模拟)</option>
+                    <option value="connector">连接器</option>
+                    <option value="relay">继电器</option>
+                    <option value="other">其他</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>基础失效率 λb (FIT)</label>
+                  <input type="number" id="custom-comp-lambda" class="form-input" min="0" step="0.01" value="0.1" />
+                </div>
+                <div class="form-group">
+                  <label>描述</label>
+                  <input type="text" id="custom-comp-desc" class="form-input" placeholder="可选：元器件描述" />
+                </div>
+              </div>
+              <div class="custom-component-footer">
+                <button type="button" class="btn-ghost" id="custom-comp-cancel">取消</button>
+                <button type="button" class="btn-primary" id="custom-comp-save">保存</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="pred-tab-allocation" class="pred-tab-content" style="display: ${activePredTab === 'allocation' ? 'block' : 'none'};">
+          <div class="card alloc-settings-card">
+            <div class="card-header">
+              <h3>分配设置</h3>
+            </div>
+            <div class="card-body">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>整机目标 B10 (小时)</label>
+                  <input type="number" id="alloc-target-b10" class="form-input" min="1" .value=${live(String(allocationData?.targetB10 || 150))} step="1" @input=${(e) => handleTargetB10Change(container, e)} />
+                </div>
+                <div class="form-group">
+                  <label>置信度</label>
+                  <select id="alloc-confidence" class="form-input" @change=${(e) => handleConfidenceChange(container, e)}>
+                    <option value="0.9" ?selected=${allocationData?.confidence === 0.9}>90%</option>
+                    <option value="0.95" ?selected=${allocationData?.confidence === 0.95}>95%</option>
+                    <option value="0.99" ?selected=${allocationData?.confidence === 0.99}>99%</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>系统结构</label>
+                  <select id="alloc-system-structure" class="form-input" @change=${(e) => handleAllocStructureChange(container, e)}>
+                    <option value="series" ?selected=${allocationData?.systemStructure === 'series'}>串联</option>
+                    <option value="parallel" ?selected=${allocationData?.systemStructure === 'parallel'}>并联</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>β 形状参数</label>
+                  <input type="number" id="alloc-beta" class="form-input" min="0.1" .value=${live(String(allocationData?.beta || 2.2))} step="0.1" @input=${(e) => handleBetaChange(container, e)} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card alloc-subsystems-card">
+            <div class="card-header">
+              <h3>子系统评分表</h3>
+              <div class="card-actions">
+                <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">共 <span id="alloc-subsystem-count">${allocationData?.subsystems?.length || 0}</span> 个子系统</span>
+                <button type="button" class="btn-icon btn-sm" id="alloc-add-subsystem">
+                  <span>➕</span>
+                  <span class="btn-text">添加子系统</span>
+                </button>
+              </div>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <div class="alloc-table-container table-wrap">
+                <table class="data-table alloc-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px;">序号</th>
+                      <th style="min-width: 160px;">子系统名称</th>
+                      <th style="width: 100px;">复杂度<span class="help-icon" data-tooltip="零件越多、装配越复杂，得分越高（1~10分）">?</span></th>
+                      <th style="width: 110px;">成熟度(反)<span class="help-icon" data-tooltip="供应链越成熟，得分越低（1~10分，反向计分）">?</span></th>
+                      <th style="width: 110px;">环境严酷度<span class="help-icon" data-tooltip="受力、温升、粉尘影响越大，得分越高（1~10分）">?</span></th>
+                      <th style="width: 100px;">任务占比<span class="help-icon" data-tooltip="全程带载工作时间占比越高，得分越高（1~10分）">?</span></th>
+                      <th style="width: 90px;">总分</th>
+                      <th style="width: 100px;">权重占比</th>
+                      <th style="width: 120px;">分配 B10 (h)</th>
+                      <th style="width: 140px;">失效率 λ(10⁻⁶/h)<span class="help-icon" data-tooltip="λ = ln(10/9) / B10 × 10⁶，单位：10⁻⁶/h">?</span></th>
+                      <th style="width: 70px;">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="alloc-table-body">
+                  </tbody>
+                </table>
+                <div class="alloc-empty-state empty-state" id="alloc-empty-state" style="display: ${!allocationData?.subsystems || allocationData.subsystems.length === 0 ? 'block' : 'none'};">
+                  <div class="empty-icon">📊</div>
+                  <h3>暂无子系统数据</h3>
+                  <p>点击「添加子系统」按钮开始创建您的第一个子系统条目。</p>
+                  <button type="button" class="btn-primary" id="alloc-empty-add-btn">添加第一个子系统</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card alloc-results-card">
+            <div class="card-header">
+              <h3>分配结果</h3>
+            </div>
+            <div class="card-body">
+              <div class="metrics-grid">
+                <div class="metric-card">
+                  <div class="metric-label">子系统数量</div>
+                  <div class="metric-value" id="alloc-subsys-count">${allocationData?.subsystems?.length || 0}</div>
+                  <div class="metric-unit">个</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-label">权重总和</div>
+                  <div class="metric-value" id="alloc-weight-sum">${((allocationData?.subsystems?.reduce((sum, s) => sum + (s.weight || 0), 0) || 0) * 100).toFixed(2)}%</div>
+                  <div class="metric-unit">%</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-label">整机目标 B10</div>
+                  <div class="metric-value" id="alloc-target-b10-display">${(allocationData?.targetB10 || 0).toFixed(1)}</div>
+                  <div class="metric-unit">小时</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-label">计算整机 B10</div>
+                  <div class="metric-value" id="alloc-calc-b10">${(allocationData?.calcSysB10 || 0).toFixed(2)}</div>
+                  <div class="metric-unit">小时</div>
+                </div>
+              </div>
+
+              <div class="alloc-chart-section">
+                <h4 style="margin: 1rem 0 0.75rem; font-size: 0.9rem;">子系统权重占比</h4>
+                <div class="alloc-chart-container">
+                  <canvas id="alloc-pie-canvas" width="400" height="300"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card alloc-pred-compare-card">
+            <div class="card-header">
+              <h3>📊 与可靠性预计比对</h3>
+              <span class="tp-optimize-hint">预测模块的等效B10与分配目标B10对比验证</span>
+            </div>
+            <div class="card-body">
+              <div id="alloc-pred-compare-panel"></div>
+            </div>
+          </div>
+
+          <div class="card alloc-compare-card">
+            <div class="card-header">
+              <h3>🔍 与 FMEA 主观失效率比对</h3>
+              <span class="tp-optimize-hint">基于 FMEA 的 RPN 估算失效率，与分配结果比对验证</span>
+            </div>
+            <div class="card-body">
+              <div id="alloc-fmea-compare-panel"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `, container);
+}
+
 export function init(model, onSave) {
   currentModel = model;
   onSaveCallback = onSave;
@@ -1975,16 +2310,6 @@ export function init(model, onSave) {
 
 export function render(container, model) {
   currentModel = model;
-
-  const template = document.getElementById("prediction-template");
-  if (!template) {
-    container.innerHTML = '<div class="error-state"><h3>加载失败</h3><p>可靠性预测模板未找到</p></div>';
-    return;
-  }
-
-  const clone = template.content.cloneNode(true);
-  container.innerHTML = "";
-  container.appendChild(clone);
   deratingInitialized = false;
 
   predictionData = model?.modules?.prediction || {
@@ -2001,25 +2326,9 @@ export function render(container, model) {
 
   predictionData.components.forEach((c) => updateComponentCalculations(c));
 
-  const structureSelect = container.querySelector("#pred-structure-select");
-  if (structureSelect) {
-    structureSelect.value = predictionData.systemStructure;
-  }
+  ensureAllocationData();
 
-  const parallelCountInput = container.querySelector("#pred-parallel-count");
-  if (parallelCountInput) {
-    parallelCountInput.value = predictionData.parallelCount;
-  }
-
-  const parallelGroup = container.querySelector("#parallel-count-group");
-  if (parallelGroup) {
-    parallelGroup.style.display = predictionData.systemStructure === "parallel" ? "block" : "none";
-  }
-
-  const missionTimeInput = container.querySelector("#pred-mission-time");
-  if (missionTimeInput) {
-    missionTimeInput.value = predictionData.missionTime;
-  }
+  renderTemplate(container);
 
   renderTable(container);
   bindEvents(container);

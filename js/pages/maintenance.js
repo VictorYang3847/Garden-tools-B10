@@ -1,3 +1,4 @@
+import { html, render as litRender } from 'lit-html';
 import { genId } from "../store.js";
 import { fmt, pct } from "../utils.js";
 
@@ -11,15 +12,240 @@ export function init(model, onSave) {
 
 export function render(container, model) {
   currentModel = model;
-  const template = document.getElementById("maintenance-template");
-  const content = template.content.cloneNode(true);
-  container.appendChild(content);
-
   ensureMaintenanceData();
+
+  litRender(template(), container);
+
   bindEvents();
   renderAvailability();
   renderSparesTable();
   renderStrategy();
+}
+
+function template() {
+  return html`
+    <div class="module-page maintenance-page">
+      <div class="module-header">
+        <h2>维护可用性分析</h2>
+        <p>可用度建模、备件需求估算与维护策略优化</p>
+      </div>
+      <div class="module-content">
+        <div class="maintenance-toolbar">
+          <div class="maintenance-tabs">
+            <button type="button" class="maintenance-tab active" data-tab="availability">维护可用度</button>
+            <button type="button" class="maintenance-tab" data-tab="spares">备件需求</button>
+            <button type="button" class="maintenance-tab" data-tab="strategy">维护策略</button>
+          </div>
+        </div>
+
+        <div class="maintenance-tab-content" id="mt-tab-availability">
+          <div class="card-grid">
+            <div class="card">
+              <div class="card-header">
+                <h3>输入参数</h3>
+              </div>
+              <div class="card-body">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>MTBF (h)</label>
+                    <input type="number" id="mt-avail-mtbf" class="form-input" min="0" step="1" />
+                  </div>
+                  <div class="form-group">
+                    <label>MTTR (h)</label>
+                    <input type="number" id="mt-avail-mttr" class="form-input" min="0" step="0.1" />
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>故障检测时间 (h)</label>
+                    <input type="number" id="mt-avail-detection" class="form-input" min="0" step="0.1" />
+                  </div>
+                  <div class="form-group">
+                    <label>预防性维护间隔 (h)</label>
+                    <input type="number" id="mt-avail-pm-interval" class="form-input" min="0" step="1" />
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>预防性维护时间 (h)</label>
+                    <input type="number" id="mt-avail-pm-time" class="form-input" min="0" step="0.1" />
+                  </div>
+                  <div class="form-group">
+                    <label>物流延迟 (h)</label>
+                    <input type="number" id="mt-avail-logistics" class="form-input" min="0" step="1" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3>计算结果</h3>
+              </div>
+              <div class="card-body">
+                <div class="metrics-grid">
+                  <div class="metric-card">
+                    <div class="metric-label">固有可用度</div>
+                    <div class="metric-value" id="mt-avail-inherent">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">可达可用度</div>
+                    <div class="metric-value" id="mt-avail-achieved">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">使用可用度</div>
+                    <div class="metric-value" id="mt-avail-operational">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">MTBF</div>
+                    <div class="metric-value" id="mt-avail-mtbf-val">—</div>
+                    <div class="metric-unit">h</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">MTTR</div>
+                    <div class="metric-value" id="mt-avail-mttr-val">—</div>
+                    <div class="metric-unit">h</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">MTBM</div>
+                    <div class="metric-value" id="mt-avail-mtbm">—</div>
+                    <div class="metric-unit">h</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">MDT</div>
+                    <div class="metric-value" id="mt-avail-mdt">—</div>
+                    <div class="metric-unit">h</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>可用度对比</h3>
+            </div>
+            <div class="card-body">
+              <div class="chart-container">
+                <canvas id="mt-avail-chart" width="800" height="300"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="maintenance-tab-content" id="mt-tab-spares" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <h3>备件需求估算</h3>
+              <div class="card-actions">
+                <button type="button" class="btn-primary" id="mt-spares-add">添加备件</button>
+              </div>
+            </div>
+            <div class="card-body" style="padding: 0;">
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px;">序号</th>
+                      <th style="min-width: 120px;">备件名称</th>
+                      <th style="width: 100px;">MTBF (h)</th>
+                      <th style="width: 100px;">年使用时长</th>
+                      <th style="width: 80px;">设备数量</th>
+                      <th style="width: 80px;">支持年限</th>
+                      <th style="width: 100px;">置信度</th>
+                      <th style="width: 100px;">预期需求</th>
+                      <th style="width: 100px;">建议备件数</th>
+                      <th style="width: 100px;">缺件风险</th>
+                      <th style="width: 60px;">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="mt-spares-tbody"></tbody>
+                </table>
+              </div>
+              <div class="empty-state" id="mt-spares-empty" style="display: none;">
+                <div class="empty-icon">📦</div>
+                <h3>暂无备件数据</h3>
+                <p>点击「添加备件」按钮开始估算备件需求</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="maintenance-tab-content" id="mt-tab-strategy" style="display: none;">
+          <div class="card-grid">
+            <div class="card">
+              <div class="card-header">
+                <h3>输入参数</h3>
+              </div>
+              <div class="card-body">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>目标可靠度</label>
+                    <input type="number" id="mt-strat-target-rel" class="form-input" min="0" max="1" step="0.01" />
+                  </div>
+                  <div class="form-group">
+                    <label>威布尔形状参数 β</label>
+                    <input type="number" id="mt-strat-beta" class="form-input" min="0.1" step="0.1" />
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>威布尔尺度参数 η (h)</label>
+                    <input type="number" id="mt-strat-eta" class="form-input" min="1" step="1" />
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>预防性维护成本</label>
+                    <input type="number" id="mt-strat-pm-cost" class="form-input" min="0" step="1" />
+                  </div>
+                  <div class="form-group">
+                    <label>故障维修成本</label>
+                    <input type="number" id="mt-strat-failure-cost" class="form-input" min="0" step="1" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3>优化结果</h3>
+              </div>
+              <div class="card-body">
+                <div class="metrics-grid">
+                  <div class="metric-card">
+                    <div class="metric-label">最优维护间隔</div>
+                    <div class="metric-value" id="mt-strat-optimal-interval">—</div>
+                    <div class="metric-unit">h</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">年维护次数</div>
+                    <div class="metric-value" id="mt-strat-annual-pm">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">年维护成本</div>
+                    <div class="metric-value" id="mt-strat-pm-cost-annual">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">年故障次数</div>
+                    <div class="metric-value" id="mt-strat-annual-failures">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">年故障成本</div>
+                    <div class="metric-value" id="mt-strat-failure-cost-annual">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">年总成本</div>
+                    <div class="metric-value" id="mt-strat-total-cost">—</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function ensureMaintenanceData() {
@@ -409,16 +635,16 @@ function renderSparesTable() {
   spares.forEach((s) => calcSpareDemand(s));
 
   if (spares.length === 0) {
-    tbody.innerHTML = "";
+    litRender(html``, tbody);
     if (emptyState) emptyState.style.display = "";
     return;
   }
 
   if (emptyState) emptyState.style.display = "none";
 
-  let html = "";
+  let htmlContent = "";
   spares.forEach((s, idx) => {
-    html += `
+    htmlContent += `
       <tr data-id="${s.id}">
         <td>${idx + 1}</td>
         <td>
@@ -454,7 +680,7 @@ function renderSparesTable() {
       </tr>
     `;
   });
-  tbody.innerHTML = html;
+  tbody.innerHTML = htmlContent;
 }
 
 function bindStrategyEvents() {

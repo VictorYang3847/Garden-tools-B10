@@ -1,9 +1,10 @@
+import { html, render as litRender } from 'lit-html';
 import { genId, getCustomImprovements, setCustomImprovements, getCurrentProduct, getProductShared } from "../store.js";
 import { fmt } from "../utils.js";
 import { gammaApprox } from "../calculator.js";
 
 let currentModel = null;
-let onSaveCallback = null;
+let growthService = null;
 
 let improvLibraryCategory = "all";
 let improvLibraryKeyword = "";
@@ -68,19 +69,27 @@ const PHASE_COLORS = [
   "#f472b6",
 ];
 
-export function init(model, onSave) {
+export function init(model, onSave, services = {}) {
   currentModel = model;
-  onSaveCallback = onSave;
+  growthService = services.growth || null;
 }
 
 export function render(container, model) {
   currentModel = model;
-  const template = document.getElementById("growth-template");
-  const content = template.content.cloneNode(true);
-  container.appendChild(content);
-
-  ensurePhases();
+  if (!currentModel) {
+    litRender(html`<div class="error-state"><h3>请先选择型号</h3><p>请在顶部选择器中选择一个产品型号后再使用此模块。</p></div>`, container);
+    return;
+  }
+  // 使用 Service 层初始化数据（含兼容性处理）
+  if (growthService) {
+    growthService.ensureGrowthData(currentModel);
+  } else {
+    ensurePhases();
+  }
   loadCustomImprovements();
+
+  litRender(template(), container);
+
   bindEvents();
   renderPhaseSelector();
   renderPhaseInfo();
@@ -91,6 +100,358 @@ export function render(container, model) {
   drawComparisonChart();
   renderGrowthSummary();
   renderProductHistory();
+}
+
+function template() {
+  return html`
+    <div class="module-page growth-page">
+      <div class="module-header">
+        <h2>可靠性增长</h2>
+        <p>基于 Duane 模型和 Crow-AMSAA 模型的可靠性增长分析与验证</p>
+      </div>
+      <div class="module-content">
+        <div class="growth-toolbar">
+          <div class="growth-toolbar-left">
+            <label class="selector-group">
+              <span class="selector-label">增长模型</span>
+              <select id="growth-model-select" class="header-select">
+                <option value="duane">Duane 模型</option>
+                <option value="crowAMSAA">Crow-AMSAA 模型</option>
+              </select>
+            </label>
+            <label class="selector-group">
+              <span class="selector-label">试验轮次</span>
+              <select id="growth-phase-select" class="header-select">
+              </select>
+            </label>
+            <button type="button" class="btn-icon btn-sm" id="growth-add-phase" title="新增轮次">
+              <span>➕</span>
+              <span class="btn-text">新增轮次</span>
+            </button>
+            <button type="button" class="btn-icon btn-sm btn-danger" id="growth-delete-phase" title="删除轮次">
+              <span>🗑️</span>
+              <span class="btn-text">删除轮次</span>
+            </button>
+          </div>
+          <div class="growth-toolbar-right">
+            <label class="selector-group">
+              <span class="selector-label">增长目标 MTBF (h)</span>
+              <input type="number" id="growth-target-mtbf" class="form-input" min="0" step="1" style="width: 120px;" placeholder="输入目标" />
+            </label>
+            <button type="button" class="btn-icon btn-primary" id="growth-add-failure">
+              <span>➕</span>
+              <span class="btn-text">添加失效记录</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>失效数据</h3>
+            <div class="card-actions">
+              <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">共 <span id="growth-failure-count">0</span> 条失效记录</span>
+            </div>
+          </div>
+          <div class="card-body" style="padding-bottom: 0;">
+            <div class="phase-info-bar" id="growth-phase-info" style="display: flex; gap: 1.5rem; flex-wrap: wrap; padding: 0.75rem 1rem; background: var(--bg-secondary); border-radius: 6px; margin-bottom: 1rem;">
+              <div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">轮次名称</div>
+                <div style="font-weight: 600; color: var(--text-primary);"><input type="text" id="growth-phase-name" class="form-input" style="width: 180px; padding: 0.25rem 0.5rem; font-size: 0.85rem;" /></div>
+              </div>
+              <div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">总试验时间 (h)</div>
+                <div style="font-weight: 600; color: var(--text-primary);"><input type="number" id="growth-phase-total-time" class="form-input" style="width: 120px; padding: 0.25rem 0.5rem; font-size: 0.85rem;" min="0" step="1" /></div>
+              </div>
+              <div style="flex: 1; min-width: 200px;">
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">轮次描述</div>
+                <div style="font-weight: 500; color: var(--text-primary);"><input type="text" id="growth-phase-desc" class="form-input" style="width: 100%; padding: 0.25rem 0.5rem; font-size: 0.85rem;" placeholder="输入轮次描述" /></div>
+              </div>
+            </div>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <div class="growth-table-container table-wrap">
+              <table class="data-table growth-table">
+                <thead>
+                  <tr>
+                    <th style="width: 60px;">序号</th>
+                    <th style="width: 120px;">失效时间 (h)</th>
+                    <th style="min-width: 180px;">失效模式</th>
+                    <th style="width: 130px;">累计时间 (h)</th>
+                    <th style="width: 120px;">累计失效数</th>
+                    <th style="width: 130px;">瞬时 MTBF (h)</th>
+                    <th style="width: 70px;">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="growth-table-body">
+                </tbody>
+              </table>
+              <div class="growth-empty-state empty-state" id="growth-empty-state" style="display: none;">
+                <div class="empty-icon">📋</div>
+                <h3>暂无失效数据</h3>
+                <p>点击「添加失效记录」按钮开始录入失效时间数据。</p>
+                <button type="button" class="btn-primary" id="growth-empty-add-btn">添加第一条记录</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>改进措施</h3>
+            <div class="card-actions">
+              <button type="button" class="btn-icon btn-sm btn-primary" id="growth-open-library">
+                <span>📚</span>
+                <span class="btn-text">从措施库选择</span>
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="growth-improvement-list" class="improvement-list">
+            </div>
+            <div id="growth-improvement-empty" class="empty-state" style="padding: 2rem 1rem;">
+              <div class="empty-icon">💡</div>
+              <h3>暂无改进措施</h3>
+              <p>点击「从措施库选择」按钮添加改进措施</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>产品历史参考数据</h3>
+            <div class="card-actions">
+              <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">来自产品级共享数据</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="growth-product-history" class="history-reference">
+            </div>
+            <div id="growth-product-history-empty" class="empty-state" style="padding: 2rem 1rem;">
+              <div class="empty-icon">📊</div>
+              <h3>暂无产品历史数据</h3>
+              <p>当前产品未配置历史参考数据</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="growth-bottom-grid">
+          <div class="card growth-params-card">
+            <div class="card-header">
+              <h3>参数估计结果</h3>
+            </div>
+            <div class="card-body">
+              <div class="growth-model-params" id="growth-duane-params">
+                <h4 style="margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--accent);">Duane 模型</h4>
+                <div class="metrics-grid">
+                  <div class="metric-card">
+                    <div class="metric-label">斜率 m</div>
+                    <div class="metric-value" id="growth-duane-m">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">截距 a</div>
+                    <div class="metric-value" id="growth-duane-a">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">最终 MTBF</div>
+                    <div class="metric-value" id="growth-duane-mtbf">—</div>
+                    <div class="metric-unit">h</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">拟合优度 R²</div>
+                    <div class="metric-value" id="growth-duane-r2">—</div>
+                  </div>
+                </div>
+              </div>
+              <div class="growth-model-params" id="growth-crow-params" style="display: none;">
+                <h4 style="margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--accent);">Crow-AMSAA 模型</h4>
+                <div class="metrics-grid">
+                  <div class="metric-card">
+                    <div class="metric-label">形状参数 β</div>
+                    <div class="metric-value" id="growth-crow-beta">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">尺度参数 λ</div>
+                    <div class="metric-value" id="growth-crow-lambda">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">当前 MTBF</div>
+                    <div class="metric-value" id="growth-crow-mtbf">—</div>
+                    <div class="metric-unit">h</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">增长趋势</div>
+                    <div class="metric-value" id="growth-crow-trend">—</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="growth-target-section" style="margin-top: 1.25rem;">
+                <h4 style="margin: 0 0 0.75rem; font-size: 0.9rem;">增长目标评估</h4>
+                <div class="metrics-grid">
+                  <div class="metric-card">
+                    <div class="metric-label">目标 MTBF</div>
+                    <div class="metric-value" id="growth-target-display">—</div>
+                    <div class="metric-unit">h</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">当前 MTBF</div>
+                    <div class="metric-value" id="growth-current-mtbf">—</div>
+                    <div class="metric-unit">h</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">达标状态</div>
+                    <div class="metric-value" id="growth-target-status">—</div>
+                  </div>
+                  <div class="metric-card">
+                    <div class="metric-label">预计达标时间</div>
+                    <div class="metric-value" id="growth-estimated-time">—</div>
+                    <div class="metric-unit">h</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="status-banner" id="growth-status-banner" style="display: none;"></div>
+            </div>
+          </div>
+
+          <div class="card growth-chart-card">
+            <div class="card-header">
+              <h3>可靠性增长曲线</h3>
+            </div>
+            <div class="card-body">
+              <div class="growth-chart-container">
+                <canvas id="growth-chart-canvas" width="600" height="450"></canvas>
+              </div>
+              <div class="growth-chart-legend" style="margin-top: 0.75rem; display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.8rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span style="width: 12px; height: 12px; border-radius: 50%; background: var(--accent); display: inline-block;"></span>
+                  <span style="color: var(--text-muted);">失效数据点</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span style="width: 20px; height: 2px; background: var(--success); display: inline-block;"></span>
+                  <span style="color: var(--text-muted);">拟合曲线</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span style="width: 20px; height: 2px; background: var(--warning); border-style: dashed; display: inline-block;"></span>
+                  <span style="color: var(--text-muted);">目标 MTBF</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>多轮增长对比</h3>
+            <div class="card-actions">
+              <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">各轮试验指标对比与增长趋势</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+              <div>
+                <h4 style="margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--accent);">轮次对比表</h4>
+                <div class="table-wrap">
+                  <table class="data-table" id="growth-comparison-table">
+                    <thead>
+                      <tr>
+                        <th>轮次名称</th>
+                        <th>失效数</th>
+                        <th>总时间(h)</th>
+                        <th>MTBF(h)</th>
+                        <th>B10(h)</th>
+                        <th>提升幅度</th>
+                      </tr>
+                    </thead>
+                    <tbody id="growth-comparison-body">
+                    </tbody>
+                  </table>
+                </div>
+                <div id="growth-summary" style="margin-top: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 6px;">
+                </div>
+              </div>
+              <div>
+                <h4 style="margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--accent);">增长曲线叠加图</h4>
+                <div class="growth-chart-container">
+                  <canvas id="growth-comparison-canvas" width="600" height="350"></canvas>
+                </div>
+                <div id="growth-comparison-legend" style="margin-top: 0.75rem; display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.8rem;">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="improvement-library-modal" id="growth-improv-library-modal" style="display: none;">
+        <div class="improvement-library-overlay" id="growth-improv-library-overlay"></div>
+        <div class="improvement-library-panel">
+          <div class="improvement-library-header">
+            <h3>📚 改进措施库</h3>
+            <button type="button" class="improvement-library-close" id="growth-improv-library-close">×</button>
+          </div>
+          <div class="improvement-library-search">
+            <input type="text" id="growth-improv-search" class="form-input" placeholder="搜索措施名称、描述、适用场景..." />
+          </div>
+          <div class="improvement-library-categories" id="growth-improv-categories">
+            <button type="button" class="improv-cat-btn active" data-category="all">全部</button>
+            <button type="button" class="improv-cat-btn" data-category="gear">齿轮磨损</button>
+            <button type="button" class="improv-cat-btn" data-category="motor">电机轴承</button>
+            <button type="button" class="improv-cat-btn" data-category="switch">开关触点</button>
+            <button type="button" class="improv-cat-btn" data-category="battery">锂电池</button>
+            <button type="button" class="improv-cat-btn" data-category="pcb">PCB电子</button>
+          </div>
+          <div class="improvement-library-list" id="growth-improv-library-list">
+          </div>
+          <div class="improvement-library-footer">
+            <button type="button" class="btn-secondary" id="growth-add-custom-improv">➕ 添加自定义措施</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="custom-improvement-modal" id="growth-custom-improv-modal" style="display: none;">
+        <div class="custom-improvement-overlay" id="growth-custom-improv-overlay"></div>
+        <div class="custom-improvement-panel">
+          <div class="custom-improvement-header">
+            <h3>添加自定义措施</h3>
+            <button type="button" class="custom-improvement-close" id="growth-custom-improv-close">×</button>
+          </div>
+          <div class="custom-improvement-body">
+            <div class="form-group">
+              <label>措施名称 *</label>
+              <input type="text" id="growth-custom-improv-name" class="form-input" placeholder="输入措施名称" />
+            </div>
+            <div class="form-group">
+              <label>分类 *</label>
+              <select id="growth-custom-improv-category" class="form-input">
+                <option value="gear">齿轮磨损</option>
+                <option value="motor">电机轴承</option>
+                <option value="switch">开关触点</option>
+                <option value="battery">锂电池</option>
+                <option value="pcb">PCB电子</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>预期提升幅度</label>
+              <input type="text" id="growth-custom-improv-improvement" class="form-input" placeholder="如：1.5~2倍寿命" />
+            </div>
+            <div class="form-group">
+              <label>措施描述</label>
+              <textarea id="growth-custom-improv-desc" class="form-input" rows="2" placeholder="描述措施的技术原理"></textarea>
+            </div>
+            <div class="form-group">
+              <label>适用场景</label>
+              <input type="text" id="growth-custom-improv-applicable" class="form-input" placeholder="适用的失效模式或场景" />
+            </div>
+          </div>
+          <div class="custom-improvement-footer">
+            <button type="button" class="btn-ghost" id="growth-custom-improv-cancel">取消</button>
+            <button type="button" class="btn-primary" id="growth-custom-improv-save">保存并添加</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function ensurePhases() {
@@ -133,11 +494,6 @@ function ensurePhases() {
     if (!phase.phaseNumber) phase.phaseNumber = 1;
     if (!phase.name) phase.name = `第${phase.phaseNumber}轮`;
   }
-}
-
-function save() {
-  if (!onSaveCallback || !currentModel) return;
-  onSaveCallback(currentModel);
 }
 
 function getGrowth() {
@@ -188,12 +544,12 @@ function renderPhaseSelector() {
   const select = document.getElementById("growth-phase-select");
   if (!select) return;
 
-  let html = "";
+  let htmlContent = "";
   g.phases.forEach((phase) => {
     const selected = phase.id === g.activePhaseId ? "selected" : "";
-    html += `<option value="${phase.id}" ${selected}>第${phase.phaseNumber}轮 - ${escapeHtml(phase.name)}</option>`;
+    htmlContent += `<option value="${phase.id}" ${selected}>第${phase.phaseNumber}轮 - ${escapeHtml(phase.name)}</option>`;
   });
-  select.innerHTML = html;
+  select.innerHTML = htmlContent;
 
   const deleteBtn = document.getElementById("growth-delete-phase");
   if (deleteBtn) {
@@ -215,24 +571,21 @@ function renderPhaseInfo() {
   if (descInput) descInput.value = phase.description || "";
 }
 
-function addPhase() {
+async function addPhase() {
   const g = getGrowth();
   const lastPhase = g.phases[g.phases.length - 1];
-  const newNumber = lastPhase ? lastPhase.phaseNumber + 1 : 1;
-  const newId = genId();
+  const newNumber = lastPhase ? (lastPhase.phaseNumber || 0) + 1 : 1;
 
-  g.phases.push({
-    id: newId,
-    name: `第${newNumber}轮试验`,
-    phaseNumber: newNumber,
-    description: "",
-    failures: [],
-    improvements: [],
-    totalTime: null,
-    startDate: null,
-  });
-  g.activePhaseId = newId;
-  save();
+  try {
+    const result = await growthService.addPhase(currentModel.id, {
+      name: `第${newNumber}轮试验`,
+      phaseNumber: newNumber,
+    });
+    currentModel = result.model;
+  } catch (e) {
+    console.error('addPhase failed:', e);
+    return;
+  }
   renderPhaseSelector();
   renderPhaseInfo();
   renderFailureTable();
@@ -243,23 +596,18 @@ function addPhase() {
   renderGrowthSummary();
 }
 
-function deletePhase() {
+async function deletePhase() {
   const g = getGrowth();
   if (g.phases.length <= 1) return;
 
   if (!confirm("确定要删除当前轮次吗？此操作不可撤销。")) return;
 
-  const idx = g.phases.findIndex((p) => p.id === g.activePhaseId);
-  if (idx < 0) return;
-
-  g.phases.splice(idx, 1);
-
-  for (let i = idx; i < g.phases.length; i++) {
-    g.phases[i].phaseNumber = i + 1;
+  try {
+    currentModel = await growthService.removePhase(currentModel.id, g.activePhaseId);
+  } catch (e) {
+    console.error('deletePhase failed:', e);
+    return;
   }
-
-  g.activePhaseId = g.phases[Math.max(0, idx - 1)].id;
-  save();
   renderPhaseSelector();
   renderPhaseInfo();
   renderFailureTable();
@@ -285,9 +633,13 @@ function bindEvents() {
   const g = getGrowth();
   if (modelSelect) {
     modelSelect.value = g.model || "duane";
-    modelSelect.addEventListener("change", () => {
-      g.model = modelSelect.value;
-      save();
+    modelSelect.addEventListener("change", async () => {
+      try {
+        currentModel = await growthService.updateGrowthConfig(currentModel.id, { model: modelSelect.value });
+      } catch (e) {
+        console.error('updateGrowthConfig failed:', e);
+        return;
+      }
       updateModelParamsVisibility();
       updateParamsAndChart();
       renderComparisonTable();
@@ -298,10 +650,15 @@ function bindEvents() {
 
   if (targetInput) {
     targetInput.value = g.targetMtbf || "";
-    targetInput.addEventListener("input", () => {
+    targetInput.addEventListener("input", async () => {
       const val = parseFloat(targetInput.value);
-      g.targetMtbf = Number.isFinite(val) && val > 0 ? val : null;
-      save();
+      const targetMtbf = Number.isFinite(val) && val > 0 ? val : null;
+      try {
+        currentModel = await growthService.updateGrowthConfig(currentModel.id, { targetMtbf });
+      } catch (e) {
+        console.error('updateGrowthConfig failed:', e);
+        return;
+      }
       updateParamsAndChart();
       renderComparisonTable();
       drawComparisonChart();
@@ -310,9 +667,13 @@ function bindEvents() {
   }
 
   if (phaseSelect) {
-    phaseSelect.addEventListener("change", () => {
-      g.activePhaseId = phaseSelect.value;
-      save();
+    phaseSelect.addEventListener("change", async () => {
+      try {
+        currentModel = await growthService.setActivePhase(currentModel.id, phaseSelect.value);
+      } catch (e) {
+        console.error('setActivePhase failed:', e);
+        return;
+      }
       renderPhaseInfo();
       renderFailureTable();
       renderImprovementList();
@@ -329,39 +690,52 @@ function bindEvents() {
   }
 
   if (phaseNameInput) {
-    phaseNameInput.addEventListener("input", () => {
+    phaseNameInput.addEventListener("input", async () => {
       const phase = getActivePhase();
-      if (phase) {
-        phase.name = phaseNameInput.value;
-        save();
-        renderPhaseSelector();
-        renderComparisonTable();
-        drawComparisonChart();
+      if (!phase) return;
+      try {
+        const result = await growthService.updatePhase(currentModel.id, phase.id, { name: phaseNameInput.value });
+        currentModel = result.model;
+      } catch (e) {
+        console.error('updatePhase failed:', e);
+        return;
       }
+      renderPhaseSelector();
+      renderComparisonTable();
+      drawComparisonChart();
     });
   }
 
   if (phaseTotalTimeInput) {
-    phaseTotalTimeInput.addEventListener("input", () => {
+    phaseTotalTimeInput.addEventListener("input", async () => {
       const phase = getActivePhase();
-      if (phase) {
-        const val = parseFloat(phaseTotalTimeInput.value);
-        phase.totalTime = Number.isFinite(val) && val > 0 ? val : null;
-        save();
-        updateParamsAndChart();
-        renderComparisonTable();
-        drawComparisonChart();
-        renderGrowthSummary();
+      if (!phase) return;
+      const val = parseFloat(phaseTotalTimeInput.value);
+      const totalTime = Number.isFinite(val) && val > 0 ? val : null;
+      try {
+        const result = await growthService.updatePhase(currentModel.id, phase.id, { totalTime });
+        currentModel = result.model;
+      } catch (e) {
+        console.error('updatePhase failed:', e);
+        return;
       }
+      updateParamsAndChart();
+      renderComparisonTable();
+      drawComparisonChart();
+      renderGrowthSummary();
     });
   }
 
   if (phaseDescInput) {
-    phaseDescInput.addEventListener("input", () => {
+    phaseDescInput.addEventListener("input", async () => {
       const phase = getActivePhase();
-      if (phase) {
-        phase.description = phaseDescInput.value;
-        save();
+      if (!phase) return;
+      try {
+        const result = await growthService.updatePhase(currentModel.id, phase.id, { description: phaseDescInput.value });
+        currentModel = result.model;
+      } catch (e) {
+        console.error('updatePhase failed:', e);
+        return;
       }
     });
   }
@@ -383,7 +757,7 @@ function bindEvents() {
       }
     });
 
-    tbody.addEventListener("change", (e) => {
+    tbody.addEventListener("change", async (e) => {
       const row = e.target.closest("[data-id]");
       if (!row) return;
       const id = row.dataset.id;
@@ -392,16 +766,23 @@ function bindEvents() {
 
       const phase = getActivePhase();
       if (!phase) return;
-      const failure = phase.failures.find((f) => f.id === id);
-      if (!failure) return;
 
+      let updates;
       if (field === "time") {
         const val = parseFloat(e.target.value);
-        failure.time = Number.isFinite(val) && val > 0 ? val : 0;
+        updates = { time: Number.isFinite(val) && val > 0 ? val : 0 };
       } else if (field === "failureMode") {
-        failure.failureMode = e.target.value;
+        updates = { failureMode: e.target.value };
+      } else {
+        return;
       }
-      save();
+
+      try {
+        currentModel = await growthService.updateFailure(currentModel.id, phase.id, id, updates);
+      } catch (err) {
+        console.error('updateFailure failed:', err);
+        return;
+      }
       renderFailureTable();
       updateParamsAndChart();
       renderComparisonTable();
@@ -488,19 +869,23 @@ function bindEvents() {
   }
 }
 
-function addFailure() {
+async function addFailure() {
   const phase = getActivePhase();
   if (!phase) return;
   const sorted = getSortedFailures();
   const lastTime = sorted.length > 0 ? sorted[sorted.length - 1].time : 0;
   const newTime = lastTime + (lastTime > 0 ? lastTime * 0.2 : 100);
 
-  phase.failures.push({
-    id: genId(),
-    time: Math.round(newTime * 10) / 10,
-    failureMode: "",
-  });
-  save();
+  try {
+    const result = await growthService.addFailure(currentModel.id, phase.id, {
+      time: Math.round(newTime * 10) / 10,
+      failureMode: "",
+    });
+    currentModel = result.model;
+  } catch (e) {
+    console.error('addFailure failed:', e);
+    return;
+  }
   renderFailureTable();
   updateParamsAndChart();
   renderComparisonTable();
@@ -508,11 +893,15 @@ function addFailure() {
   renderGrowthSummary();
 }
 
-function deleteFailure(id) {
+async function deleteFailure(id) {
   const phase = getActivePhase();
   if (!phase) return;
-  phase.failures = phase.failures.filter((f) => f.id !== id);
-  save();
+  try {
+    currentModel = await growthService.removeFailure(currentModel.id, phase.id, id);
+  } catch (e) {
+    console.error('deleteFailure failed:', e);
+    return;
+  }
   renderFailureTable();
   updateParamsAndChart();
   renderComparisonTable();
@@ -534,20 +923,20 @@ function renderFailureTable() {
   }
 
   if (sorted.length === 0) {
-    tbody.innerHTML = "";
+    litRender(html``, tbody);
     if (emptyState) emptyState.style.display = "";
     return;
   }
 
   if (emptyState) emptyState.style.display = "none";
 
-  let html = "";
+  let htmlContent = "";
   sorted.forEach((f, idx) => {
     const cumulativeTime = f.time;
     const cumulativeN = idx + 1;
     const instantaneousMtbf = idx > 0 ? (f.time - sorted[idx - 1].time) : f.time;
 
-    html += `
+    htmlContent += `
       <tr data-id="${f.id}">
         <td>${idx + 1}</td>
         <td>
@@ -567,7 +956,7 @@ function renderFailureTable() {
       </tr>
     `;
   });
-  tbody.innerHTML = html;
+  tbody.innerHTML = htmlContent;
 }
 
 function updateModelParamsVisibility() {
@@ -1053,7 +1442,7 @@ function renderComparisonTable() {
   const tbody = document.getElementById("growth-comparison-body");
   if (!tbody) return;
 
-  let html = "";
+  let htmlContent = "";
   let prevMtbf = null;
 
   g.phases.forEach((phase, idx) => {
@@ -1068,7 +1457,7 @@ function renderComparisonTable() {
       improvementColor = pct >= 0 ? "var(--success)" : "var(--danger)";
     }
 
-    html += `
+    htmlContent += `
       <tr>
         <td style="display: flex; align-items: center; gap: 0.5rem;">
           <span style="width: 10px; height: 10px; border-radius: 50%; background: ${color}; display: inline-block;"></span>
@@ -1087,7 +1476,7 @@ function renderComparisonTable() {
     }
   });
 
-  tbody.innerHTML = html;
+  tbody.innerHTML = htmlContent;
 }
 
 function drawComparisonChart() {
@@ -1440,7 +1829,8 @@ function renderProductHistory() {
   }
 
   const shared = getProductShared(currentProduct.id);
-  const historyData = shared.growthHistory || [];
+  const rawHistory = shared.growthHistory;
+  const historyData = Array.isArray(rawHistory) ? rawHistory : (rawHistory?.phases || []);
 
   if (!historyData || historyData.length === 0) {
     historyDiv.innerHTML = "";
@@ -1524,13 +1914,6 @@ function getAllImprovements() {
   return [...IMPROVEMENT_LIBRARY, ...customImprovements];
 }
 
-function ensureImprovements() {
-  const phase = getActivePhase();
-  if (phase && !Array.isArray(phase.improvements)) {
-    phase.improvements = [];
-  }
-}
-
 function openImprovementLibrary() {
   const modal = document.getElementById("growth-improv-library-modal");
   if (modal) {
@@ -1607,10 +1990,10 @@ function renderImprovementLibrary() {
     return;
   }
 
-  let html = "";
+  let htmlContent = "";
   filtered.forEach((item) => {
     const isCustom = customImprovements.some((c) => c.id === item.id);
-    html += `
+    htmlContent += `
       <div class="improv-lib-card">
         <div class="improv-lib-header">
           <div class="improv-lib-name">${escapeHtml(item.name)}</div>
@@ -1630,36 +2013,37 @@ function renderImprovementLibrary() {
     `;
   });
 
-  listEl.innerHTML = html;
+  listEl.innerHTML = htmlContent;
 }
 
-function addImprovementFromLibrary(improvId) {
+async function addImprovementFromLibrary(improvId) {
   const phase = getActivePhase();
   if (!phase) return;
-  ensureImprovements();
 
   const all = getAllImprovements();
   const item = all.find((i) => i.id === improvId);
   if (!item) return;
 
-  const exists = phase.improvements.some((imp) => imp.id === improvId);
+  const exists = (phase.improvements || []).some((imp) => imp.id === improvId);
   if (exists) {
     showImprovToast("该措施已在当前轮次中");
     return;
   }
 
-  phase.improvements.push({
-    id: item.id,
-    name: item.name,
-    category: item.category,
-    improvement: item.improvement || "",
-    desc: item.desc || "",
-    status: "pending",
-    responsible: "",
-    targetDate: "",
-  });
-
-  save();
+  try {
+    const result = await growthService.addImprovement(currentModel.id, phase.id, {
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      improvement: item.improvement || "",
+      desc: item.desc || "",
+    });
+    currentModel = result.model;
+  } catch (e) {
+    console.error('addImprovement failed:', e);
+    showImprovToast(e.message || "添加失败");
+    return;
+  }
   renderImprovementList();
   closeImprovementLibrary();
   showImprovToast("已添加改进措施");
@@ -1684,7 +2068,7 @@ function closeCustomImprovementModal() {
   }
 }
 
-function handleSaveCustomImprovement() {
+async function handleSaveCustomImprovement() {
   const name = document.getElementById("growth-custom-improv-name").value.trim();
   const category = document.getElementById("growth-custom-improv-category").value;
   const improvement = document.getElementById("growth-custom-improv-improvement").value.trim();
@@ -1711,18 +2095,20 @@ function handleSaveCustomImprovement() {
 
   const phase = getActivePhase();
   if (phase) {
-    ensureImprovements();
-    phase.improvements.push({
-      id: customItem.id,
-      name: customItem.name,
-      category: customItem.category,
-      improvement: customItem.improvement,
-      desc: customItem.desc,
-      status: "pending",
-      responsible: "",
-      targetDate: "",
-    });
-    save();
+    try {
+      const result = await growthService.addImprovement(currentModel.id, phase.id, {
+        id: customItem.id,
+        name: customItem.name,
+        category: customItem.category,
+        improvement: customItem.improvement,
+        desc: customItem.desc,
+      });
+      currentModel = result.model;
+    } catch (e) {
+      console.error('addImprovement failed:', e);
+      showImprovToast(e.message || "添加失败");
+      return;
+    }
     renderImprovementList();
   }
 
@@ -1738,7 +2124,6 @@ function renderImprovementList() {
 
   const phase = getActivePhase();
   if (!phase) return;
-  ensureImprovements();
 
   const improvements = phase.improvements || [];
 
@@ -1750,7 +2135,7 @@ function renderImprovementList() {
 
   if (emptyEl) emptyEl.style.display = "none";
 
-  let html = "";
+  let htmlContent = "";
   improvements.forEach((imp, idx) => {
     const statusLabels = {
       pending: "待实施",
@@ -1762,7 +2147,7 @@ function renderImprovementList() {
       in_progress: "var(--accent)",
       completed: "var(--success)",
     };
-    html += `
+    htmlContent += `
       <div class="improvement-item" data-improv-id="${imp.id}">
         <div class="improvement-item-header">
           <div class="improvement-item-title">
@@ -1787,18 +2172,21 @@ function renderImprovementList() {
     `;
   });
 
-  listEl.innerHTML = html;
+  listEl.innerHTML = htmlContent;
 }
 
-function deleteImprovement(id) {
+async function deleteImprovement(id) {
   const phase = getActivePhase();
   if (!phase) return;
-  ensureImprovements();
 
   if (!confirm("确定要删除这条改进措施吗？")) return;
 
-  phase.improvements = phase.improvements.filter((imp) => imp.id !== id);
-  save();
+  try {
+    currentModel = await growthService.removeImprovement(currentModel.id, phase.id, id);
+  } catch (e) {
+    console.error('removeImprovement failed:', e);
+    return;
+  }
   renderImprovementList();
 }
 

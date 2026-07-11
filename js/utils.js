@@ -19,6 +19,7 @@ export function pct(n, digits = 2) {
 }
 
 export function toast(el, message, duration = 2000) {
+  if (!el) return;
   const prev = el.textContent;
   el.textContent = message;
   setTimeout(() => {

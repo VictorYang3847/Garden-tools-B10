@@ -1,3 +1,5 @@
+import { html, render as litRender } from 'lit-html';
+import { live } from 'lit-html/directives/live.js';
 import { genId, getHomeB10, getCurrentProduct, getProductShared } from "../store.js";
 import { fmt, toast } from "../utils.js";
 import { gammaApprox, K10 } from "../calculator.js";
@@ -97,12 +99,11 @@ export function init(model, onSave) {
 
 export function render(container, model) {
   currentModel = model;
-  const template = document.getElementById("test-plan-template");
-  const content = template.content.cloneNode(true);
-  container.appendChild(content);
-
   ensureTestPlan();
-  bindEvents();
+  
+  litRender(htmlTemplate(container), container);
+  
+  bindEvents(container);
   renderGlobalParams();
   renderTestItems();
   renderAltPlans();
@@ -110,7 +111,7 @@ export function render(container, model) {
   renderDvprTable();
   renderOptimizePanel();
 
-  const b10Input = document.getElementById("tp-sa-b10");
+  const b10Input = container.querySelector("#tp-sa-b10");
   if (b10Input) {
     b10Input.value = getHomeB10(currentModel);
   }
@@ -118,22 +119,462 @@ export function render(container, model) {
   switchTab(activeTab);
 }
 
-function bindEvents() {
-  const toolbar = document.querySelector(".test-plan-toolbar");
-  if (toolbar) {
-    toolbar.addEventListener("click", (e) => {
-      const tab = e.target.closest(".test-plan-tab");
-      if (!tab) return;
-      switchTab(tab.dataset.tab);
-    });
-  }
+function htmlTemplate(container) {
+  return html`
+    <div class="module-page test-plan-page">
+      <div class="module-header">
+        <h2>测试计划与评估</h2>
+        <p>可靠性试验方案设计、样本量计算、加速寿命试验与 HALT 试验管理</p>
+      </div>
+      <div class="module-content">
+        <div class="test-plan-toolbar">
+          <div class="test-plan-tabs">
+            <button type="button" class="test-plan-tab active" data-tab="sample-analysis" @click=${(e) => handleTabClick(e, container)}>样本量分析</button>
+            <button type="button" class="test-plan-tab" data-tab="test-items" @click=${(e) => handleTabClick(e, container)}>试验项目</button>
+            <button type="button" class="test-plan-tab" data-tab="alt" @click=${(e) => handleTabClick(e, container)}>加速寿命</button>
+            <button type="button" class="test-plan-tab" data-tab="halt" @click=${(e) => handleTabClick(e, container)}>HALT 试验</button>
+            <button type="button" class="test-plan-tab" data-tab="dvpr" @click=${(e) => handleTabClick(e, container)}>DVP&R</button>
+          </div>
+        </div>
 
-  bindGlobalParamsEvents();
-  bindTestItemsEvents();
-  bindAltEvents();
-  bindHaltEvents();
-  bindDvprEvents();
-  bindSampleAnalysisEvents();
+        <div class="test-plan-tab-content" id="tp-tab-sample-analysis">
+          <div class="card">
+            <div class="card-header">
+              <h3>样本量分析</h3>
+              <span class="tp-optimize-hint">制定测试计划前的前置分析工具</span>
+            </div>
+            <div class="card-body">
+              <div class="sample-analysis-tabs">
+                <button type="button" class="sample-analysis-tab active" data-tab="qualification" @click=${(e) => handleSampleAnalysisTabClick(e, container)}>合格性验证</button>
+                <button type="button" class="sample-analysis-tab" data-tab="life-test" @click=${(e) => handleSampleAnalysisTabClick(e, container)}>寿命测定</button>
+              </div>
+
+              <div class="sample-analysis-tab-content" id="tp-sa-tab-qualification">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>目标可靠度 R<span class="help-icon" data-tooltip="产品在目标寿命时刻的可靠度">?</span></label>
+                    <input type="number" id="tp-sa-reliability" class="form-input" min="50" max="99.9" step="0.1" .value=${live("90")} @input=${calculateQualificationAnalysis} />
+                  </div>
+                  <div class="form-group">
+                    <label>置信度 γ<span class="help-icon" data-tooltip="统计置信度，通常90%或95%">?</span></label>
+                    <input type="number" id="tp-sa-confidence" class="form-input" min="50" max="99.9" step="0.1" .value=${live("90")} @input=${calculateQualificationAnalysis} />
+                  </div>
+                  <div class="form-group">
+                    <label>允许失效数 r<span class="help-icon" data-tooltip="试验中允许的最大失效数">?</span></label>
+                    <input type="number" id="tp-sa-allowed" class="form-input" min="0" max="20" step="1" .value=${live("0")} @input=${calculateQualificationAnalysis} />
+                  </div>
+                </div>
+                <div class="result-card">
+                  <div class="result-row">
+                    <span class="result-label">所需样本量 n</span>
+                    <span class="result-value" id="tp-sa-qual-n">-</span>
+                  </div>
+                  <div class="result-row">
+                    <span class="result-label">通过概率（零失效）</span>
+                    <span class="result-value" id="tp-sa-qual-pass">-</span>
+                  </div>
+                </div>
+                <div class="formula-section">
+                  <button type="button" id="tp-sa-qual-formula-toggle" class="btn-link" @click=${toggleQualFormula}>📐 查看计算公式</button>
+                  <div id="tp-sa-qual-formula-content" style="display: none; margin-top: 8px; padding: 8px; background: var(--surface-2); border-radius: var(--radius); font-size: 0.85rem;">
+                    <p><strong>二项分布样本量公式：</strong></p>
+                    <p>P(≤r失效 | n,R) ≤ 1-γ</p>
+                    <p>当 r=0 时：n = ceil(ln(1-γ) / ln(R))</p>
+                    <p>当 r>0 时：搜索最小 n 满足 Σ(k=0 to r) C(n,k)p^k(1-p)^(n-k) ≤ 1-γ</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="sample-analysis-tab-content" id="tp-sa-tab-life-test" style="display: none;">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>目标 B10 寿命 (h)<span class="help-icon" data-tooltip="10%失效概率对应的寿命">?</span></label>
+                    <input type="number" id="tp-sa-b10" class="form-input" min="1" max="100000" step="1" .value=${live("150")} @input=${calculateLifeTestAnalysis} />
+                  </div>
+                  <div class="form-group">
+                    <label>形状参数 β<span class="help-icon" data-tooltip="Weibull形状参数，β>1磨损失效">?</span></label>
+                    <input type="number" id="tp-sa-beta" class="form-input" min="0.5" max="5" step="0.1" .value=${live("2.2")} @input=${calculateLifeTestAnalysis} />
+                  </div>
+                  <div class="form-group">
+                    <label>置信度 γ</label>
+                    <input type="number" id="tp-sa-life-confidence" class="form-input" min="50" max="99.9" step="0.1" .value=${live("90")} @input=${calculateLifeTestAnalysis} />
+                  </div>
+                  <div class="form-group">
+                    <label>允许失效数 r</label>
+                    <input type="number" id="tp-sa-life-allowed" class="form-input" min="0" max="20" step="1" .value=${live("0")} @input=${calculateLifeTestAnalysis} />
+                  </div>
+                  <div class="form-group">
+                    <label>试验时间倍率<span class="help-icon" data-tooltip="试验时间 / B10，越大样本量越少">?</span></label>
+                    <input type="number" id="tp-sa-multiplier" class="form-input" min="0.5" max="5" step="0.1" .value=${live("1.0")} @input=${calculateLifeTestAnalysis} />
+                  </div>
+                </div>
+                <div class="result-card">
+                  <div class="result-row">
+                    <span class="result-label">试验时间</span>
+                    <span class="result-value" id="tp-sa-life-duration">-</span>
+                  </div>
+                  <div class="result-row">
+                    <span class="result-label">所需样本量 n</span>
+                    <span class="result-value" id="tp-sa-life-n">-</span>
+                  </div>
+                  <div class="result-row">
+                    <span class="result-label">等效可靠度 R_test</span>
+                    <span class="result-value" id="tp-sa-life-rtest">-</span>
+                  </div>
+                  <div class="result-row">
+                    <span class="result-label">总台时</span>
+                    <span class="result-value" id="tp-sa-life-total">-</span>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group" style="flex: 1;">
+                    <label>不同倍率优化对比</label>
+                    <table class="data-table tp-compare-table" style="margin-top: 8px;">
+                      <thead>
+                        <tr>
+                          <th>倍率</th>
+                          <th>试验时间</th>
+                          <th>样本量</th>
+                          <th>总台时</th>
+                          <th>节省</th>
+                        </tr>
+                      </thead>
+                      <tbody id="tp-sa-life-comparison">
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="formula-section">
+                  <button type="button" id="tp-sa-life-formula-toggle" class="btn-link" @click=${toggleLifeFormula}>📐 查看计算公式</button>
+                  <div id="tp-sa-life-formula-content" style="display: none; margin-top: 8px; padding: 8px; background: var(--surface-2); border-radius: var(--radius); font-size: 0.85rem;">
+                    <p><strong>Weibull 折算样本量公式：</strong></p>
+                    <p>K10 = ln(10/9) ≈ 0.10536</p>
+                    <p>R_test = exp(-K10 × (T/B10)^β)</p>
+                    <p>n = binomialSampleSize(R_test, γ, r)</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="test-plan-tab-content" id="tp-tab-test-items" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <h3>全局参数设置</h3>
+            </div>
+            <div class="card-body">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>置信度</label>
+                  <select id="tp-confidence" class="form-input" .value=${live("0.9")} @change=${handleGlobalParamChange}>
+                    <option value="0.9">90%</option>
+                    <option value="0.95">95%</option>
+                    <option value="0.99">99%</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>允许失效数</label>
+                  <input type="number" id="tp-allowed-failures" class="form-input" min="0" step="1" .value=${live("0")} @change=${handleGlobalParamChange} />
+                </div>
+                <div class="form-group">
+                  <label>默认截尾类型<span class="help-icon" data-tooltip="定时截尾(到时停) vs 定数截尾(失效数够了停)">?</span></label>
+                  <select id="tp-default-censor" class="form-input" .value=${live("time")} @change=${handleGlobalParamChange}>
+                    <option value="time">定时截尾</option>
+                    <option value="failure">定数截尾</option>
+                    <option value="complete">完全失效</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>形状参数 β<span class="help-icon" data-tooltip="Weibull 分布的形状参数，β>1 表示老化失效，β=1 为随机失效，β<1 为早期失效">?</span></label>
+                  <input type="number" id="tp-default-beta" class="form-input" min="0.1" step="0.1" .value=${live("2.2")} @change=${handleGlobalParamChange} />
+                </div>
+                <div class="form-group">
+                  <label>优化策略<span class="help-icon" data-tooltip="standard=传统截尾系数, optimized=Weibull延长试验(部件2.2×B10,整机1.3×B10), custom=自定义">?</span></label>
+                  <select id="tp-strategy" class="form-input" .value=${live("standard")} @change=${handleStrategyChange}>
+                    <option value="standard">标准</option>
+                    <option value="optimized">Weibull 优化</option>
+                    <option value="custom">自定义</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>试验项目明细</h3>
+              <div class="card-actions">
+                <button type="button" class="btn-icon" id="tp-apply-template" @click=${applyTestPlanTemplate}>
+                  <span>📋</span>
+                  <span class="btn-text">应用模板</span>
+                </button>
+                <button type="button" class="btn-icon" id="tp-import-fmea" @click=${importFromFmea}>
+                  <span>📥</span>
+                  <span class="btn-text">从 FMEA 导入</span>
+                </button>
+                <button type="button" class="btn-icon" id="tp-calc-all" @click=${calculateAllTestItems}>
+                  <span>🔢</span>
+                  <span class="btn-text">计算全部</span>
+                </button>
+                <button type="button" class="btn-icon btn-primary" id="tp-add-item" @click=${addTestItem}>
+                  <span>➕</span>
+                  <span class="btn-text">添加测试项</span>
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="table-wrap">
+                <table class="data-table test-items-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 40px;">#</th>
+                      <th style="width: 18%;">测试项目名称</th>
+                      <th style="width: 80px;">目标寿命</th>
+                      <th style="width: 75px;">可靠度</th>
+                      <th style="width: 70px;">级别</th>
+                      <th style="width: 55px;">β</th>
+                      <th style="width: 70px;">倍率</th>
+                      <th style="width: 65px;">样本量</th>
+                      <th style="width: 80px;">试验时长</th>
+                      <th style="width: 80px;">截尾类型</th>
+                      <th style="width: 15%;">台架条件</th>
+                      <th style="width: 50px;">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tp-items-tbody"></tbody>
+                </table>
+              </div>
+              <div class="empty-state" id="tp-items-empty" style="display: none;">
+                <div class="empty-icon">📋</div>
+                <h3>暂无试验项目</h3>
+                <p>点击「添加测试项」或「从 FMEA 导入」开始创建试验项目。</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>智能优化方案对比</h3>
+            </div>
+            <div class="card-body">
+              <div id="tp-optimize-panel"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="test-plan-tab-content" id="tp-tab-alt" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <h3>ALT 加速寿命试验计划</h3>
+              <div class="card-actions">
+                <button type="button" class="btn-icon btn-primary" id="tp-add-alt" @click=${addAltPlan}>
+                  <span>➕</span>
+                  <span class="btn-text">添加 ALT 计划</span>
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="table-wrap">
+                <table class="data-table alt-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px;">序号</th>
+                      <th style="min-width: 180px;">试验名称</th>
+                      <th style="width: 100px;">应力类型</th>
+                      <th style="width: 140px;">加速模型<span class="help-icon" data-tooltip="Arrhenius温度加速、逆幂律负载加速等，根据失效机理选择">?</span></th>
+                      <th style="width: 120px;">正常使用应力</th>
+                      <th style="width: 130px;">加速应力水平1<span class="help-icon" data-tooltip="加速试验施加的应力等级，至少需要2个水平才能计算加速因子">?</span></th>
+                      <th style="width: 130px;">加速应力水平2</th>
+                      <th style="width: 110px;">加速因子</th>
+                      <th style="width: 110px;">目标B10 (h)<span class="help-icon" data-tooltip="使用工况下的目标B10寿命，用于自动计算加速后所需测试时间">?</span></th>
+                      <th style="width: 110px;">试验时长 (h)<span class="help-icon" data-tooltip="自动计算 = 目标B10 / 加速因子，可手动覆盖">?</span></th>
+                      <th style="width: 90px;">样本量</th>
+                      <th style="width: 70px;">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tp-alt-tbody"></tbody>
+                </table>
+              </div>
+              <div class="empty-state" id="tp-alt-empty" style="display: none;">
+                <div class="empty-icon">⚡</div>
+                <h3>暂无 ALT 试验计划</h3>
+                <p>点击「添加 ALT 计划」开始创建加速寿命试验。</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>加速因子说明</h3>
+            </div>
+            <div class="card-body">
+              <div class="alt-info-grid">
+                <div class="alt-info-item">
+                  <h4>Arrhenius 模型</h4>
+                  <p>适用于温度应力：AF = exp(Ea/k × (1/T_use - 1/T_accel))</p>
+                  <p class="hint">Ea=0.7eV, k=8.617e-5 eV/K</p>
+                </div>
+                <div class="alt-info-item">
+                  <h4>Coffin-Manson 模型</h4>
+                  <p>适用于温度循环：AF = (ΔT_accel / ΔT_use)^n</p>
+                  <p class="hint">n=2.5（默认，范围 2~4）</p>
+                </div>
+                <div class="alt-info-item">
+                  <h4>逆幂律模型</h4>
+                  <p>适用于电压、功率、振动等应力：AF = (S_accel / S_use)^n</p>
+                  <p class="hint">n: 电压=5, 功率=4, 振动=3, 其他=4</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="test-plan-tab-content" id="tp-tab-halt" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <h3>HALT 试验记录</h3>
+              <div class="card-actions">
+                <button type="button" class="btn-icon btn-primary" id="tp-add-halt" @click=${addHaltTest}>
+                  <span>➕</span>
+                  <span class="btn-text">添加 HALT 试验</span>
+                </button>
+              </div>
+            </div>
+            <div class="card-body" id="tp-halt-container">
+              <div class="empty-state" id="tp-halt-empty">
+                <div class="empty-icon">🧪</div>
+                <h3>暂无 HALT 试验记录</h3>
+                <p>点击「添加 HALT 试验」开始记录高加速寿命试验。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="test-plan-tab-content" id="tp-tab-dvpr" style="display: none;">
+          <div class="card">
+            <div class="card-header">
+              <h3>DVP&R 设计验证计划与报告</h3>
+              <div class="card-actions">
+                <span class="selector-label" style="font-size: 0.8rem; color: var(--text-muted);">
+                  共 <span id="dvpr-total">0</span> 项
+                </span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="table-wrap">
+                <table class="data-table dvpr-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px;">序号</th>
+                      <th style="min-width: 200px;">试验项目名称</th>
+                      <th style="min-width: 150px;">试验对象</th>
+                      <th style="min-width: 200px;">试验工况</th>
+                      <th style="width: 80px;">样本量</th>
+                      <th style="width: 120px;">截尾方式<span class="help-icon" data-tooltip="定时截尾(到时停) vs 定数截尾(失效数够了停)">?</span></th>
+                      <th style="min-width: 220px;">验收标准</th>
+                      <th style="width: 100px;">试验结果</th>
+                      <th style="min-width: 150px;">备注</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dvpr-tbody"></tbody>
+                </table>
+              </div>
+              <div class="empty-state" id="dvpr-empty" style="display: none;">
+                <div class="empty-icon">📋</div>
+                <h3>暂无 DVP&R 数据</h3>
+                <p>请先在「试验项目」Tab 中添加试验项目。</p>
+              </div>
+              <div class="dvpr-stats" style="margin-top: 1rem; display: flex; gap: 1.5rem; flex-wrap: wrap;">
+                <div class="dvpr-stat-item">
+                  <span class="dvpr-stat-label">总试验项数：</span>
+                  <span class="dvpr-stat-value" id="dvpr-stat-total">0</span>
+                </div>
+                <div class="dvpr-stat-item">
+                  <span class="dvpr-stat-label">通过：</span>
+                  <span class="dvpr-stat-value dvpr-pass" id="dvpr-stat-passed">0</span>
+                </div>
+                <div class="dvpr-stat-item">
+                  <span class="dvpr-stat-label">失败：</span>
+                  <span class="dvpr-stat-value dvpr-fail" id="dvpr-stat-failed">0</span>
+                </div>
+                <div class="dvpr-stat-item">
+                  <span class="dvpr-stat-label">进行中：</span>
+                  <span class="dvpr-stat-value dvpr-progress" id="dvpr-stat-progress">0</span>
+                </div>
+                <div class="dvpr-stat-item">
+                  <span class="dvpr-stat-label">未开始：</span>
+                  <span class="dvpr-stat-value dvpr-pending" id="dvpr-stat-pending">0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function handleTabClick(e, container) {
+  const tab = e.target.closest(".test-plan-tab");
+  if (!tab) return;
+  switchTab(tab.dataset.tab);
+}
+
+function handleSampleAnalysisTabClick(e, container) {
+  const tab = e.target.closest(".sample-analysis-tab");
+  if (!tab) return;
+  switchSampleAnalysisTab(tab.dataset.tab);
+}
+
+function toggleQualFormula() {
+  const qualToggle = document.getElementById("tp-sa-qual-formula-toggle");
+  const qualContent = document.getElementById("tp-sa-qual-formula-content");
+  if (qualToggle && qualContent) {
+    const isHidden = qualContent.style.display === "none";
+    qualContent.style.display = isHidden ? "" : "none";
+    qualToggle.textContent = isHidden ? "📐 收起公式" : "📐 查看计算公式";
+  }
+}
+
+function toggleLifeFormula() {
+  const lifeToggle = document.getElementById("tp-sa-life-formula-toggle");
+  const lifeContent = document.getElementById("tp-sa-life-formula-content");
+  if (lifeToggle && lifeContent) {
+    const isHidden = lifeContent.style.display === "none";
+    lifeContent.style.display = isHidden ? "" : "none";
+    lifeToggle.textContent = isHidden ? "📐 收起公式" : "📐 查看计算公式";
+  }
+}
+
+function handleGlobalParamChange(e) {
+  const el = e.target;
+  const id = el.id;
+  const params = currentModel.modules.testPlan.globalParams;
+  
+  if (id === "tp-confidence") {
+    params.confidence = Number(el.value);
+  } else if (id === "tp-allowed-failures") {
+    params.allowedFailures = Number(el.value) || 0;
+  } else if (id === "tp-default-censor") {
+    params.defaultCensorType = el.value;
+  } else if (id === "tp-default-beta") {
+    params.defaultBeta = Number(el.value) || 2.2;
+  }
+  autoSave();
+}
+
+function handleStrategyChange(e) {
+  const el = e.target;
+  currentModel.modules.testPlan.globalParams.strategy = el.value;
+  calculateAllTestItems();
+}
+
+function bindEvents(container) {
+  bindTestItemsEvents(container);
+  bindAltEvents(container);
+  bindHaltEvents(container);
+  bindDvprEvents(container);
 }
 
 function switchTab(tabName) {
@@ -146,45 +587,6 @@ function switchTab(tabName) {
   });
   const tabEl = document.getElementById(`tp-tab-${tabName}`);
   if (tabEl) tabEl.style.display = "";
-}
-
-function bindGlobalParamsEvents() {
-  const confidence = document.getElementById("tp-confidence");
-  const allowedFailures = document.getElementById("tp-allowed-failures");
-  const defaultCensor = document.getElementById("tp-default-censor");
-  const defaultBeta = document.getElementById("tp-default-beta");
-  const strategy = document.getElementById("tp-strategy");
-
-  if (confidence) {
-    confidence.addEventListener("change", () => {
-      currentModel.modules.testPlan.globalParams.confidence = Number(confidence.value);
-      autoSave();
-    });
-  }
-  if (allowedFailures) {
-    allowedFailures.addEventListener("change", () => {
-      currentModel.modules.testPlan.globalParams.allowedFailures = Number(allowedFailures.value) || 0;
-      autoSave();
-    });
-  }
-  if (defaultCensor) {
-    defaultCensor.addEventListener("change", () => {
-      currentModel.modules.testPlan.globalParams.defaultCensorType = defaultCensor.value;
-      autoSave();
-    });
-  }
-  if (defaultBeta) {
-    defaultBeta.addEventListener("change", () => {
-      currentModel.modules.testPlan.globalParams.defaultBeta = Number(defaultBeta.value) || 2.2;
-      autoSave();
-    });
-  }
-  if (strategy) {
-    strategy.addEventListener("change", () => {
-      currentModel.modules.testPlan.globalParams.strategy = strategy.value;
-      calculateAllTestItems();
-    });
-  }
 }
 
 function renderGlobalParams() {
@@ -385,18 +787,8 @@ function createNewTestItem() {
   };
 }
 
-function bindTestItemsEvents() {
-  const addBtn = document.getElementById("tp-add-item");
-  const calcAllBtn = document.getElementById("tp-calc-all");
-  const importBtn = document.getElementById("tp-import-fmea");
-  const templateBtn = document.getElementById("tp-apply-template");
-  const tbody = document.getElementById("tp-items-tbody");
-
-  if (addBtn) addBtn.addEventListener("click", addTestItem);
-  if (calcAllBtn) calcAllBtn.addEventListener("click", calculateAllTestItems);
-  if (importBtn) importBtn.addEventListener("click", importFromFmea);
-  if (templateBtn) templateBtn.addEventListener("click", applyTestPlanTemplate);
-
+function bindTestItemsEvents(container) {
+  const tbody = container.querySelector("#tp-items-tbody");
   if (tbody) {
     tbody.addEventListener("change", (e) => {
       const el = e.target.closest("[data-field]");
@@ -471,7 +863,7 @@ function renderTestItems() {
   if (!tbody) return;
 
   if (!items || items.length === 0) {
-    tbody.innerHTML = "";
+    litRender(html``, tbody);
     if (empty) empty.style.display = "";
     return;
   }
@@ -737,12 +1129,8 @@ function createNewAltPlan() {
   };
 }
 
-function bindAltEvents() {
-  const addBtn = document.getElementById("tp-add-alt");
-  const tbody = document.getElementById("tp-alt-tbody");
-
-  if (addBtn) addBtn.addEventListener("click", addAltPlan);
-
+function bindAltEvents(container) {
+  const tbody = container.querySelector("#tp-alt-tbody");
   if (tbody) {
     tbody.addEventListener("change", (e) => {
       const el = e.target.closest("[data-field]");
@@ -800,7 +1188,7 @@ function renderAltPlans() {
   if (!tbody) return;
 
   if (!plans || plans.length === 0) {
-    tbody.innerHTML = "";
+    litRender(html``, tbody);
     if (empty) empty.style.display = "";
     return;
   }
@@ -895,14 +1283,11 @@ function getHaltTotalFailures(test) {
   return test.steps.reduce((sum, s) => sum + (Number(s.failures) || 0), 0);
 }
 
-function bindHaltEvents() {
-  const addBtn = document.getElementById("tp-add-halt");
-  const container = document.getElementById("tp-halt-container");
+function bindHaltEvents(container) {
+  const haltContainer = container.querySelector("#tp-halt-container");
 
-  if (addBtn) addBtn.addEventListener("click", addHaltTest);
-
-  if (container) {
-    container.addEventListener("click", (e) => {
+  if (haltContainer) {
+    haltContainer.addEventListener("click", (e) => {
       const addStepBtn = e.target.closest("button[data-action='add-step']");
       if (addStepBtn) {
         const testId = addStepBtn.dataset.testId;
@@ -926,7 +1311,7 @@ function bindHaltEvents() {
       }
     });
 
-    container.addEventListener("change", (e) => {
+    haltContainer.addEventListener("change", (e) => {
       const el = e.target.closest("[data-field]");
       if (!el) return;
 
@@ -1143,7 +1528,7 @@ function renderDvprTable() {
   const statPending = document.getElementById("dvpr-stat-pending");
 
   if (!items || items.length === 0) {
-    tbody.innerHTML = "";
+    litRender(html``, tbody);
     if (empty) empty.style.display = "";
     if (totalEl) totalEl.textContent = "0";
     if (statTotal) statTotal.textContent = "0";
@@ -1206,8 +1591,8 @@ function renderDvprTable() {
     .join("");
 }
 
-function bindDvprEvents() {
-  const tbody = document.getElementById("dvpr-tbody");
+function bindDvprEvents(container) {
+  const tbody = container.querySelector("#dvpr-tbody");
   if (!tbody) return;
 
   tbody.addEventListener("change", (e) => {
@@ -1424,48 +1809,4 @@ function calculateLifeTestAnalysis() {
   });
 
   document.getElementById("tp-sa-life-comparison").innerHTML = rows;
-}
-
-function bindSampleAnalysisEvents() {
-  const tabContainer = document.querySelector(".sample-analysis-tabs");
-  if (tabContainer) {
-    tabContainer.addEventListener("click", (e) => {
-      const tab = e.target.closest(".sample-analysis-tab");
-      if (!tab) return;
-      switchSampleAnalysisTab(tab.dataset.tab);
-    });
-  }
-
-  document.getElementById("tp-sa-reliability")?.addEventListener("input", calculateQualificationAnalysis);
-  document.getElementById("tp-sa-confidence")?.addEventListener("input", calculateQualificationAnalysis);
-  document.getElementById("tp-sa-allowed")?.addEventListener("input", calculateQualificationAnalysis);
-
-  document.getElementById("tp-sa-b10")?.addEventListener("input", calculateLifeTestAnalysis);
-  document.getElementById("tp-sa-beta")?.addEventListener("input", calculateLifeTestAnalysis);
-  document.getElementById("tp-sa-life-confidence")?.addEventListener("input", calculateLifeTestAnalysis);
-  document.getElementById("tp-sa-life-allowed")?.addEventListener("input", calculateLifeTestAnalysis);
-  document.getElementById("tp-sa-multiplier")?.addEventListener("input", calculateLifeTestAnalysis);
-
-  const qualToggle = document.getElementById("tp-sa-qual-formula-toggle");
-  const qualContent = document.getElementById("tp-sa-qual-formula-content");
-  if (qualToggle && qualContent) {
-    qualToggle.addEventListener("click", () => {
-      const isHidden = qualContent.style.display === "none";
-      qualContent.style.display = isHidden ? "" : "none";
-      qualToggle.textContent = isHidden ? "📐 收起公式" : "📐 查看计算公式";
-    });
-  }
-
-  const lifeToggle = document.getElementById("tp-sa-life-formula-toggle");
-  const lifeContent = document.getElementById("tp-sa-life-formula-content");
-  if (lifeToggle && lifeContent) {
-    lifeToggle.addEventListener("click", () => {
-      const isHidden = lifeContent.style.display === "none";
-      lifeContent.style.display = isHidden ? "" : "none";
-      lifeToggle.textContent = isHidden ? "📐 收起公式" : "📐 查看计算公式";
-    });
-  }
-
-  calculateQualificationAnalysis();
-  calculateLifeTestAnalysis();
 }

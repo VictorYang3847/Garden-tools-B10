@@ -1,3 +1,5 @@
+import { html, render as litRender } from 'lit-html';
+import { live } from 'lit-html/directives/live.js';
 import {
   targetB10,
   targetB10WithoutMargin,
@@ -9,8 +11,8 @@ import {
 
 let currentModel = null;
 let onSaveCallback = null;
-let lastSyncedB10 = null; // 上次同步到其他模块的 B10 值
-let lastSyncedModelId = null; // 跟踪模型切换
+let lastSyncedB10 = null;
+let lastSyncedModelId = null;
 let syncBannerTimer = null;
 
 // 产品信息字段定义
@@ -26,6 +28,31 @@ const PRODUCT_INFO_FIELDS = [
   { id: "product-note", key: "note", label: "备注", type: "textarea" },
 ];
 
+// 本地状态（用于 lit-html 渲染）
+let state = {
+  warrantyYears: 2,
+  hoursPerYear: 25,
+  allowFailRate: 2,
+  beta: 2.2,
+  safetyMargin: 20,
+  time: 50,
+  // 计算结果
+  tw: 0,
+  b10WithMargin: 0,
+  b10NoMargin: 0,
+  eta: 0,
+  mtbf: 0,
+  reliabilityT: 0,
+  failureT: 0,
+  // 同步横幅
+  showSyncBanner: false,
+  pendingB10: 0,
+  // 公式折叠
+  formulaExpanded: false,
+  // 产品卡片折叠
+  productInfoCollapsed: true,
+};
+
 export function init(model, onSave) {
   currentModel = model;
   onSaveCallback = onSave;
@@ -33,109 +60,284 @@ export function init(model, onSave) {
 
 export function render(container, model) {
   currentModel = model;
-  // 模型切换时重置同步跟踪
   if (lastSyncedModelId !== model?.id) {
     lastSyncedModelId = model?.id;
     lastSyncedB10 = null;
   }
-  const template = document.getElementById("home-template");
-  const content = template.content.cloneNode(true);
-  container.appendChild(content);
-
-  loadValuesFromModel();
-  loadProductInfoFromModel();
-  updateProductInfoSummary();
-  bindEvents();
-  bindProductInfoEvents();
-  bindSyncBanner();
-  calculate();
+  loadStateFromModel();
+  doRender(container);
 }
 
-function loadValuesFromModel() {
+function loadStateFromModel() {
   const hc = currentModel?.homeCalc;
   if (!hc) return;
-  const fields = [
-    ["home-warranty-years", "warrantyYears"],
-    ["home-hours-per-year", "hoursPerYear"],
-    ["home-allow-fail-rate", "allowFailRate"],
-    ["home-beta", "beta"],
-    ["home-safety-margin", "safetyMargin"],
-    ["home-time", "time"],
-  ];
-  fields.forEach(([domId, field]) => {
-    const el = document.getElementById(domId);
-    if (el && hc[field] !== undefined && hc[field] !== null) {
-      el.value = hc[field];
-    }
-  });
+  state.warrantyYears = hc.warrantyYears ?? 2;
+  state.hoursPerYear = hc.hoursPerYear ?? 25;
+  state.allowFailRate = hc.allowFailRate ?? 2;
+  state.beta = hc.beta ?? 2.2;
+  state.safetyMargin = hc.safetyMargin ?? 20;
+  state.time = hc.time ?? 50;
 }
 
-function saveValuesToModel() {
+function saveStateToModel() {
   if (!currentModel) return;
   const hc = currentModel.homeCalc || {};
-  hc.warrantyYears = Number(document.getElementById("home-warranty-years")?.value) || 0;
-  hc.hoursPerYear = Number(document.getElementById("home-hours-per-year")?.value) || 0;
-  hc.allowFailRate = Number(document.getElementById("home-allow-fail-rate")?.value) || 0;
-  hc.beta = Number(document.getElementById("home-beta")?.value) || 0;
-  hc.safetyMargin = Number(document.getElementById("home-safety-margin")?.value) || 0;
-  hc.time = Number(document.getElementById("home-time")?.value) || 0;
+  hc.warrantyYears = state.warrantyYears;
+  hc.hoursPerYear = state.hoursPerYear;
+  hc.allowFailRate = state.allowFailRate;
+  hc.beta = state.beta;
+  hc.safetyMargin = state.safetyMargin;
+  hc.time = state.time;
   currentModel.homeCalc = hc;
   if (typeof onSaveCallback === "function") {
     onSaveCallback({ homeCalc: hc });
   }
 }
 
-function bindEvents() {
-  const ids = [
-    "home-warranty-years",
-    "home-hours-per-year",
-    "home-allow-fail-rate",
-    "home-beta",
-    "home-safety-margin",
-    "home-time",
+function doRender(container) {
+  calculate();
+  litRender(html`
+    <div class="module-page home-page">
+      ${renderWelcome()}
+      ${renderToolCards()}
+      ${renderProductInfoCard()}
+      ${renderB10Calculator()}
+      ${renderQuickStart()}
+    </div>
+  `, container);
+}
+
+function renderWelcome() {
+  return html`
+    <div class="home-welcome">
+      <h1 class="home-title">可靠性工具平台</h1>
+      <p class="home-subtitle">专业的锂电产品可靠性分析与计算工具</p>
+    </div>
+  `;
+}
+
+function renderToolCards() {
+  const cards = [
+    { href: "#/fmea", icon: "🔍", name: "FMEA分析", desc: "失效模式与影响分析" },
+    { href: "#/prediction", icon: "📊", name: "可靠性预测", desc: "系统可靠性预计与分配" },
+    { href: "#/life-data", icon: "📈", name: "寿命数据分析", desc: "Weibull分布与B10计算" },
+    { href: "#/test-plan", icon: "📋", name: "测试计划", desc: "试验方案设计与评估" },
+    { href: "#/fta", icon: "🌳", name: "故障树分析", desc: "FTA故障树分析" },
+    { href: "#/growth", icon: "📈", name: "可靠性增长", desc: "可靠性增长模型" },
+    { href: "#/data", icon: "💾", name: "数据管理", desc: "项目数据导入导出" },
   ];
+  return html`
+    <div class="home-section">
+      <h2 class="home-section-title">工具快捷入口</h2>
+      <div class="tool-cards-grid">
+        ${cards.map(c => html`
+          <a href="${c.href}" class="tool-card">
+            <div class="tool-card-icon">${c.icon}</div>
+            <div class="tool-card-name">${c.name}</div>
+            <div class="tool-card-desc">${c.desc}</div>
+          </a>
+        `)}
+      </div>
+    </div>
+  `;
+}
 
-  ids.forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.addEventListener("input", () => {
-        saveValuesToModel();
-        calculate();
-      });
+function renderProductInfoCard() {
+  const summary = getProductInfoSummary();
+  return html`
+    <div class="home-section">
+      <div class="card product-info-card collapsible" data-collapsed="${state.productInfoCollapsed ? 'true' : 'false'}">
+        <div class="card-header collapsible-header" id="product-info-header" @click=${toggleProductInfoCollapse}>
+          <div class="collapsible-title">
+            <span class="collapse-indicator" aria-hidden="true">${state.productInfoCollapsed ? '▶' : '▼'}</span>
+            <h3>产品信息</h3>
+          </div>
+          <div class="product-info-summary" id="product-info-summary">${summary}</div>
+        </div>
+        <div class="card-body collapsible-body">
+          <div class="product-info-grid">
+            ${PRODUCT_INFO_FIELDS.map(f => html`
+              <div class="form-group${f.type === 'textarea' ? ' full-width' : ''}">
+                <label>${f.label}</label>
+                ${f.type === 'textarea'
+                  ? html`<textarea id="${f.id}" class="form-input" rows="2" placeholder="请输入${f.label}" .value=${live(getProductInfoValue(f.key))} @input=${(e) => onProductInfoChange(f.key, e.target.value)}></textarea>`
+                  : html`<input type="${f.type}" id="${f.id}" class="form-input" min="${f.type === 'number' ? '0' : undefined}" step="${f.type === 'number' ? (f.unit ? '0.1' : '1') : undefined}" placeholder="请输入${f.label}" .value=${live(getProductInfoValue(f.key))} @input=${(e) => onProductInfoChange(f.key, f.type === 'number' ? Number(e.target.value) || 0 : e.target.value)} />`
+                }
+              </div>
+            `)}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function getProductInfoValue(key) {
+  const pi = currentModel?.productInfo || {};
+  let val = pi[key];
+  if (key === "modelName" && (val === undefined || val === null || val === "")) {
+    val = currentModel?.name ?? "";
+  }
+  return val ?? "";
+}
+
+function onProductInfoChange(key, value) {
+  if (!currentModel) return;
+  const pi = currentModel.productInfo || {};
+  pi[key] = value;
+  pi.updatedAt = new Date().toISOString();
+  currentModel.productInfo = pi;
+
+  // 同步型号名称到 model.name
+  if (key === "modelName") {
+    const newName = value || "";
+    if (newName && newName !== currentModel.name) {
+      currentModel.name = newName;
     }
-  });
+  }
 
-  const formulaToggle = document.getElementById("home-formula-toggle");
-  const formulaContent = document.getElementById("home-formula-content");
-  if (formulaToggle && formulaContent) {
-    formulaToggle.addEventListener("click", () => {
-      const isHidden = formulaContent.style.display === "none";
-      formulaContent.style.display = isHidden ? "" : "none";
-      formulaToggle.textContent = isHidden ? "📐 收起公式" : "📐 查看计算公式";
-    });
+  if (typeof onSaveCallback === "function") {
+    const payload = { productInfo: pi };
+    if (key === "modelName" && value !== currentModel.name) {
+      payload.name = value;
+    }
+    onSaveCallback(payload);
   }
 }
 
-function calculate() {
-  const warrantyYears = Number(document.getElementById("home-warranty-years")?.value) || 0;
-  const hoursPerYear = Number(document.getElementById("home-hours-per-year")?.value) || 0;
-  const allowFailRate = Number(document.getElementById("home-allow-fail-rate")?.value) || 0;
-  const beta = Number(document.getElementById("home-beta")?.value) || 0;
-  const safetyMargin = Number(document.getElementById("home-safety-margin")?.value) || 0;
-  const t = Number(document.getElementById("home-time")?.value) || 0;
+function getProductInfoSummary() {
+  const modelName = getProductInfoValue("modelName") || currentModel?.name || "未命名型号";
+  const projectCode = getProductInfoValue("projectCode");
+  return projectCode ? `${modelName} | ${projectCode}` : modelName;
+}
 
-  const twEl = document.getElementById("home-tw");
-  const b10El = document.getElementById("home-b10");
-  const b10NoMarginEl = document.getElementById("home-b10-no-margin");
-  const etaEl = document.getElementById("home-eta");
-  const mtbfEl = document.getElementById("home-mtbf");
-  const reliabilityTEl = document.getElementById("home-reliability-t");
-  const failureTEl = document.getElementById("home-failure-t");
+function toggleProductInfoCollapse() {
+  state.productInfoCollapsed = !state.productInfoCollapsed;
+  doRender(document.getElementById("app-content"));
+}
+
+function renderB10Calculator() {
+  return html`
+    <div class="home-section">
+      <div class="card b10-quick-card">
+        <div class="card-header">
+          <h3>B10 目标定义计算器</h3>
+        </div>
+        <div class="card-body">
+          <div class="b10-calc-layout">
+            <div class="b10-calc-inputs">
+              <div class="form-group">
+                <label>质保期 (年)</label>
+                <input type="number" class="form-input" min="0.5" max="10" step="0.5" .value=${live(state.warrantyYears)} @input=${(e) => onB10Input('warrantyYears', Number(e.target.value))} />
+              </div>
+              <div class="form-group">
+                <label>年使用时长 (小时/年)</label>
+                <input type="number" class="form-input" min="1" max="1000" step="1" .value=${live(state.hoursPerYear)} @input=${(e) => onB10Input('hoursPerYear', Number(e.target.value))} />
+              </div>
+              <div class="form-group">
+                <label>允许失效率 (%)</label>
+                <input type="number" class="form-input" min="0.1" max="10" step="0.1" .value=${live(state.allowFailRate)} @input=${(e) => onB10Input('allowFailRate', Number(e.target.value))} />
+              </div>
+              <div class="form-group">
+                <label>形状参数 β<span class="help-icon" data-tooltip="Weibull形状参数：β>1磨损失效(典型2.0~2.5)，β=1随机失效，β<1早期失效">?</span></label>
+                <input type="number" class="form-input" min="0.1" step="0.1" .value=${live(state.beta)} @input=${(e) => onB10Input('beta', Number(e.target.value))} />
+              </div>
+              <div class="form-group">
+                <label>安全余量 (%)<span class="help-icon" data-tooltip="设计余量，行业常用20%~30%，考虑制造波动和使用条件变化">?</span></label>
+                <input type="number" class="form-input" min="0" max="50" step="5" .value=${live(state.safetyMargin)} @input=${(e) => onB10Input('safetyMargin', Number(e.target.value))} />
+              </div>
+              <div class="form-group">
+                <label>指定时间 t (小时)<span class="help-icon" data-tooltip="查询该时刻的可靠度，例如质保总时长或设计寿命">?</span></label>
+                <input type="number" class="form-input" min="0" step="1" .value=${live(state.time)} @input=${(e) => onB10Input('time', Number(e.target.value))} />
+              </div>
+            </div>
+            <div class="b10-calc-results">
+              ${renderMetricCard('质保总时长 Tw', state.tw.toFixed(0), '小时')}
+              ${renderMetricCard('目标 B10 (含余量)', state.b10WithMargin.toFixed(1), '小时', true)}
+              ${state.showSyncBanner ? html`
+                <div class="b10-sync-banner" id="b10-sync-banner">
+                  <span class="sync-banner-text">目标B10已更新为 ${state.pendingB10.toFixed(1)} 小时，是否同步到其他模块？</span>
+                  <div class="sync-banner-actions">
+                    <button type="button" class="btn-sync-confirm" id="b10-sync-btn" @click=${onSyncConfirm}>同步</button>
+                    <button type="button" class="btn-sync-dismiss" id="b10-sync-dismiss" @click=${onSyncDismiss}>忽略</button>
+                  </div>
+                </div>
+              ` : ''}
+              ${renderMetricCard('目标 B10 (不含余量)', state.b10NoMargin.toFixed(1), '小时')}
+              ${renderMetricCard('所需特征寿命 η', state.eta.toFixed(1), '小时')}
+              ${renderMetricCard('所需 MTBF', state.mtbf.toFixed(1), '小时')}
+              ${renderMetricCard('t 时刻可靠度', (state.reliabilityT * 100).toFixed(2), '%')}
+              ${renderMetricCard('t 时刻失效概率', (state.failureT * 100).toFixed(2), '%')}
+              <div class="formula-section">
+                <button type="button" class="formula-toggle" id="home-formula-toggle" @click=${toggleFormula}>${state.formulaExpanded ? ' 收起公式' : '📐 查看计算公式'}</button>
+                ${state.formulaExpanded ? html`
+                  <div class="formula-content formula-grid" id="home-formula-content">
+                    <div class="formula-item">
+                      <h4>质保总时长</h4>
+                      <div class="formula-equation">Tw = 质保年数 × 年使用时长</div>
+                    </div>
+                    <div class="formula-item">
+                      <h4>特征寿命 η</h4>
+                      <div class="formula-equation">η = B10 / [ln(10/9)]<sup>1/β</sup></div>
+                    </div>
+                    <div class="formula-item formula-item-wide">
+                      <h4>目标 B10 寿命（含安全余量）</h4>
+                      <div class="formula-equation">B10 = Tw × [ln(10/9) / -ln(1-Fw)]<sup>1/β</sup> × (1 + margin)</div>
+                      <div class="formula-vars-inline">
+                        <span class="var-chip"><b>Tw</b>质保总时长</span>
+                        <span class="var-chip"><b>Fw</b>允许失效率</span>
+                        <span class="var-chip"><b>β</b>形状参数</span>
+                        <span class="var-chip"><b>margin</b>安全余量</span>
+                      </div>
+                      <div class="formula-note">ln(10/9)≈0.10536，B10点对应的标准常数</div>
+                    </div>
+                    <div class="formula-item">
+                      <h4>MTBF</h4>
+                      <div class="formula-equation">MTBF = η × Γ(1 + 1/β)</div>
+                    </div>
+                    <div class="formula-item">
+                      <h4>t 时刻可靠度</h4>
+                      <div class="formula-equation">R(t) = exp(-(t/η)<sup>β</sup>)</div>
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderMetricCard(label, value, unit, highlight) {
+  return html`
+    <div class="metric-card${highlight ? ' b10-highlight' : ''}">
+      <div class="metric-label">${label}</div>
+      <div class="metric-value">${value}</div>
+      <div class="metric-unit">${unit}</div>
+    </div>
+  `;
+}
+
+function onB10Input(field, value) {
+  state[field] = value;
+  saveStateToModel();
+  checkB10Sync();
+  doRender(document.getElementById("app-content"));
+}
+
+function calculate() {
+  const { warrantyYears, hoursPerYear, allowFailRate, beta, safetyMargin, time } = state;
 
   if (warrantyYears <= 0 || hoursPerYear <= 0 || allowFailRate <= 0 || beta <= 0) {
-    [twEl, b10El, b10NoMarginEl, etaEl, mtbfEl, reliabilityTEl, failureTEl].forEach((el) => {
-      if (el) el.textContent = "—";
-    });
+    state.tw = 0;
+    state.b10WithMargin = 0;
+    state.b10NoMargin = 0;
+    state.eta = 0;
+    state.mtbf = 0;
+    state.reliabilityT = 0;
+    state.failureT = 0;
     return;
   }
 
@@ -143,213 +345,77 @@ function calculate() {
   const fw = allowFailRate / 100;
   const margin = safetyMargin / 100;
 
-  const b10WithMargin = targetB10(tw, fw, beta, margin);
-  const b10NoMargin = targetB10WithoutMargin(tw, fw, beta);
-  const eta = weibullEta(b10WithMargin, beta);
-  const mtbf = calcMtbf(eta, beta);
-  const ft = failureRate(t, b10WithMargin, beta);
-  const rt = 1 - ft;
-
-  if (twEl) twEl.textContent = tw.toFixed(0);
-  if (b10El) b10El.textContent = b10WithMargin.toFixed(1);
-  if (b10NoMarginEl) b10NoMarginEl.textContent = b10NoMargin.toFixed(1);
-  if (etaEl) etaEl.textContent = eta.toFixed(1);
-  if (mtbfEl) mtbfEl.textContent = mtbf.toFixed(1);
-  if (reliabilityTEl) reliabilityTEl.textContent = (rt * 100).toFixed(2);
-  if (failureTEl) failureTEl.textContent = (ft * 100).toFixed(2);
-
-  // 检测 B10 含余量值是否变化，提示同步
-  checkB10Sync(b10WithMargin);
+  state.tw = tw;
+  state.b10WithMargin = targetB10(tw, fw, beta, margin);
+  state.b10NoMargin = targetB10WithoutMargin(tw, fw, beta);
+  state.eta = weibullEta(state.b10WithMargin, beta);
+  state.mtbf = calcMtbf(state.eta, beta);
+  state.failureT = failureRate(time, state.b10WithMargin, beta);
+  state.reliabilityT = 1 - state.failureT;
 }
 
-// ========== B10 同步逻辑 ==========
-
-function checkB10Sync(b10WithMargin) {
+function checkB10Sync() {
   if (!currentModel) return;
-
-  // 首次加载：记录初始值，不弹提示
   if (lastSyncedB10 === null) {
-    lastSyncedB10 = b10WithMargin;
+    lastSyncedB10 = state.b10WithMargin;
     return;
   }
-
-  // 值没变化，不处理
-  const diff = Math.abs(b10WithMargin - lastSyncedB10);
+  const diff = Math.abs(state.b10WithMargin - lastSyncedB10);
   if (diff < 0.1) return;
-
-  // 值变化了，显示同步提示
-  showSyncBanner(b10WithMargin);
+  state.showSyncBanner = true;
+  state.pendingB10 = state.b10WithMargin;
 }
 
-function showSyncBanner(newB10) {
-  const banner = document.getElementById("b10-sync-banner");
-  if (!banner) return;
-
-  banner.hidden = false;
-
-  // 更新提示文字
-  const textEl = banner.querySelector(".sync-banner-text");
-  if (textEl) {
-    textEl.textContent = `目标B10已更新为 ${newB10.toFixed(1)} 小时，是否同步到其他模块？`;
-  }
-
-  // 存储待同步的值
-  banner.dataset.pendingB10 = newB10.toFixed(1);
-
-  // 自动消失（15秒）
-  clearTimeout(syncBannerTimer);
-  syncBannerTimer = setTimeout(() => {
-    hideSyncBanner();
-  }, 15000);
+function onSyncConfirm() {
+  if (!currentModel) return;
+  syncB10ToModules(state.pendingB10);
+  lastSyncedB10 = state.pendingB10;
+  state.showSyncBanner = false;
+  doRender(document.getElementById("app-content"));
 }
 
-function hideSyncBanner() {
-  const banner = document.getElementById("b10-sync-banner");
-  if (banner) banner.hidden = true;
-  clearTimeout(syncBannerTimer);
-}
-
-function bindSyncBanner() {
-  const syncBtn = document.getElementById("b10-sync-btn");
-  const dismissBtn = document.getElementById("b10-sync-dismiss");
-
-  if (syncBtn) {
-    syncBtn.addEventListener("click", () => {
-      const banner = document.getElementById("b10-sync-banner");
-      const pendingB10 = parseFloat(banner?.dataset.pendingB10);
-      if (!isNaN(pendingB10) && currentModel) {
-        syncB10ToModules(pendingB10);
-        lastSyncedB10 = pendingB10;
-      }
-      hideSyncBanner();
-    });
-  }
-
-  if (dismissBtn) {
-    dismissBtn.addEventListener("click", () => {
-      // 忽略：更新 lastSyncedB10 为当前值，避免重复弹窗
-      const banner = document.getElementById("b10-sync-banner");
-      const pendingB10 = parseFloat(banner?.dataset.pendingB10);
-      if (!isNaN(pendingB10)) {
-        lastSyncedB10 = pendingB10;
-      }
-      hideSyncBanner();
-    });
-  }
+function onSyncDismiss() {
+  lastSyncedB10 = state.pendingB10;
+  state.showSyncBanner = false;
+  doRender(document.getElementById("app-content"));
 }
 
 function syncB10ToModules(b10Value) {
   if (!currentModel) return;
-
-  // 同步到预测模块的分配目标B10
   const prediction = currentModel.modules?.prediction;
   if (prediction?.allocation) {
     prediction.allocation.targetB10 = b10Value;
   }
-
-  // 保存到模型
   if (typeof onSaveCallback === "function") {
     onSaveCallback({});
   }
 }
 
-// ========== 产品信息相关函数 ==========
-
-function loadProductInfoFromModel() {
-  const productInfo = currentModel?.productInfo || {};
-  PRODUCT_INFO_FIELDS.forEach(({ id, key, type }) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    // 型号名称字段：优先使用 productInfo.modelName，为空时回退到 model.name，保持与顶部型号选择器对齐
-    let value = productInfo[key];
-    if (key === "modelName" && (value === undefined || value === null || value === "")) {
-      value = currentModel?.name ?? "";
-    }
-    if (value !== undefined && value !== null) {
-      if (type === "number") {
-        el.value = value;
-      } else {
-        el.value = value;
-      }
-    }
-  });
+function toggleFormula() {
+  state.formulaExpanded = !state.formulaExpanded;
+  doRender(document.getElementById("app-content"));
 }
 
-function saveProductInfoToModel() {
-  if (!currentModel) return;
-
-  const productInfo = {};
-  PRODUCT_INFO_FIELDS.forEach(({ id, key, type }) => {
-    const el = document.getElementById(id);
-    if (el) {
-      if (type === "number") {
-        productInfo[key] = Number(el.value) || 0;
-      } else {
-        productInfo[key] = el.value || "";
-      }
-    }
-  });
-
-  productInfo.updatedAt = new Date().toISOString();
-  currentModel.productInfo = productInfo;
-
-  // 同步型号名称到 model.name（与顶部型号选择器对齐）
-  const newName = productInfo.modelName || "";
-  const nameChanged = newName && newName !== currentModel.name;
-  if (nameChanged) {
-    currentModel.name = newName;
-  }
-
-  if (typeof onSaveCallback === "function") {
-    // 传入 name 字段，app.js 的 saveModel 回调会调用 refreshAllSelectors 刷新顶部型号选择器
-    const payload = { productInfo };
-    if (nameChanged) payload.name = newName;
-    onSaveCallback(payload);
-  }
-}
-
-function updateProductInfoSummary() {
-  const summaryEl = document.getElementById("product-info-summary");
-  if (!summaryEl) return;
-
-  const nameEl = document.getElementById("product-model-name");
-  const codeEl = document.getElementById("product-project-code");
-  const modelName = (nameEl?.value || "").trim() || currentModel?.name || "未命名型号";
-  const projectCode = (codeEl?.value || "").trim();
-
-  summaryEl.textContent = projectCode
-    ? `${modelName} | ${projectCode}`
-    : modelName;
-}
-
-function toggleProductInfoCollapse() {
-  const card = document.querySelector(".product-info-card.collapsible");
-  if (!card) return;
-  const isCollapsed = card.dataset.collapsed === "true";
-  card.dataset.collapsed = isCollapsed ? "false" : "true";
-  const indicator = card.querySelector(".collapse-indicator");
-  if (indicator) {
-    indicator.textContent = isCollapsed ? "▼" : "▶";
-  }
-}
-
-function bindProductInfoEvents() {
-  // 折叠/展开：点击卡片标题切换
-  const header = document.getElementById("product-info-header");
-  if (header) {
-    header.addEventListener("click", toggleProductInfoCollapse);
-  }
-
-  // 自动保存：编辑任意字段后立即保存并更新摘要
-  PRODUCT_INFO_FIELDS.forEach(({ id }) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.addEventListener("input", () => {
-        saveProductInfoToModel();
-        updateProductInfoSummary();
-        // 型号名称变化时，同步更新顶部型号选择器（由 onSaveCallback 触发 refreshAllSelectors）
-        // 注意：不在此处刷新页面，避免输入框失焦
-      });
-    }
-  });
+function renderQuickStart() {
+  const steps = [
+    { num: 1, title: "创建/选择产品型号", desc: "在顶部选择器中创建或选择您的产品和型号" },
+    { num: 2, title: "使用工具进行分析", desc: "从左侧导航或上方快捷入口进入所需的可靠性分析工具" },
+    { num: 3, title: "导出结果或保存数据", desc: "完成分析后，可导出结果或通过数据管理保存项目数据" },
+  ];
+  return html`
+    <div class="home-section">
+      <h2 class="home-section-title">快速开始</h2>
+      <div class="quick-start-steps">
+        ${steps.map(s => html`
+          <div class="step-card">
+            <div class="step-number">${s.num}</div>
+            <div class="step-content">
+              <h3>${s.title}</h3>
+              <p>${s.desc}</p>
+            </div>
+          </div>
+        `)}
+      </div>
+    </div>
+  `;
 }

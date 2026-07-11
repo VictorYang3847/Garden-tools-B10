@@ -1,3 +1,7 @@
+import { html, render as litRender } from 'lit-html';
+import { live } from 'lit-html/directives/live.js';
+import { getCurrentProduct, getProductShared } from "../store.js";
+
 let onSaveCallback = null;
 let currentModel = null;
 let currentFilter = "all";
@@ -5,8 +9,6 @@ let fmeaData = null;
 let currentRatingInput = null;
 let currentRatingType = null;
 const expandedRows = new Set();
-
-import { getCurrentProduct, getProductShared } from "../store.js";
 
 const SEVERITY_RATINGS = [
   { score: 10, desc: "危及安全/违反法规，无预警" },
@@ -107,141 +109,16 @@ function createNewItem() {
   };
 }
 
-function escapeHtml(s) {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
 function apBadge(ap) {
-  if (!ap) return '<span class="ap-badge ap-l">-</span>';
+  if (!ap) return html`<span class="ap-badge ap-l">-</span>`;
   const label = { H: "H", M: "M", L: "L" }[ap] || ap;
-  return `<span class="ap-badge ap-${ap.toLowerCase()}">${label}</span>`;
-}
-
-function renderRow(item, index) {
-  const expanded = expandedRows.has(item.id);
-  return `
-    <tr data-id="${item.id}" class="fmea-main-row">
-      <td class="fmea-toggle-cell">
-        <button type="button" class="fmea-toggle-btn" data-action="toggle" title="${expanded ? "折叠" : "展开"}">${expanded ? "▼" : "▶"}</button>
-      </td>
-      <td class="fmea-index">${index + 1}</td>
-      <td><input type="text" class="item-input" data-field="function" value="${escapeHtml(item.function)}" placeholder="功能/过程要求" /></td>
-      <td><input type="text" class="item-input" data-field="failureMode" value="${escapeHtml(item.failureMode)}" placeholder="失效模式" /></td>
-      <td><input type="number" class="item-input fmea-num-input" data-field="severity" value="${item.severity}" min="1" max="10" /></td>
-      <td><input type="number" class="item-input fmea-num-input" data-field="occurrence" value="${item.occurrence}" min="1" max="10" /></td>
-      <td><input type="number" class="item-input fmea-num-input" data-field="detection" value="${item.detection}" min="1" max="10" /></td>
-      <td class="fmea-rpn-cell" data-rpn>${item.rpn}</td>
-      <td class="fmea-ap-cell" data-ap>${apBadge(item.ap)}</td>
-      <td class="fmea-action-cell">
-        <button type="button" class="fmea-delete-btn" data-action="delete" title="删除">🗑️</button>
-      </td>
-    </tr>
-    ${renderDetailRow(item, expanded)}
-  `;
-}
-
-function renderDetailRow(item, expanded) {
-  const newApBadge = item.newAp
-    ? apBadge(item.newAp)
-    : '<span class="ap-badge ap-l">-</span>';
-  return `
-    <tr data-id="${item.id}" class="fmea-detail-row" style="display: ${expanded ? "table-row" : "none"};">
-      <td colspan="10">
-        <div class="fmea-detail-grid">
-          <div class="fmea-detail-item">
-            <label>失效后果</label>
-            <input type="text" class="item-input" data-field="effect" value="${escapeHtml(item.effect)}" placeholder="失效后果" />
-          </div>
-          <div class="fmea-detail-item">
-            <label>失效原因</label>
-            <input type="text" class="item-input" data-field="cause" value="${escapeHtml(item.cause)}" placeholder="失效原因" />
-          </div>
-          <div class="fmea-detail-item">
-            <label>现行控制 - 预防</label>
-            <input type="text" class="item-input" data-field="controlPrevention" value="${escapeHtml(item.controlPrevention)}" placeholder="预防控制" />
-          </div>
-          <div class="fmea-detail-item">
-            <label>现行控制 - 探测</label>
-            <input type="text" class="item-input" data-field="controlDetection" value="${escapeHtml(item.controlDetection)}" placeholder="探测控制" />
-          </div>
-          <div class="fmea-detail-item">
-            <label>建议措施</label>
-            <input type="text" class="item-input" data-field="action" value="${escapeHtml(item.action)}" placeholder="建议措施" />
-          </div>
-          <div class="fmea-detail-item">
-            <label>责任部门/人 · 目标完成日期</label>
-            <div class="fmea-detail-pair">
-              <input type="text" class="item-input" data-field="responsible" value="${escapeHtml(item.responsible)}" placeholder="责任部门/人" />
-              <input type="date" class="item-input" data-field="targetDate" value="${escapeHtml(item.targetDate)}" />
-            </div>
-          </div>
-          <div class="fmea-detail-item fmea-detail-result">
-            <label>措施结果（S新 / O新 / D新 → RPN新 / AP新）</label>
-            <div class="fmea-detail-result-row">
-              <input type="number" class="item-input fmea-num-input" data-field="newSeverity" value="${item.newSeverity}" min="0" max="10" placeholder="S新" />
-              <input type="number" class="item-input fmea-num-input" data-field="newOccurrence" value="${item.newOccurrence}" min="0" max="10" placeholder="O新" />
-              <input type="number" class="item-input fmea-num-input" data-field="newDetection" value="${item.newDetection}" min="0" max="10" placeholder="D新" />
-              <span class="fmea-detail-arrow">→</span>
-              <span class="fmea-detail-rpn" data-new-rpn>${item.newRpn || "-"}</span>
-              <span class="fmea-detail-ap" data-new-ap>${newApBadge}</span>
-            </div>
-          </div>
-        </div>
-      </td>
-    </tr>
-  `;
+  return html`<span class="ap-badge ap-${ap.toLowerCase()}">${label}</span>`;
 }
 
 function getFilteredItems() {
   if (!fmeaData || !fmeaData.items) return [];
   if (currentFilter === "all") return fmeaData.items;
   return fmeaData.items.filter((item) => item.ap === currentFilter);
-}
-
-function renderTable(container) {
-  const tbody = container.querySelector("#fmea-table-body");
-  const emptyState = container.querySelector("#fmea-empty-state");
-  const items = getFilteredItems();
-
-  if (!items || items.length === 0) {
-    tbody.innerHTML = "";
-    emptyState.style.display = "block";
-    return;
-  }
-
-  emptyState.style.display = "none";
-  let displayIndex = 0;
-  tbody.innerHTML = fmeaData.items
-    .map((item, realIndex) => {
-      if (currentFilter !== "all" && item.ap !== currentFilter) return "";
-      displayIndex++;
-      return renderRow(item, displayIndex - 1);
-    })
-    .join("");
-}
-
-function updateTabState(container) {
-  const tabs = container.querySelectorAll(".fmea-tab");
-  tabs.forEach((tab) => {
-    tab.classList.toggle("active", tab.dataset.type === fmeaData.type);
-  });
-}
-
-function saveData() {
-  if (onSaveCallback && currentModel) {
-    const updated = {
-      ...currentModel,
-      modules: {
-        ...currentModel.modules,
-        fmea: fmeaData,
-      },
-    };
-    onSaveCallback(updated);
-  }
 }
 
 function updateItemCalculations(item) {
@@ -267,7 +144,22 @@ function updateItemCalculations(item) {
   }
 }
 
-function handleInputChange(container, e) {
+function saveData() {
+  if (onSaveCallback && currentModel) {
+    const updated = {
+      ...currentModel,
+      modules: {
+        ...currentModel.modules,
+        fmea: fmeaData,
+      },
+    };
+    onSaveCallback(updated);
+  }
+}
+
+// --- Event handlers (receive container reference) ---
+
+function handleFieldInput(container, e) {
   const input = e.target;
   if (!input.matches("[data-field]")) return;
 
@@ -287,33 +179,8 @@ function handleInputChange(container, e) {
 
   updateItemCalculations(item);
   saveData();
-
-  let mainRow = null;
-  let detailRow = null;
-  if (tr.classList.contains("fmea-main-row")) {
-    mainRow = tr;
-    detailRow = tr.nextElementSibling;
-  } else if (tr.classList.contains("fmea-detail-row")) {
-    mainRow = tr.previousElementSibling;
-    detailRow = tr;
-  }
-
-  if (mainRow) {
-    const rpnCell = mainRow.querySelector("[data-rpn]");
-    const apCell = mainRow.querySelector("[data-ap]");
-    if (rpnCell) rpnCell.textContent = item.rpn;
-    if (apCell) apCell.innerHTML = apBadge(item.ap);
-  }
-  if (detailRow) {
-    const newRpnCell = detailRow.querySelector("[data-new-rpn]");
-    const newApCell = detailRow.querySelector("[data-new-ap]");
-    if (newRpnCell) newRpnCell.textContent = item.newRpn || "-";
-    if (newApCell) {
-      newApCell.innerHTML = item.newAp
-        ? apBadge(item.newAp)
-        : '<span class="ap-badge ap-l">-</span>';
-    }
-  }
+  // Re-render to update RPN/AP cells
+  renderPage(container);
 }
 
 function handleDeleteClick(container, e) {
@@ -331,7 +198,7 @@ function handleDeleteClick(container, e) {
   expandedRows.delete(id);
   fmeaData.items = fmeaData.items.filter((i) => i.id !== id);
   saveData();
-  renderTable(container);
+  renderPage(container);
 }
 
 function handleToggleRow(container, e) {
@@ -344,21 +211,12 @@ function handleToggleRow(container, e) {
   const id = tr.dataset.id;
   if (!id) return;
 
-  const detailRow = tr.nextElementSibling;
-  if (!detailRow || !detailRow.classList.contains("fmea-detail-row")) return;
-
-  const isExpanded = expandedRows.has(id);
-  if (isExpanded) {
+  if (expandedRows.has(id)) {
     expandedRows.delete(id);
-    detailRow.style.display = "none";
-    btn.textContent = "▶";
-    btn.title = "展开";
   } else {
     expandedRows.add(id);
-    detailRow.style.display = "table-row";
-    btn.textContent = "▼";
-    btn.title = "折叠";
   }
+  renderPage(container);
 }
 
 function handleTabClick(container, e) {
@@ -370,26 +228,29 @@ function handleTabClick(container, e) {
 
   fmeaData.type = type;
   saveData();
-  updateTabState(container);
+  renderPage(container);
 }
 
 function handleAddRow(container) {
   const newItem = createNewItem();
   fmeaData.items.push(newItem);
   saveData();
-  renderTable(container);
+  renderPage(container);
 
+  // Focus the first input of the new row
   const tbody = container.querySelector("#fmea-table-body");
-  const lastRow = tbody.querySelector(`tr.fmea-main-row[data-id="${newItem.id}"]`);
-  if (lastRow) {
-    const firstInput = lastRow.querySelector("input[data-field='function']");
-    if (firstInput) firstInput.focus();
+  if (tbody) {
+    const lastRow = tbody.querySelector(`tr.fmea-main-row[data-id="${newItem.id}"]`);
+    if (lastRow) {
+      const firstInput = lastRow.querySelector("input[data-field='function']");
+      if (firstInput) firstInput.focus();
+    }
   }
 }
 
 function handleFilterChange(container, e) {
   currentFilter = e.target.value;
-  renderTable(container);
+  renderPage(container);
 }
 
 function getRatingData(type) {
@@ -601,75 +462,6 @@ function exportCsv() {
   URL.revokeObjectURL(url);
 }
 
-function bindEvents(container) {
-  const tbody = container.querySelector("#fmea-table-body");
-  tbody.addEventListener("input", (e) => handleInputChange(container, e));
-  tbody.addEventListener("click", (e) => {
-    handleToggleRow(container, e);
-    handleDeleteClick(container, e);
-    handleRatingInputClick(container, e);
-  });
-
-  const tabs = container.querySelector(".fmea-tabs");
-  tabs.addEventListener("click", (e) => handleTabClick(container, e));
-
-  const addBtn = container.querySelector("#fmea-add-row");
-  addBtn.addEventListener("click", () => handleAddRow(container));
-
-  const emptyAddBtn = container.querySelector("#fmea-empty-add-btn");
-  emptyAddBtn.addEventListener("click", () => handleAddRow(container));
-
-  const filterSelect = container.querySelector("#fmea-ap-filter");
-  filterSelect.addEventListener("change", (e) => handleFilterChange(container, e));
-
-  const exportBtn = container.querySelector("#fmea-export-csv");
-  exportBtn.addEventListener("click", exportCsv);
-
-  const inheritBtn = container.querySelector("#fmea-inherit-template");
-  inheritBtn.addEventListener("click", () => handleInheritFromTemplate(container));
-
-  const ratingPanel = container.querySelector("#fmea-rating-panel");
-  if (ratingPanel) {
-    ratingPanel.addEventListener("click", (e) => {
-      handleRatingClick(container, e);
-      handleRatingPanelClose(container, e);
-    });
-  }
-
-  document.addEventListener("click", handleDocumentClick);
-}
-
-export function init(model, onSave) {
-  currentModel = model;
-  onSaveCallback = onSave;
-}
-
-export function render(container, model) {
-  currentModel = model;
-
-  const template = document.getElementById("fmea-template");
-  if (!template) {
-    container.innerHTML = '<div class="error-state"><h3>加载失败</h3><p>FMEA 模板未找到</p></div>';
-    return;
-  }
-
-  const clone = template.content.cloneNode(true);
-  container.innerHTML = "";
-  container.appendChild(clone);
-
-  fmeaData = model?.modules?.fmea || { items: [], type: "DFMEA" };
-  if (!fmeaData.items) fmeaData.items = [];
-  if (!fmeaData.type) fmeaData.type = "DFMEA";
-
-  currentFilter = "all";
-
-  fmeaData.items.forEach((item) => updateItemCalculations(item));
-
-  updateTabState(container);
-  renderTable(container);
-  bindEvents(container);
-}
-
 function handleInheritFromTemplate(container) {
   const currentProduct = getCurrentProduct();
   if (!currentProduct) {
@@ -703,9 +495,213 @@ function handleInheritFromTemplate(container) {
 
   if (addedCount > 0) {
     saveData();
-    renderTable(container);
+    renderPage(container);
     alert(`成功从模板继承 ${addedCount} 个失效模式`);
   } else {
     alert("模板中的失效模式已经全部存在");
   }
+}
+
+// --- lit-html rendering ---
+
+function renderMainRow(item, index) {
+  const expanded = expandedRows.has(item.id);
+  return html`
+    <tr data-id="${item.id}" class="fmea-main-row">
+      <td class="fmea-toggle-cell">
+        <button type="button" class="fmea-toggle-btn" data-action="toggle" title="${expanded ? "折叠" : "展开"}">${expanded ? "▼" : "▶"}</button>
+      </td>
+      <td class="fmea-index">${index + 1}</td>
+      <td><input type="text" class="item-input" data-field="function" .value=${live(item.function ?? "")} placeholder="功能/过程要求" /></td>
+      <td><input type="text" class="item-input" data-field="failureMode" .value=${live(item.failureMode ?? "")} placeholder="失效模式" /></td>
+      <td><input type="number" class="item-input fmea-num-input" data-field="severity" .value=${live(String(item.severity))} min="1" max="10" /></td>
+      <td><input type="number" class="item-input fmea-num-input" data-field="occurrence" .value=${live(String(item.occurrence))} min="1" max="10" /></td>
+      <td><input type="number" class="item-input fmea-num-input" data-field="detection" .value=${live(String(item.detection))} min="1" max="10" /></td>
+      <td class="fmea-rpn-cell" data-rpn>${item.rpn}</td>
+      <td class="fmea-ap-cell" data-ap>${apBadge(item.ap)}</td>
+      <td class="fmea-action-cell">
+        <button type="button" class="fmea-delete-btn" data-action="delete" title="删除">🗑️</button>
+      </td>
+    </tr>
+    ${renderDetailRow(item, expanded)}
+  `;
+}
+
+function renderDetailRow(item, expanded) {
+  const newApBadge = item.newAp
+    ? apBadge(item.newAp)
+    : html`<span class="ap-badge ap-l">-</span>`;
+  return html`
+    <tr data-id="${item.id}" class="fmea-detail-row" style="display: ${expanded ? "table-row" : "none"};">
+      <td colspan="10">
+        <div class="fmea-detail-grid">
+          <div class="fmea-detail-item">
+            <label>失效后果</label>
+            <input type="text" class="item-input" data-field="effect" .value=${live(item.effect ?? "")} placeholder="失效后果" />
+          </div>
+          <div class="fmea-detail-item">
+            <label>失效原因</label>
+            <input type="text" class="item-input" data-field="cause" .value=${live(item.cause ?? "")} placeholder="失效原因" />
+          </div>
+          <div class="fmea-detail-item">
+            <label>现行控制 - 预防</label>
+            <input type="text" class="item-input" data-field="controlPrevention" .value=${live(item.controlPrevention ?? "")} placeholder="预防控制" />
+          </div>
+          <div class="fmea-detail-item">
+            <label>现行控制 - 探测</label>
+            <input type="text" class="item-input" data-field="controlDetection" .value=${live(item.controlDetection ?? "")} placeholder="探测控制" />
+          </div>
+          <div class="fmea-detail-item">
+            <label>建议措施</label>
+            <input type="text" class="item-input" data-field="action" .value=${live(item.action ?? "")} placeholder="建议措施" />
+          </div>
+          <div class="fmea-detail-item">
+            <label>责任部门/人 · 目标完成日期</label>
+            <div class="fmea-detail-pair">
+              <input type="text" class="item-input" data-field="responsible" .value=${live(item.responsible ?? "")} placeholder="责任部门/人" />
+              <input type="date" class="item-input" data-field="targetDate" .value=${live(item.targetDate ?? "")} />
+            </div>
+          </div>
+          <div class="fmea-detail-item fmea-detail-result">
+            <label>措施结果（S新 / O新 / D新 → RPN新 / AP新）</label>
+            <div class="fmea-detail-result-row">
+              <input type="number" class="item-input fmea-num-input" data-field="newSeverity" .value=${live(String(item.newSeverity))} min="0" max="10" placeholder="S新" />
+              <input type="number" class="item-input fmea-num-input" data-field="newOccurrence" .value=${live(String(item.newOccurrence))} min="0" max="10" placeholder="O新" />
+              <input type="number" class="item-input fmea-num-input" data-field="newDetection" .value=${live(String(item.newDetection))} min="0" max="10" placeholder="D新" />
+              <span class="fmea-detail-arrow">→</span>
+              <span class="fmea-detail-rpn" data-new-rpn>${item.newRpn || "-"}</span>
+              <span class="fmea-detail-ap" data-new-ap>${newApBadge}</span>
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+function renderPage(container) {
+  const items = getFilteredItems();
+  let displayIndex = 0;
+
+  const template = html`
+    <div class="module-page fmea-page">
+      <div class="module-header">
+        <h2>FMEA</h2>
+        <p>失效模式与影响分析（Failure Mode and Effects Analysis）</p>
+      </div>
+      <div class="module-content">
+        <div class="fmea-toolbar">
+          <div class="fmea-tabs">
+            <button type="button" class="fmea-tab ${fmeaData.type === 'DFMEA' ? 'active' : ''}" data-type="DFMEA" @click=${(e) => handleTabClick(container, e)}>DFMEA</button>
+            <button type="button" class="fmea-tab ${fmeaData.type === 'PFMEA' ? 'active' : ''}" data-type="PFMEA" @click=${(e) => handleTabClick(container, e)}>PFMEA</button>
+          </div>
+          <div class="fmea-toolbar-right">
+            <div class="fmea-filter">
+              <label class="filter-label">AP 筛选</label>
+              <select class="fmea-filter-select" id="fmea-ap-filter" @change=${(e) => handleFilterChange(container, e)}>
+                <option value="all" ${currentFilter === 'all' ? 'selected' : ''}>全部</option>
+                <option value="H" ${currentFilter === 'H' ? 'selected' : ''}>H - 高</option>
+                <option value="M" ${currentFilter === 'M' ? 'selected' : ''}>M - 中</option>
+                <option value="L" ${currentFilter === 'L' ? 'selected' : ''}>L - 低</option>
+              </select>
+            </div>
+            <button type="button" class="btn-icon" id="fmea-inherit-template" @click=${() => handleInheritFromTemplate(container)}>
+              <span>📋</span>
+              <span class="btn-text">从模板继承</span>
+            </button>
+            <button type="button" class="btn-icon" id="fmea-add-row" @click=${() => handleAddRow(container)}>
+              <span>➕</span>
+              <span class="btn-text">添加行</span>
+            </button>
+            <button type="button" class="btn-icon" id="fmea-export-csv" @click=${exportCsv}>
+              <span>📤</span>
+              <span class="btn-text">导出 CSV</span>
+            </button>
+          </div>
+        </div>
+        <div class="fmea-table-container table-wrap">
+          <table class="data-table fmea-table">
+            <thead>
+              <tr>
+                <th style="width: 40px;"></th>
+                <th style="width: 50px;">序号</th>
+                <th style="min-width: 160px;">功能/要求</th>
+                <th style="min-width: 160px;">失效模式</th>
+                <th style="width: 70px;">S<span class="help-icon" data-tooltip="严重度(S): 失效后果严重程度，10=危及安全，1=轻微">?</span></th>
+                <th style="width: 70px;">O<span class="help-icon" data-tooltip="发生度(O): 失效发生频率，10=几乎必然发生，1=极不可能">?</span></th>
+                <th style="width: 70px;">D<span class="help-icon" data-tooltip="探测度(D): 现行控制探测失效的能力，10=无法探测，1=肯定能探测">?</span></th>
+                <th style="width: 70px;">RPN</th>
+                <th style="width: 70px;">AP</th>
+                <th style="width: 70px;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="fmea-table-body">
+              ${items.map((item) => {
+                displayIndex++;
+                return renderMainRow(item, displayIndex - 1);
+              })}
+            </tbody>
+          </table>
+          <div class="fmea-empty-state empty-state" id="fmea-empty-state" style="display: ${items.length === 0 ? 'block' : 'none'};">
+            <div class="empty-icon">📋</div>
+            <h3>暂无 FMEA 数据</h3>
+            <p>点击「添加行」按钮开始创建您的第一个 FMEA 条目。</p>
+            <button type="button" class="btn-primary" id="fmea-empty-add-btn" @click=${() => handleAddRow(container)}>添加第一行</button>
+          </div>
+        </div>
+      </div>
+      <div class="fmea-rating-panel" id="fmea-rating-panel" style="display: none;">
+        <div class="rating-panel-header">
+          <span class="rating-panel-title">评分标准</span>
+          <button type="button" class="rating-panel-close">×</button>
+        </div>
+        <div class="rating-panel-content" id="rating-panel-content">
+        </div>
+      </div>
+    </div>
+  `;
+
+  litRender(template, container);
+}
+
+function bindEvents(container) {
+  const tbody = container.querySelector("#fmea-table-body");
+  if (tbody) {
+    tbody.addEventListener("input", (e) => handleFieldInput(container, e));
+    tbody.addEventListener("click", (e) => {
+      handleToggleRow(container, e);
+      handleDeleteClick(container, e);
+      handleRatingInputClick(container, e);
+    });
+  }
+
+  const ratingPanel = container.querySelector("#fmea-rating-panel");
+  if (ratingPanel) {
+    ratingPanel.addEventListener("click", (e) => {
+      handleRatingClick(container, e);
+      handleRatingPanelClose(container, e);
+    });
+  }
+
+  document.addEventListener("click", handleDocumentClick);
+}
+
+export function init(model, onSave) {
+  currentModel = model;
+  onSaveCallback = onSave;
+}
+
+export function render(container, model) {
+  currentModel = model;
+
+  fmeaData = model?.modules?.fmea || { items: [], type: "DFMEA" };
+  if (!fmeaData.items) fmeaData.items = [];
+  if (!fmeaData.type) fmeaData.type = "DFMEA";
+
+  currentFilter = "all";
+
+  fmeaData.items.forEach((item) => updateItemCalculations(item));
+
+  renderPage(container);
+  bindEvents(container);
 }
