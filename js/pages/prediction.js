@@ -8,6 +8,7 @@ let currentModel = null;
 let predictionData = null;
 let activePredTab = "prediction";
 let allocationData = null;
+let predFormulaExpanded = false;
 // 同步标志，防止预测侧与分配侧双向同步时循环触发事件
 let isSyncing = false;
 
@@ -2312,6 +2313,57 @@ function renderTemplate(container) {
                   <div class="pred-chart-container">
                     <canvas id="pred-bar-canvas" width="400" height="200"></canvas>
                   </div>
+                </div>
+
+                <div class="b10-formula-section">
+                  <button type="button" class="formula-toggle" id="pred-formula-toggle" @click=${() => { predFormulaExpanded = !predFormulaExpanded; doRender(container); }}>${predFormulaExpanded ? ' 收起公式' : '📐 查看计算公式'}</button>
+                  ${predFormulaExpanded ? html`
+                    <div class="formula-content formula-grid" id="pred-formula-content">
+                      <div class="formula-item">
+                        <h4>工作失效率</h4>
+                        <div class="formula-equation">λ<sub>op</sub> = λ<sub>b</sub> × π<sub>T</sub> × π<sub>S</sub> × π<sub>Q</sub> × N</div>
+                      </div>
+                      <div class="formula-item">
+                        <h4>温度系数 π<sub>T</sub></h4>
+                        <div class="formula-equation">π<sub>T</sub> = exp[E<sub>a</sub>/k × (1/T<sub>ref</sub> - 1/T<sub>op</sub>)]</div>
+                      </div>
+                      <div class="formula-item">
+                        <h4>系统失效率（串联）</h4>
+                        <div class="formula-equation">λ<sub>s</sub> = Σ λ<sub>op,i</sub></div>
+                      </div>
+                      <div class="formula-item">
+                        <h4>系统 MTBF</h4>
+                        <div class="formula-equation">MTBF = 1 / λ<sub>s</sub></div>
+                      </div>
+                      <div class="formula-item">
+                        <h4>等效特征寿命 η</h4>
+                        <div class="formula-equation">η = MTBF / Γ(1 + 1/β)</div>
+                      </div>
+                      <div class="formula-item">
+                        <h4>等效 B10 寿命</h4>
+                        <div class="formula-equation">B10 = η × [ln(10/9)]<sup>1/β</sup></div>
+                      </div>
+                      <div class="formula-item">
+                        <h4>t 时刻可靠度</h4>
+                        <div class="formula-equation">R(t) = exp(-λ<sub>s</sub> × t)</div>
+                      </div>
+                      <div class="formula-item formula-item-wide">
+                        <h4>计算流程</h4>
+                        <div class="formula-equation" style="text-align: left; font-size: 0.88rem;">
+                          各零件 λ<sub>b</sub> → 乘以修正系数得 λ<sub>op</sub> → 求和得 λ<sub>s</sub> → 反算 MTBF → Weibull 转换得 η → 反算等效 B10
+                        </div>
+                        <div class="formula-vars-inline" style="margin-top: 0.5rem;">
+                          <span class="var-chip"><b>λ<sub>b</sub></b>基础失效率</span>
+                          <span class="var-chip"><b>π<sub>T</sub></b>温度系数</span>
+                          <span class="var-chip"><b>π<sub>S</sub></b>应力系数</span>
+                          <span class="var-chip"><b>π<sub>Q</sub></b>质量系数</span>
+                          <span class="var-chip"><b>N</b>数量</span>
+                          <span class="var-chip"><b>E<sub>a</sub></b>激活能(eV)</span>
+                          <span class="var-chip"><b>β</b>形状参数</span>
+                        </div>
+                      </div>
+                    </div>
+                  ` : ''}
                 </div>
               </div>
             </div>
