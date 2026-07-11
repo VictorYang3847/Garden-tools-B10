@@ -2750,13 +2750,19 @@ textarea.form-input {
   gap: 1rem;
 }
 
+.pred-left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
 .pred-diagram-card,
 .pred-results-card {
   margin-bottom: 0;
 }
 
 .pred-formula-card {
-  margin-top: 1rem;
+  margin-top: 0;
 }
 
 .pred-formula-card .card-header {

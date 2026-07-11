@@ -1297,6 +1297,18 @@ function bindEvents(container) {
   const calculateBtn = container.querySelector("#pred-calculate");
   calculateBtn.addEventListener("click", () => handleCalculate(container));
 
+  const predFormulaToggle = container.querySelector("#pred-formula-toggle");
+  if (predFormulaToggle) {
+    predFormulaToggle.addEventListener("click", () => {
+      const body = container.querySelector("#pred-formula-body");
+      if (body) {
+        const isHidden = body.style.display === "none";
+        body.style.display = isHidden ? "block" : "none";
+        predFormulaToggle.textContent = isHidden ? "收起" : "📐 展开公式";
+      }
+    });
+  }
+
   // 注册表导入按钮（预计）
   const importPredBtn = container.querySelector("#pred-import-registry");
   if (importPredBtn) {
@@ -2236,13 +2248,84 @@ function renderTemplate(container) {
           </div>
 
           <div class="pred-bottom-grid">
-            <div class="card pred-diagram-card">
-              <div class="card-header">
-                <h3>系统结构示意图</h3>
+            <div class="pred-left-col">
+              <div class="card pred-diagram-card">
+                <div class="card-header">
+                  <h3>系统结构示意图</h3>
+                </div>
+                <div class="card-body">
+                  <div class="pred-diagram-container" id="pred-diagram-container">
+                    <canvas id="pred-diagram-canvas" width="500" height="200"></canvas>
+                  </div>
+                </div>
               </div>
-              <div class="card-body">
-                <div class="pred-diagram-container" id="pred-diagram-container">
-                  <canvas id="pred-diagram-canvas" width="500" height="200"></canvas>
+
+              <div class="card pred-formula-card">
+                <div class="card-header">
+                  <h3>计算公式与原理说明</h3>
+                  <button type="button" class="formula-toggle" id="pred-formula-toggle">📐 展开公式</button>
+                </div>
+                <div class="card-body pred-formula-body" id="pred-formula-body" style="display: none;">
+                  <div class="formula-content formula-grid" id="pred-formula-content">
+                    <div class="formula-item">
+                      <h4>① 工作失效率</h4>
+                      <div class="formula-equation">λ<sub>op</sub> = λ<sub>b</sub> × π<sub>T</sub> × π<sub>S</sub> × π<sub>Q</sub> × N</div>
+                    </div>
+                    <div class="formula-item">
+                      <h4>② 温度系数</h4>
+                      <div class="formula-equation">π<sub>T</sub> = exp[E<sub>a</sub>/k × (1/T<sub>ref</sub> - 1/T<sub>op</sub>)]</div>
+                    </div>
+                    <div class="formula-item">
+                      <h4>③ 系统失效率（串联）</h4>
+                      <div class="formula-equation">λ<sub>s</sub> = Σ λ<sub>op,i</sub></div>
+                    </div>
+                    <div class="formula-item">
+                      <h4>④ 系统 MTBF</h4>
+                      <div class="formula-equation">MTBF = 1 / λ<sub>s</sub></div>
+                    </div>
+                    <div class="formula-item">
+                      <h4>⑤ 等效特征寿命 η</h4>
+                      <div class="formula-equation">η = MTBF / Γ(1 + 1/β)</div>
+                    </div>
+                    <div class="formula-item">
+                      <h4>⑥ 等效 B10 寿命</h4>
+                      <div class="formula-equation">B10 = η × [ln(10/9)]<sup>1/β</sup></div>
+                    </div>
+                    <div class="formula-item">
+                      <h4>⑦ t 时刻可靠度</h4>
+                      <div class="formula-equation">R(t) = exp(-λ<sub>s</sub> × t)</div>
+                    </div>
+                    <div class="formula-item">
+                      <h4>⑧ 失效率 ↔ B10 转换</h4>
+                      <div class="formula-equation">λ = ln(10/9) / B10 × 10⁶</div>
+                    </div>
+                    <div class="formula-item formula-item-wide">
+                      <h4>计算流程</h4>
+                      <div class="formula-equation" style="text-align: left; font-size: 0.88rem;">
+                        各零件 λ<sub>b</sub> → 乘以修正系数得 λ<sub>op</sub> → 求和得 λ<sub>s</sub> → 反算 MTBF → Weibull 转换得 η → 反算等效 B10
+                      </div>
+                      <div class="formula-vars-inline" style="margin-top: 0.5rem;">
+                        <span class="var-chip"><b>λ<sub>b</sub></b>基础失效率</span>
+                        <span class="var-chip"><b>π<sub>T</sub></b>温度系数</span>
+                        <span class="var-chip"><b>π<sub>S</sub></b>应力系数</span>
+                        <span class="var-chip"><b>π<sub>Q</sub></b>质量系数</span>
+                        <span class="var-chip"><b>N</b>数量</span>
+                        <span class="var-chip"><b>E<sub>a</sub></b>激活能(eV)</span>
+                        <span class="var-chip"><b>β</b>形状参数</span>
+                      </div>
+                    </div>
+                    <div class="formula-item formula-item-wide">
+                      <h4>失效率与 B10 寿命的关系</h4>
+                      <div class="formula-explanation">
+                        <p><b>B10 寿命</b>是指产品累积失效概率达到 10% 时对应的工作时间，即此时可靠度 R = 90%。它是工程中衡量产品寿命的常用指标，尤其在机械和机电产品中广泛使用。</p>
+                        <p><b>失效率 λ</b>是单位时间内发生失效的概率。在指数分布假设下，失效率恒定，此时 MTBF = 1/λ，且 B10 与 λ 有直接关系：</p>
+                        <div class="formula-equation" style="margin: 0.5rem 0;">B10 = -ln(0.9) / λ ≈ 0.10536 / λ</div>
+                        <p>在本工具中，系统等效 B10 的计算更为精确：先通过各零件失效率求和得到系统失效率 λ<sub>s</sub>，反算出 MTBF，再利用 <b>Weibull 分布</b>（形状参数 β）将 MTBF 转换为特征寿命 η，最后由 η 反算 B10。</p>
+                        <p>当 β = 1（随机失效）时，B10 = MTBF × ln(10/9) ≈ MTBF × 0.10536，与指数分布一致；当 β > 1（磨损失效）时，B10 会小于 MTBF × 0.10536，反映了耗损失效集中在后期的特点。</p>
+                        <p><b>简言之</b>：零件失效率越低 → 系统失效率越低 → MTBF 越长 → 等效 B10 寿命越长。反之，B10 寿命要求越高，对零件失效率的要求也越苛刻。</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2316,77 +2399,6 @@ function renderTemplate(container) {
                 </div>
               </div>
             </div>
-          </div>
-
-          <div class="card pred-formula-card">
-            <div class="card-header">
-              <h3>计算公式与原理说明</h3>
-              <button type="button" class="formula-toggle" id="pred-formula-toggle" @click=${() => { predFormulaExpanded = !predFormulaExpanded; renderTemplate(container); }}>${predFormulaExpanded ? ' 收起' : '📐 展开公式'}</button>
-            </div>
-            ${predFormulaExpanded ? html`
-              <div class="card-body">
-                <div class="formula-content formula-grid" id="pred-formula-content">
-                  <div class="formula-item">
-                    <h4>① 工作失效率</h4>
-                    <div class="formula-equation">λ<sub>op</sub> = λ<sub>b</sub> × π<sub>T</sub> × π<sub>S</sub> × π<sub>Q</sub> × N</div>
-                  </div>
-                  <div class="formula-item">
-                    <h4>② 温度系数</h4>
-                    <div class="formula-equation">π<sub>T</sub> = exp[E<sub>a</sub>/k × (1/T<sub>ref</sub> - 1/T<sub>op</sub>)]</div>
-                  </div>
-                  <div class="formula-item">
-                    <h4>③ 系统失效率（串联）</h4>
-                    <div class="formula-equation">λ<sub>s</sub> = Σ λ<sub>op,i</sub></div>
-                  </div>
-                  <div class="formula-item">
-                    <h4>④ 系统 MTBF</h4>
-                    <div class="formula-equation">MTBF = 1 / λ<sub>s</sub></div>
-                  </div>
-                  <div class="formula-item">
-                    <h4>⑤ 等效特征寿命 η</h4>
-                    <div class="formula-equation">η = MTBF / Γ(1 + 1/β)</div>
-                  </div>
-                  <div class="formula-item">
-                    <h4>⑥ 等效 B10 寿命</h4>
-                    <div class="formula-equation">B10 = η × [ln(10/9)]<sup>1/β</sup></div>
-                  </div>
-                  <div class="formula-item">
-                    <h4>⑦ t 时刻可靠度</h4>
-                    <div class="formula-equation">R(t) = exp(-λ<sub>s</sub> × t)</div>
-                  </div>
-                  <div class="formula-item">
-                    <h4>⑧ 失效率 ↔ B10 转换</h4>
-                    <div class="formula-equation">λ = ln(10/9) / B10 × 10⁶</div>
-                  </div>
-                  <div class="formula-item formula-item-wide">
-                    <h4>计算流程</h4>
-                    <div class="formula-equation" style="text-align: left; font-size: 0.88rem;">
-                      各零件 λ<sub>b</sub> → 乘以修正系数得 λ<sub>op</sub> → 求和得 λ<sub>s</sub> → 反算 MTBF → Weibull 转换得 η → 反算等效 B10
-                    </div>
-                    <div class="formula-vars-inline" style="margin-top: 0.5rem;">
-                      <span class="var-chip"><b>λ<sub>b</sub></b>基础失效率</span>
-                      <span class="var-chip"><b>π<sub>T</sub></b>温度系数</span>
-                      <span class="var-chip"><b>π<sub>S</sub></b>应力系数</span>
-                      <span class="var-chip"><b>π<sub>Q</sub></b>质量系数</span>
-                      <span class="var-chip"><b>N</b>数量</span>
-                      <span class="var-chip"><b>E<sub>a</sub></b>激活能(eV)</span>
-                      <span class="var-chip"><b>β</b>形状参数</span>
-                    </div>
-                  </div>
-                  <div class="formula-item formula-item-wide">
-                    <h4>失效率与 B10 寿命的关系</h4>
-                    <div class="formula-explanation">
-                      <p><b>B10 寿命</b>是指产品累积失效概率达到 10% 时对应的工作时间，即此时可靠度 R = 90%。它是工程中衡量产品寿命的常用指标，尤其在机械和机电产品中广泛使用。</p>
-                      <p><b>失效率 λ</b>是单位时间内发生失效的概率。在指数分布假设下，失效率恒定，此时 MTBF = 1/λ，且 B10 与 λ 有直接关系：</p>
-                      <div class="formula-equation" style="margin: 0.5rem 0;">B10 = -ln(0.9) / λ ≈ 0.10536 / λ</div>
-                      <p>在本工具中，系统等效 B10 的计算更为精确：先通过各零件失效率求和得到系统失效率 λ<sub>s</sub>，反算出 MTBF，再利用 <b>Weibull 分布</b>（形状参数 β）将 MTBF 转换为特征寿命 η，最后由 η 反算 B10。</p>
-                      <p>当 β = 1（随机失效）时，B10 = MTBF × ln(10/9) ≈ MTBF × 0.10536，与指数分布一致；当 β > 1（磨损失效）时，B10 会小于 MTBF × 0.10536，反映了耗损失效集中在后期的特点。</p>
-                      <p><b>简言之</b>：零件失效率越低 → 系统失效率越低 → MTBF 越长 → 等效 B10 寿命越长。反之，B10 寿命要求越高，对零件失效率的要求也越苛刻。</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ` : ''}
           </div>
 
           <div class="component-library-modal" id="component-library-modal" style="display: none;">
