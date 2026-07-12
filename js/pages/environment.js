@@ -1,5 +1,6 @@
 import { html, render as litRender } from 'lit-html';
 import { genId } from "../store.js";
+import { formatDecimal } from '../utils.js';
 
 const title = "环境适应性分析";
 const description = "环境应力筛选、温度循环分析、振动分析与环境试验标准查询";
@@ -703,7 +704,7 @@ function updateThermalResults(container, tc) {
   if (deltaTEl) deltaTEl.textContent = tc.deltaT ? tc.deltaT.toFixed(1) : "—";
   if (cycleDamageEl) cycleDamageEl.textContent = tc.cycleDamage ? tc.cycleDamage.toExponential(2) : "—";
   if (totalDamageEl) {
-    totalDamageEl.textContent = tc.totalDamage ? tc.totalDamage.toFixed(4) : "—";
+    totalDamageEl.textContent = tc.totalDamage ? formatDecimal(tc.totalDamage, 2) : "—";
     totalDamageEl.classList.remove("pass", "fail");
     if (tc.totalDamage > 0) {
       totalDamageEl.classList.add(tc.totalDamage < 1 ? "pass" : "fail");
@@ -716,13 +717,13 @@ function updateThermalResults(container, tc) {
     statusBanner.style.display = "";
     if (tc.totalDamage < 0.3) {
       statusBanner.className = "status-banner pass";
-      statusBanner.textContent = `累积损伤 ${tc.totalDamage.toFixed(4)}，远低于 1.0，寿命裕度充足。`;
+      statusBanner.textContent = `累积损伤 ${formatDecimal(tc.totalDamage, 2)}，远低于 1.0，寿命裕度充足。`;
     } else if (tc.totalDamage < 1) {
       statusBanner.className = "status-banner pass";
-      statusBanner.textContent = `累积损伤 ${tc.totalDamage.toFixed(4)}，低于 1.0，满足要求。`;
+      statusBanner.textContent = `累积损伤 ${formatDecimal(tc.totalDamage, 2)}，低于 1.0，满足要求。`;
     } else {
       statusBanner.className = "status-banner fail";
-      statusBanner.textContent = `累积损伤 ${tc.totalDamage.toFixed(4)}，已超过 1.0，存在失效风险！`;
+      statusBanner.textContent = `累积损伤 ${formatDecimal(tc.totalDamage, 2)}，已超过 1.0，存在失效风险！`;
     }
   } else if (statusBanner) {
     statusBanner.style.display = "none";
@@ -907,7 +908,7 @@ function updateVibrationResults(container, vib) {
     stressEl.textContent = vib.stressLevel || "—";
   }
   if (fatigueEl) {
-    fatigueEl.textContent = vib.fatigueDamage ? vib.fatigueDamage.toFixed(4) : "—";
+    fatigueEl.textContent = vib.fatigueDamage ? formatDecimal(vib.fatigueDamage, 2) : "—";
   }
   if (suggestedEl) {
     suggestedEl.textContent = vib.suggestedLevel || "—";

@@ -1,6 +1,6 @@
 import { html, render as litRender } from 'lit-html';
 import { genId } from "../store.js";
-import { fmt, pct, toast } from "../utils.js";
+import { fmt, pct, toast, formatDecimal } from "../utils.js";
 
 let currentModel = null;
 let onSaveCallback = null;
@@ -1150,7 +1150,7 @@ function renderResults() {
           <tr>
             <td>${idx + 1}</td>
             <td>${escapeHtml(item.name)}</td>
-            <td>${item.structural.toFixed(4)}</td>
+            <td>${formatDecimal(item.structural, 2)}</td>
             <td>${item.probability.toExponential(2)}</td>
           </tr>
         `;

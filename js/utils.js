@@ -1,4 +1,4 @@
-﻿export function escapeHtml(str) {
+export function escapeHtml(str) {
   if (typeof str !== 'string') return String(str);
   return str
     .replace(/&/g, '&amp;')
@@ -16,6 +16,11 @@ export function fmt(n, digits = 1) {
 export function pct(n, digits = 2) {
   if (!Number.isFinite(n)) return "—";
   return (n * 100).toFixed(digits) + "%";
+}
+
+export function formatDecimal(num, maxDecimals) {
+  if (num == null || isNaN(num)) return num;
+  return Number(parseFloat(Number(num).toFixed(maxDecimals))).toString();
 }
 
 export function toast(el, message, duration = 2000) {

@@ -2,6 +2,7 @@ import { html, render as litRender } from 'lit-html';
 import { live } from 'lit-html/directives/live.js';
 import { getCustomComponentLibrary, setCustomComponentLibrary, getHomeB10, getCurrentProduct, getProductShared, getComponents, ensureComponentRegistered } from "../store.js";
 import { gammaApprox, K10 } from "../calculator.js";
+import { formatDecimal } from '../utils.js';
 
 let onSaveCallback = null;
 let currentModel = null;
@@ -249,10 +250,10 @@ function renderComponentRow(item, index, container) {
       <td><input type="number" class="item-input pred-num-input" data-field="quantity" .value=${live(String(item.quantity))} min="1" step="1" @input=${(e) => handleInputChange(container, e)} /></td>
       <td><input type="number" class="item-input pred-num-input" data-field="lambdaBase" .value=${live(String(item.lambdaBase))} min="0" step="0.01" @input=${(e) => handleInputChange(container, e)} /></td>
       <td><input type="number" class="item-input pred-num-input" data-field="temperature" .value=${live(String(item.temperature))} step="1" @input=${(e) => handleInputChange(container, e)} /></td>
-      <td class="pred-factor-cell">${item.piT?.toFixed(3) || "-"}</td>
+      <td class="pred-factor-cell">${item.piT != null ? formatDecimal(item.piT, 2) : "-"}</td>
       <td><input type="number" class="item-input pred-num-input" data-field="piS" .value=${live(String(item.piS))} min="0" step="0.1" @input=${(e) => handleInputChange(container, e)} /></td>
       <td><input type="number" class="item-input pred-num-input" data-field="piQ" .value=${live(String(item.piQ))} min="0" step="0.1" @input=${(e) => handleInputChange(container, e)} /></td>
-      <td class="pred-lambda-cell">${(item.lambdaOp)?.toFixed(4) || "-"}</td>
+      <td class="pred-lambda-cell">${item.lambdaOp != null ? formatDecimal(item.lambdaOp, 2) : "-"}</td>
       <td class="pred-action-cell">
         <button type="button" class="pred-delete-btn" @click=${(e) => handleDeleteClick(container, e, item.id)} title="删除">🗑️</button>
       </td>
@@ -302,8 +303,8 @@ function updateComponentCalculations(component) {
 function updateRowDisplay(tr, component) {
   const piTCell = tr.querySelector(".pred-factor-cell");
   const lambdaOpCell = tr.querySelector(".pred-lambda-cell");
-  if (piTCell) piTCell.textContent = component.piT.toFixed(3);
-  if (lambdaOpCell) lambdaOpCell.textContent = (component.lambdaOp).toFixed(4);
+  if (piTCell) piTCell.textContent = formatDecimal(component.piT, 2);
+  if (lambdaOpCell) lambdaOpCell.textContent = formatDecimal(component.lambdaOp, 2);
 }
 
 function handleInputChange(container, e) {
@@ -427,7 +428,7 @@ function handleMissionTimeChange(container, e) {
   const reliability = calcReliability(t);
   const reliabilityEl = container.querySelector("#pred-reliability-value");
   if (reliabilityEl) {
-    reliabilityEl.textContent = (reliability * 100).toFixed(4) + "%";
+    reliabilityEl.textContent = formatDecimal(reliability * 100, 2) + "%";
   }
   saveData();
 }
@@ -456,8 +457,8 @@ function updateResults(container) {
   const reliabilityEl = container.querySelector("#pred-reliability-value");
   const missionTimeInput = container.querySelector("#pred-mission-time");
 
-  if (totalLambdaEl) totalLambdaEl.textContent = (totalLambda).toFixed(4);
-  if (sysLambdaEl) sysLambdaEl.textContent = (sysLambda).toFixed(4);
+  if (totalLambdaEl) totalLambdaEl.textContent = formatDecimal(totalLambda, 2);
+  if (sysLambdaEl) sysLambdaEl.textContent = formatDecimal(sysLambda, 2);
   if (mtbfHoursEl) {
     mtbfHoursEl.textContent = mtbfHours > 0 ? formatNumber(mtbfHours) : "-";
   }
@@ -465,7 +466,7 @@ function updateResults(container) {
     mtbfYearsEl.textContent = mtbfYears > 0 ? mtbfYears.toFixed(2) : "-";
   }
   if (reliabilityEl) {
-    reliabilityEl.textContent = (reliability * 100).toFixed(4) + "%";
+    reliabilityEl.textContent = formatDecimal(reliability * 100, 2) + "%";
   }
   if (missionTimeInput && !missionTimeInput.matches(":focus")) {
     missionTimeInput.value = missionTime;
@@ -931,7 +932,7 @@ function renderComponentLibrary(container) {
         </div>
         <div class="lib-comp-lambda">
           <span class="lambda-label">λb</span>
-          <span class="lambda-value">${(comp.lambdaBase).toFixed(4)}</span>
+          <span class="lambda-value">${formatDecimal(comp.lambdaBase, 2)}</span>
           <span class="lambda-unit">10⁻⁶/h</span>
         </div>
         ${comp.desc ? `<div class="lib-comp-desc">${escapeHtml(comp.desc)}</div>` : ''}
@@ -1073,7 +1074,7 @@ function renderRegistryImportList(container) {
   listEl.innerHTML = components.map(comp => {
     const categoryLabel = COMPONENT_CATEGORY_LABELS[comp.category] || comp.category || '其他';
     const typeLabel = COMPONENT_TYPE_LABELS[comp.type] || comp.type || '其他';
-    const lambdaStr = comp.lambdaBase != null ? (comp.lambdaBase).toFixed(4) : '-';
+    const lambdaStr = comp.lambdaBase != null ? formatDecimal(comp.lambdaBase, 2) : '-';
     return `
       <div class="lib-component-card" data-comp-id="${comp.id}" title="点击添加">
         <div class="lib-comp-header">
@@ -2338,12 +2339,12 @@ function renderTemplate(container) {
                 <div class="metrics-grid">
                   <div class="metric-card">
                     <div class="metric-label">元器件总失效率 (Σλ)</div>
-                    <div class="metric-value" id="pred-total-lambda">${(getTotalLambda() / 1000).toFixed(4)}</div>
+                    <div class="metric-value" id="pred-total-lambda">${formatDecimal(getTotalLambda(), 2)}</div>
                     <div class="metric-unit">10⁻⁶/h</div>
                   </div>
                   <div class="metric-card">
                     <div class="metric-label">系统失效率 λs</div>
-                    <div class="metric-value" id="pred-sys-lambda">${(calcSystemLambda() / 1000).toFixed(4)}</div>
+                    <div class="metric-value" id="pred-sys-lambda">${formatDecimal(calcSystemLambda(), 2)}</div>
                     <div class="metric-unit">10⁻⁶/h</div>
                   </div>
                   <div class="metric-card">
@@ -2386,7 +2387,7 @@ function renderTemplate(container) {
                     </div>
                     <div class="form-group">
                       <label>可靠度 R(t)</label>
-                      <div class="readonly-value" id="pred-reliability-value">${(calcReliability(predictionData.missionTime) * 100).toFixed(4)}%</div>
+                      <div class="readonly-value" id="pred-reliability-value">${formatDecimal(calcReliability(predictionData.missionTime) * 100, 2)}%</div>
                     </div>
                   </div>
                 </div>
