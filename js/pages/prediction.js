@@ -2219,7 +2219,10 @@ function renderTemplate(container) {
             </div>
             <div class="card-body" style="padding: 0;">
               <div class="pred-table-container table-wrap">
-                <table class="data-table pred-table">
+                <table class="data-table pred-table resizable">
+                  <colgroup>
+                    <col><col><col><col><col><col><col><col><col><col><col>
+                  </colgroup>
                   <thead>
                     <tr>
                       <th style="width: 50px;">序号</th>
@@ -2232,7 +2235,7 @@ function renderTemplate(container) {
                       <th style="width: 90px;">π_S<span class="help-icon" data-tooltip="应力降额系数：实际工作应力与额定应力之比的相关因子。默认1.0，降额设计时<1.0，过载时>1.0">?</span></th>
                       <th style="width: 90px;">π_Q<span class="help-icon" data-tooltip="质量等级系数：反映元器件质量水平。军用级0.3~0.5，工业级1.0，民用级1.5~2.0">?</span></th>
                       <th style="width: 130px;">工作失效率(10⁻⁶/h)</th>
-                      <th style="width: 70px;">操作</th>
+                      <th style="width: 70px;" data-no-resize>操作</th>
                     </tr>
                   </thead>
                   <tbody id="pred-table-body">
@@ -2532,7 +2535,10 @@ function renderTemplate(container) {
             </div>
             <div class="card-body" style="padding: 0;">
               <div class="alloc-table-container table-wrap">
-                <table class="data-table alloc-table">
+                <table class="data-table alloc-table resizable">
+                  <colgroup>
+                    <col><col><col><col><col><col><col><col><col><col><col>
+                  </colgroup>
                   <thead>
                     <tr>
                       <th style="width: 50px;">序号</th>
@@ -2545,7 +2551,7 @@ function renderTemplate(container) {
                       <th style="width: 100px;">权重占比</th>
                       <th style="width: 120px;">分配 B10 (h)</th>
                       <th style="width: 140px;">失效率 λ(10⁻⁶/h)<span class="help-icon" data-tooltip="λ = ln(10/9) / B10 × 10⁶，单位：10⁻⁶/h">?</span></th>
-                      <th style="width: 70px;">操作</th>
+                      <th style="width: 70px;" data-no-resize>操作</th>
                     </tr>
                   </thead>
                   <tbody id="alloc-table-body">

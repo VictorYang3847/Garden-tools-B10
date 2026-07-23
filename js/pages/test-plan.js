@@ -3,6 +3,7 @@ import { live } from 'lit-html/directives/live.js';
 import { genId, getHomeB10, getCurrentProduct, getProductShared } from "../store.js";
 import { fmt, toast } from "../utils.js";
 import { gammaApprox, K10 } from "../calculator.js";
+import { initResizeForContainer } from "../column-resize.js";
 
 let currentModel = null;
 let onSaveCallback = null;
@@ -325,7 +326,10 @@ function htmlTemplate(container) {
             </div>
             <div class="card-body">
               <div class="table-wrap">
-                <table class="data-table test-items-table">
+                <table class="data-table test-items-table resizable">
+                  <colgroup>
+                    <col><col><col><col><col><col><col><col><col><col><col><col>
+                  </colgroup>
                   <thead>
                     <tr>
                       <th style="width: 40px;">#</th>
@@ -339,7 +343,7 @@ function htmlTemplate(container) {
                       <th style="width: 80px;">试验时长</th>
                       <th style="width: 80px;">截尾类型</th>
                       <th style="width: 15%;">台架条件</th>
-                      <th style="width: 50px;">操作</th>
+                      <th style="width: 50px;" data-no-resize>操作</th>
                     </tr>
                   </thead>
                   <tbody id="tp-items-tbody"></tbody>
@@ -376,7 +380,10 @@ function htmlTemplate(container) {
             </div>
             <div class="card-body">
               <div class="table-wrap">
-                <table class="data-table alt-table">
+                <table class="data-table alt-table resizable">
+                  <colgroup>
+                    <col><col><col><col><col><col><col><col><col><col><col><col>
+                  </colgroup>
                   <thead>
                     <tr>
                       <th style="width: 50px;">序号</th>
@@ -390,7 +397,7 @@ function htmlTemplate(container) {
                       <th style="width: 110px;">目标B10 (h)<span class="help-icon" data-tooltip="使用工况下的目标B10寿命，用于自动计算加速后所需测试时间">?</span></th>
                       <th style="width: 110px;">试验时长 (h)<span class="help-icon" data-tooltip="自动计算 = 目标B10 / 加速因子，可手动覆盖">?</span></th>
                       <th style="width: 90px;">样本量</th>
-                      <th style="width: 70px;">操作</th>
+                      <th style="width: 70px;" data-no-resize>操作</th>
                     </tr>
                   </thead>
                   <tbody id="tp-alt-tbody"></tbody>
@@ -463,7 +470,10 @@ function htmlTemplate(container) {
             </div>
             <div class="card-body">
               <div class="table-wrap">
-                <table class="data-table dvpr-table">
+                <table class="data-table dvpr-table resizable">
+                  <colgroup>
+                    <col><col><col><col><col><col><col><col><col>
+                  </colgroup>
                   <thead>
                     <tr>
                       <th style="width: 50px;">序号</th>
@@ -587,6 +597,12 @@ function switchTab(tabName) {
   });
   const tabEl = document.getElementById(`tp-tab-${tabName}`);
   if (tabEl) tabEl.style.display = "";
+
+  // Tab 切换后重新初始化列拖拽（隐藏 Tab 中的表格宽度为 0）
+  requestAnimationFrame(() => {
+    const mainContent = document.getElementById('main-content');
+    if (mainContent) initResizeForContainer(mainContent, 'test-plan');
+  });
 }
 
 function renderGlobalParams() {
@@ -1443,7 +1459,10 @@ function renderHaltSteps(test) {
 
   return `
   <div class="table-wrap">
-    <table class="data-table halt-steps-table">
+    <table class="data-table halt-steps-table resizable">
+      <colgroup>
+        <col><col><col><col><col><col><col>
+      </colgroup>
       <thead>
         <tr>
           <th style="width: 50px;">序号</th>
@@ -1452,7 +1471,7 @@ function renderHaltSteps(test) {
           <th style="width: 130px;">持续时间 (min)</th>
           <th style="width: 100px;">失效数</th>
           <th style="min-width: 180px;">失效描述</th>
-          <th style="width: 70px;">操作</th>
+          <th style="width: 70px;" data-no-resize>操作</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>

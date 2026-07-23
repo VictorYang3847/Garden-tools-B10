@@ -796,10 +796,13 @@ function renderPage(container) {
         </div>
         <div class="fmea-table-container table-wrap">
           ${renderComponentDatalist()}
-          <table class="data-table fmea-table">
+          <table class="data-table fmea-table resizable">
+            <colgroup>
+              <col><col><col><col><col><col><col><col><col><col>
+            </colgroup>
             <thead>
               <tr>
-                <th style="width: 40px;"></th>
+                <th style="width: 40px;" data-no-resize></th>
                 <th style="width: 50px;">序号</th>
                 <th style="min-width: 160px;">功能/要求</th>
                 <th style="min-width: 160px;">失效模式</th>
@@ -808,7 +811,7 @@ function renderPage(container) {
                 <th style="width: 70px;">D<span class="help-icon" data-tooltip="探测度(D): 现行控制探测失效的能力，10=无法探测，1=肯定能探测">?</span></th>
                 <th style="width: 70px;">RPN</th>
                 <th style="width: 70px;">AP</th>
-                <th style="width: 70px;">操作</th>
+                <th style="width: 70px;" data-no-resize>操作</th>
               </tr>
             </thead>
             <tbody id="fmea-table-body">

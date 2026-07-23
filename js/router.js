@@ -1,4 +1,5 @@
 ﻿import { html, render as litRender } from 'lit-html';
+import { initResizeForContainer, initGlobalDragHandler, destroyResize } from './column-resize.js';
 const routes = {
   home: {
     path: "home",
@@ -78,6 +79,9 @@ export function initRouter(options = {}) {
   servicesCallback = options.services || null;
 
   window.addEventListener("hashchange", handleHashChange);
+
+  // 初始化全局列拖拽处理器
+  initGlobalDragHandler(mainContent);
 
   if (!location.hash) {
     location.hash = `#/${defaultRoute}`;
@@ -164,6 +168,10 @@ async function renderRoute(routeKey) {
     if (typeof module.render === "function") {
       module.render(mainContent, model);
     }
+
+    // 初始化列拖拽调整宽度
+    destroyResize();
+    initResizeForContainer(mainContent, routeKey);
   } catch (err) {
     console.error('Failed to load module:', err);
     const safeMsg = (err?.message || '未知错误')

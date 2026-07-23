@@ -280,7 +280,10 @@ function renderComponentManager() {
                 <p class="empty-hint">各分析模块中输入的零部件也会自动注册到这里</p>
               </div>
             ` : html`
-              <table class="data-table component-table">
+              <table class="data-table component-table resizable">
+                <colgroup>
+                  <col><col><col><col><col><col><col>
+                </colgroup>
                 <thead>
                   <tr>
                     <th style="width:36px;">#</th>
@@ -289,7 +292,7 @@ function renderComponentManager() {
                     <th style="width:70px;">类型</th>
                     <th>描述</th>
                     <th style="width:40px;">引用</th>
-                    <th style="width:100px;" class="col-actions">操作</th>
+                    <th style="width:100px;" class="col-actions" data-no-resize>操作</th>
                   </tr>
                 </thead>
                 <tbody>

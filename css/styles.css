@@ -7587,3 +7587,66 @@ textarea.form-input {
     max-width: none;
   }
 }
+
+/* ========== 列拖拽调整宽度样式 ========== */
+
+/* resize-active 表格使用 fixed layout */
+.data-table.resize-active {
+  table-layout: fixed;
+}
+
+/* th 需要定位上下文以支持 ::after */
+.data-table.resize-active thead th {
+  position: relative;
+}
+
+/* 默认: 单元格内容溢出时省略号 */
+.data-table.resize-active td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 允许换行的列: td 上加 class="col-wrap" 或 th 上加 data-wrap */
+.data-table.resize-active td.col-wrap,
+.data-table.resize-active td[data-wrap] {
+  white-space: normal;
+  word-break: break-word;
+  text-overflow: clip;
+}
+
+/* 拖拽指示器 — th 右边缘竖线 */
+.data-table.resize-active thead th:not([data-no-resize])::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 3;
+  transition: background 0.15s ease;
+}
+
+/* hover 时指示器可见 */
+.data-table.resize-active thead th:not([data-no-resize]):hover::after {
+  background: var(--border, rgba(128, 128, 128, 0.3));
+}
+
+/* 拖拽中指示器高亮 */
+.data-table.resize-active thead th.resizing::after {
+  background: var(--accent, #3b9eff);
+  width: 2px;
+}
+
+/* 不可调整列无指示器 */
+.data-table.resize-active thead th[data-no-resize]::after {
+  display: none;
+}
+
+/* 拖拽中禁止文本选择 */
+body.resizing-active {
+  user-select: none;
+  cursor: col-resize !important;
+}

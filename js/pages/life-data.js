@@ -149,7 +149,10 @@ function renderDataEntryTabContent() {
         </div>
         <div class="card-body">
           <div class="table-wrap">
-            <table class="data-table">
+            <table class="data-table resizable">
+              <colgroup>
+                <col><col><col><col><col><col><col>
+              </colgroup>
               <thead>
                 <tr>
                   <th style="width: 50px;">序号</th>
@@ -158,7 +161,7 @@ function renderDataEntryTabContent() {
                   <th style="width: 150px;">零件</th>
                   <th style="min-width: 150px;">失效模式</th>
                   <th style="min-width: 180px;">备注</th>
-                  <th style="width: 70px;">操作</th>
+                  <th style="width: 70px;" data-no-resize>操作</th>
                 </tr>
               </thead>
               <tbody id="ld-items-tbody"></tbody>

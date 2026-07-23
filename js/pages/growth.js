@@ -177,7 +177,10 @@ function template() {
           </div>
           <div class="card-body" style="padding: 0;">
             <div class="growth-table-container table-wrap">
-              <table class="data-table growth-table">
+              <table class="data-table growth-table resizable">
+                <colgroup>
+                  <col><col><col><col><col><col><col><col>
+                </colgroup>
                 <thead>
                   <tr>
                     <th style="width: 60px;">序号</th>
@@ -187,7 +190,7 @@ function template() {
                     <th style="width: 130px;">累计时间 (h)</th>
                     <th style="width: 120px;">累计失效数</th>
                     <th style="width: 130px;">瞬时 MTBF (h)</th>
-                    <th style="width: 70px;">操作</th>
+                    <th style="width: 70px;" data-no-resize>操作</th>
                   </tr>
                 </thead>
                 <tbody id="growth-table-body">
